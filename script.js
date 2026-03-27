@@ -1,37 +1,5 @@
 // ==========================================
-// 📚 БАЗА ЗНАНИЙ (РЕДАКТИРУЙ ЭТОТ СПИСОК)
-// ==========================================
-const lessons = [
-    {
-        question: "Как переводится 'Вода'?",
-        correct: "Щив",
-        options: ["Щив", "Чурт", "Баркалл", "Хъирши"]
-    },
-    {
-        question: "Как переводится 'Хлеб'?",
-        correct: "Чурт",
-        options: ["Щив", "Чурт", "Нан", "Дук"]
-    },
-    {
-        question: "Выберите перевод для 'Спасибо'",
-        correct: "Баркалл",
-        options: ["Баркалл", "Ассаламу", "Щив", "Чурт"]
-    },
-    {
-        question: "Как будет 'Хорошо'?",
-        correct: "Хъирши",
-        options: ["Хъирши", "Яман", "Щив", "Дук"]
-    },
-    {
-        question: "Переведите 'Дом'",
-        correct: "Хъуна",
-        options: ["Хъуна", "Щив", "Чурт", "Кьан"]
-    }
-    // Чтобы добавить новый урок, скопируй блок {...}, вставь ниже и поменяй текст
-];
-
-// ==========================================
-// ⚙️ ЛОГИКА ПРИЛОЖЕНИЯ (НЕ МЕНЯЙ, ЕСЛИ НЕ ЗНАЕШЬ)
+// ⚙️ ЛОГИКА ПРИЛОЖЕНИЯ
 // ==========================================
 
 let currentLessonIndex = 0;
@@ -49,6 +17,12 @@ const totalStepsSpan = document.getElementById('total-steps');
 // Инициализация
 function initGame() {
     totalStepsSpan.textContent = lessons.length;
+    
+    if (lessons.length === 0) {
+        questionText.textContent = "База знаний пуста! Добавьте уроки в файл data.js";
+        return;
+    }
+    
     loadLesson();
 }
 
@@ -67,7 +41,7 @@ function loadLesson() {
     feedbackText.textContent = '';
     nextBtn.classList.add('hidden');
 
-    // Перемешиваем варианты ответов (чтобы правильный не всегда был первым)
+    // Перемешиваем варианты ответов
     const shuffledOptions = [...lesson.options].sort(() => Math.random() - 0.5);
 
     shuffledOptions.forEach(option => {
@@ -81,7 +55,6 @@ function loadLesson() {
 
 // Проверка ответа
 function checkAnswer(selected, correct, btnElement) {
-    // Блокируем все кнопки, чтобы нельзя было нажать дважды
     const allButtons = document.querySelectorAll('.option-btn');
     allButtons.forEach(btn => btn.disabled = true);
 
@@ -95,7 +68,6 @@ function checkAnswer(selected, correct, btnElement) {
         feedbackText.textContent = `Правильно было: ${correct} ❌`;
         feedbackText.style.color = '#ff4b4b';
         
-        // Подсветить правильный ответ
         allButtons.forEach(btn => {
             if (btn.textContent === correct) btn.classList.add('correct');
         });
