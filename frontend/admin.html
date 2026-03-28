@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Админка — LakLingo</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .admin-container { max-width: 700px; margin: 0 auto; }
+        .form-group { margin-bottom: 15px; text-align: left; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%; padding: 10px; border: 2px solid #e5e5e5;
+            border-radius: 8px; font-size: 14px; box-sizing: border-box;
+        }
+        .options-input { display: flex; gap: 10px; flex-wrap: wrap; }
+        .options-input input { flex: 1; min-width: 120px; }
+        .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
+        .btn-primary { background: #58cc02; color: white; }
+        .btn-danger { background: #ff4b4b; color: white; }
+        .btn-sm { padding: 5px 10px; font-size: 12px; }
+        .lesson-list { margin-top: 30px; text-align: left; }
+        .lesson-item { 
+            padding: 15px; border: 1px solid #e5e5e5; border-radius: 10px; 
+            margin-bottom: 10px; background: #fafafa;
+        }
+        .lesson-actions { margin-top: 10px; display: flex; gap: 10px; }
+        .hidden { display: none !important; }
+        #auth-screen-admin { text-align: center; padding: 40px 20px; }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Экран входа для админа -->
+        <div id="auth-screen-admin">
+            <h1>🔐 Админ-панель</h1>
+            <form id="admin-login-form" style="margin-top: 20px;">
+                <input type="text" id="admin-username" placeholder="Логин" required style="width: 100%; padding: 12px; margin: 10px 0;">
+                <input type="password" id="admin-password" placeholder="Пароль" required style="width: 100%; padding: 12px; margin: 10px 0;">
+                <button type="submit" class="btn btn-primary" style="width: 100%;">Войти</button>
+            </form>
+            <p id="admin-login-error" style="color: #ff4b4b; margin-top: 10px;"></p>
+            <a href="index.html" style="display: block; margin-top: 20px;">← Вернуться к игре</a>
+        </div>
+
+        <!-- Панель управления (скрыта до входа) -->
+        <div id="admin-panel" class="admin-container hidden">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2>➕ Добавить урок</h2>
+                <button id="admin-logout" class="btn btn-danger btn-sm">Выйти</button>
+            </div>
+
+            <form id="add-lesson-form">
+                <div class="form-group">
+                    <label>Вопрос (на русском):</label>
+                    <input type="text" id="lesson-question" required placeholder="Как переводится 'Вода'?">
+                </div>
+                
+                <div class="form-group">
+                    <label>Правильный ответ (на лакском):</label>
+                    <input type="text" id="lesson-correct" required placeholder="Щив">
+                </div>
+                
+                <div class="form-group">
+                    <label>Варианты ответов (4 штуки):</label>
+                    <div class="options-input">
+                        <input type="text" class="option-input" placeholder="Вариант 1" required>
+                        <input type="text" class="option-input" placeholder="Вариант 2" required>
+                        <input type="text" class="option-input" placeholder="Вариант 3" required>
+                        <input type="text" class="option-input" placeholder="Вариант 4" required>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Категория:</label>
+                    <select id="lesson-category">
+                        <option value="basics">Базовые слова</option>
+                        <option value="greetings">Приветствия</option>
+                        <option value="food">Еда</option>
+                        <option value="numbers">Числа</option>
+                        <option value="phrases">Фразы</option>
+                        <option value="general">Общее</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>Сложность:</label>
+                    <select id="lesson-difficulty">
+                        <option value="1">Легко</option>
+                        <option value="2">Средне</option>
+                        <option value="3">Сложно</option>
+                    </select>
+                </div>
+                
+                <button type="submit" class="btn btn-primary" style="width: 100%;">💾 Сохранить урок</button>
+            </form>
+            <p id="form-message" style="margin-top: 10px; font-weight: bold;"></p>
+
+            <!-- Список существующих уроков -->
+            <div class="lesson-list">
+                <h3>📚 Существующие уроки</h3>
+                <div id="lessons-container">Загрузка...</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="admin.js"></script>
+</body>
+</html>

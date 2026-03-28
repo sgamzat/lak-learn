@@ -1,9 +1,10 @@
+// backend/server.js
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { query } = require('./database');
+const { query } = require('./database'); // 👈 query — это наша dbQuery из database.js
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -11,7 +12,9 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// Middleware для проверки токена
+// ==========================================
+// 🔐 Middleware: проверка токена
+// ==========================================
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
@@ -24,7 +27,28 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
-// 📝 Регистрация
+// 🔐 Middleware: только для админов
+const requireAdmin = async (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+  if (!token) return res.sendStatus(401);
+
+  jwt.verify(token, process.env.JWT_SECRET, async (err, user) => {
+    if (err) return res.sendStatus(403);
+    
+    const dbUser = await query('SELECT is_admin FROM users WHERE id = $1', [user.id]);
+    if (!dbUser.rows[0]?.is_admin) {
+      return res.status(403).json({ error: 'Требуется права администратора' });
+    }
+    
+    req.user = user;
+    next();
+  });
+};
+
+// ==========================================
+// 👤 AUTH: Регистрация
+// ==========================================
 app.post('/api/register', async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -35,7 +59,6 @@ app.post('/api/register', async (req, res) => {
       [username, hash]
     );
     
-    // Создаём запись прогресса
     await query('INSERT INTO user_progress (user_id) VALUES ($1)', [result.rows[0].id]);
     
     res.json({ success: true, user: result.rows[0] });
@@ -48,7 +71,9 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-// 🔑 Логин
+// ==========================================
+// 🔑 AUTH: Логин
+// ==========================================
 app.post('/api/login', async (req, res) => {
   try {
     const { username, password } = req.body;
@@ -69,13 +94,23 @@ app.post('/api/login', async (req, res) => {
       expiresIn: '7d'
     });
     
-    res.json({ success: true, token, user: { id: user.id, username: user.username } });
+    res.json({ 
+  success: true, 
+  token, 
+  user: { 
+    id: user.id, 
+    username: user.username,
+    is_admin: user.is_admin  // 👈 Добавили
+  } 
+});
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// 📊 Получить прогресс
+// ==========================================
+// 📊 PROGRESS: Получить прогресс
+// ==========================================
 app.get('/api/progress', authenticateToken, async (req, res) => {
   try {
     const result = await query('SELECT current_lesson, score FROM user_progress WHERE user_id = $1', [req.user.id]);
@@ -85,7 +120,9 @@ app.get('/api/progress', authenticateToken, async (req, res) => {
   }
 });
 
-// 💾 Сохранить прогресс
+// ==========================================
+// 💾 PROGRESS: Сохранить прогресс
+// ==========================================
 app.post('/api/progress', authenticateToken, async (req, res) => {
   try {
     const { current_lesson, score } = req.body;
@@ -102,6 +139,110 @@ app.post('/api/progress', authenticateToken, async (req, res) => {
   }
 });
 
+// ==========================================
+// 📚 LESSONS: Получить все уроки (публично)
+// ==========================================
+app.get('/api/lessons', async (req, res) => {
+  try {
+    const { category, difficulty } = req.query;
+    
+    // 👇 Используем sqlQuery вместо query, чтобы не было конфликта имён
+    let sqlQuery = 'SELECT id, question, correct, options, category, difficulty FROM lessons WHERE 1=1';
+    const params = [];
+    let paramIndex = 1;
+    
+    if (category) {
+      sqlQuery += ` AND category = $${paramIndex}`;
+      params.push(category);
+      paramIndex++;
+    }
+    if (difficulty) {
+      sqlQuery += ` AND difficulty = $${paramIndex}`;
+      params.push(difficulty);
+      paramIndex++;
+    }
+    
+    sqlQuery += ' ORDER BY id ASC';
+    
+    // 👇 Вызываем функцию query() (из database.js) с переменной sqlQuery
+    const result = await query(sqlQuery, params);
+    res.json({ lessons: result.rows });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==========================================
+// ➕ LESSONS: Добавить урок (только админ)
+// ==========================================
+app.post('/api/lessons', requireAdmin, async (req, res) => {
+  try {
+    const { question, correct, options, category, difficulty } = req.body;
+    
+    if (!question || !correct || !options || !Array.isArray(options)) {
+      return res.status(400).json({ error: 'Неверные данные' });
+    }
+    if (!options.includes(correct)) {
+      return res.status(400).json({ error: 'Правильный ответ должен быть в списке вариантов' });
+    }
+    
+    const result = await query(
+      `INSERT INTO lessons (question, correct, options, category, difficulty) 
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [question, correct, JSON.stringify(options), category || 'general', difficulty || 1]
+    );
+    
+    res.json({ success: true, lesson: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==========================================
+// ✏️ LESSONS: Редактировать урок (только админ)
+// ==========================================
+app.put('/api/lessons/:id', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { question, correct, options, category, difficulty } = req.body;
+    
+    const result = await query(
+      `UPDATE lessons SET 
+         question = COALESCE($1, question),
+         correct = COALESCE($2, correct),
+         options = COALESCE($3::jsonb, options),
+         category = COALESCE($4, category),
+         difficulty = COALESCE($5, difficulty)
+       WHERE id = $6 RETURNING *`,
+      [question, correct, options ? JSON.stringify(options) : null, category, difficulty, id]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Урок не найден' });
+    }
+    
+    res.json({ success: true, lesson: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==========================================
+// 🗑️ LESSONS: Удалить урок (только админ)
+// ==========================================
+app.delete('/api/lessons/:id', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    await query('DELETE FROM lessons WHERE id = $1', [id]);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==========================================
+// 🚀 Запуск сервера
+// ==========================================
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });

@@ -1,3 +1,4 @@
+// backend/database.js
 const { Pool } = require('pg');
 
 const pool = new Pool({
@@ -8,7 +9,6 @@ const pool = new Pool({
   database: process.env.DB_NAME,
 });
 
-// Проверка подключения
 pool.on('connect', () => {
   console.log('✅ Connected to PostgreSQL');
 });
@@ -18,7 +18,8 @@ pool.on('error', (err) => {
   process.exit(-1);
 });
 
-async function query(text, params) {
+// 👇 Функция называется dbQuery (не query!)
+async function dbQuery(text, params) {
   const start = Date.now();
   try {
     const res = await pool.query(text, params);
@@ -31,4 +32,5 @@ async function query(text, params) {
   }
 }
 
-module.exports = { query, pool };
+// 👇 Экспортируем как { query: dbQuery }, чтобы в server.js можно было писать query(...)
+module.exports = { query: dbQuery, pool };
