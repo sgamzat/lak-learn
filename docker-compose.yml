@@ -1,0 +1,87 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: lak_postgres
+    environment:
+      POSTGRES_DB: lak_language
+      POSTGRES_USER: lak_user
+      POSTGRES_PASSWORD: lak_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - lak_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U lak_user"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: lak_redis
+    ports:
+      - "6379:6379"
+    networks:
+      - lak_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: lak_backend
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py collectstatic --noinput &&
+             gunicorn config.wsgi:application --bind 0.0.0.0:8000"
+    volumes:
+      - ./backend:/app
+      - ./data:/app/data
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+    environment:
+      - DEBUG=1
+      - DB_NAME=lak_language
+      - DB_USER=lak_user
+      - DB_PASSWORD=lak_password
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - SECRET_KEY=dev-secret-key-change-in-production
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - lak_network
+    restart: on-failure
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: lak_frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - lak_network
+    restart: on-failure
+
+volumes:
+  postgres_data:
+  static_volume:
+  media_volume:
+
+networks:
+  lak_network:
+    driver: bridge

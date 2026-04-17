@@ -1,0 +1,16 @@
+{
+  "name": "lak-language-frontend",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.20.0",
+    "axios": "^1.6.2"
+  },
+  "scripts": {
+    "start": "serve -s build -l 3000",
+    "build": "mkdir -p build && echo '<!DOCTYPE html><html><head><title>Lak Language</title></head><body><div id=\"root\">Loading...</div></body></html>' > build/index.html",
+    "dev": "echo 'Development mode'"
+  }
+}
