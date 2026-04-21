@@ -3,262 +3,184 @@
    Vanilla JavaScript (ES6+)
    ============================================ */
 
+// ============================================
+// USER AUTHENTICATION & PROGRESS MANAGEMENT
+// ============================================
+
 /**
- * ВСТРОЕННАЯ СЛОВАРНАЯ БАЗА ДАННЫХ
- * Структура каждого элемента:
- * - id: уникальный идентификатор (number)
- * - lak: слово на лакском языке (string)
- * - ru: перевод на русский язык (string)
- * - transcription: транскрипция для произношения (string)
- * - category: категория слова (string)
- * - example: пример использования в предложении (string)
- * 
- * Примечание: Лакский язык содержит специфические буквы и сочетания:
- * I, КI, ХI, ЧI, Гъ, Хъ, Къ, Гь и другие.
- * Кодировка UTF-8 обеспечивает корректное отображение.
+ * Система управления пользователями
+ * Данные хранятся в localStorage с префиксом userId
  */
-const DEFAULT_DICTIONARY = [
-    {
-        id: 1,
-        lak: "Салам",
-        ru: "Здравствуйте",
-        transcription: "[салам]",
-        category: "Приветствия",
-        example: "Салам, кунна кул?"
+const AuthSystem = {
+    currentUser: null,
+    
+    /**
+     * Регистрация нового пользователя
+     * @param {string} username - имя пользователя
+     * @returns {object} результат регистрации
+     */
+    register(username) {
+        if (!username || username.trim().length < 3) {
+            return { success: false, error: 'Имя должно содержать минимум 3 символа' };
+        }
+        
+        const users = this.getAllUsers();
+        if (users.find(u => u.username.toLowerCase() === username.toLowerCase())) {
+            return { success: false, error: 'Пользователь с таким именем уже существует' };
+        }
+        
+        const newUser = {
+            id: Date.now().toString(),
+            username: username.trim(),
+            createdAt: new Date().toISOString()
+        };
+        
+        users.push(newUser);
+        localStorage.setItem('lakskyApp_users', JSON.stringify(users));
+        
+        // Инициализация прогресса для нового пользователя
+        this.initUserProgress(newUser.id);
+        
+        return { success: true, user: newUser };
     },
-    {
-        id: 2,
-        lak: "Баркалла",
-        ru: "Спасибо",
-        transcription: "[баркалла]",
-        category: "Приветствия",
-        example: "Баркалла, зура тӏимамура!"
+    
+    /**
+     * Вход пользователя
+     * @param {string} username - имя пользователя
+     * @returns {object} результат входа
+     */
+    login(username) {
+        if (!username || username.trim().length === 0) {
+            return { success: false, error: 'Введите имя пользователя' };
+        }
+        
+        const users = this.getAllUsers();
+        const user = users.find(u => u.username.toLowerCase() === username.toLowerCase());
+        
+        if (!user) {
+            return { success: false, error: 'Пользователь не найден' };
+        }
+        
+        this.currentUser = user;
+        localStorage.setItem('lakskyApp_currentUser', JSON.stringify(user));
+        
+        return { success: true, user: user };
     },
-    {
-        id: 3,
-        lak: "НахIуш",
-        ru: "Пока / До свидания",
-        transcription: "[нахӏуш]",
-        category: "Приветствия",
-        example: "НахIуш, дявуксса кӏанттай!"
+    
+    /**
+     * Выход из системы
+     */
+    logout() {
+        this.currentUser = null;
+        localStorage.removeItem('lakskyApp_currentUser');
     },
-    {
-        id: 4,
-        lak: "Ва",
-        ru: "Да",
-        transcription: "[ва]",
-        category: "Основные слова",
-        example: "Ва, ттула нитти."
+    
+    /**
+     * Проверка авторизации
+     * @returns {boolean} авторизован ли пользователь
+     */
+    isLoggedIn() {
+        return this.currentUser !== null;
     },
-    {
-        id: 5,
-        lak: "Я",
-        ru: "Нет",
-        transcription: "[я]",
-        category: "Основные слова",
-        example: "Я, ттущал бакъа."
+    
+    /**
+     * Получение всех пользователей
+     * @returns {array} массив пользователей
+     */
+    getAllUsers() {
+        const usersData = localStorage.getItem('lakskyApp_users');
+        return usersData ? JSON.parse(usersData) : [];
     },
-    {
-        id: 6,
-        lak: "Тту",
-        ru: "Я",
-        transcription: "[тту]",
-        category: "Местоимения",
-        example: "Тту лагма ялапар хъанахъиссар."
+    
+    /**
+     * Инициализация прогресса пользователя
+     * @param {string} userId - ID пользователя
+     */
+    initUserProgress(userId) {
+        const progressData = {
+            learnedWords: [],
+            quizScore: { correct: 0, wrong: 0 },
+            dictionary: []
+        };
+        localStorage.setItem(`lakskyApp_user_${userId}_progress`, JSON.stringify(progressData));
     },
-    {
-        id: 7,
-        lak: "Ичӏал",
-        ru: "Ты",
-        transcription: "[ичӏал]",
-        category: "Местоимения",
-        example: "Ичӏал куна кул?"
+    
+    /**
+     * Загрузка прогресса пользователя
+     * @param {string} userId - ID пользователя
+     * @returns {object} прогресс пользователя
+     */
+    loadUserProgress(userId) {
+        const progressData = localStorage.getItem(`lakskyApp_user_${userId}_progress`);
+        if (progressData) {
+            return JSON.parse(progressData);
+        }
+        // Если прогресс не найден, инициализируем новый
+        this.initUserProgress(userId);
+        return this.loadUserProgress(userId);
     },
-    {
-        id: 8,
-        lak: "Нитти",
-        ru: "Мама",
-        transcription: "[нитти]",
-        category: "Семья",
-        example: "Ттула нитти ххари буллуссар."
+    
+    /**
+     * Сохранение прогресса пользователя
+     * @param {string} userId - ID пользователя
+     * @param {object} progress - данные прогресса
+     */
+    saveUserProgress(userId, progress) {
+        localStorage.setItem(`lakskyApp_user_${userId}_progress`, JSON.stringify(progress));
     },
-    {
-        id: 9,
-        lak: "Бутта",
-        ru: "Папа",
-        transcription: "[бутта]",
-        category: "Семья",
-        example: "Ттула бутта зий ур заводрай."
-    },
-    {
-        id: 10,
-        lak: "Гьану",
-        ru: "Дом",
-        transcription: "[гьану]",
-        category: "Дом",
-        example: "Ттула гьану кӏулмур кӏанттур."
-    },
-    {
-        id: 11,
-        lak: "Ччатту",
-        ru: "Хлеб",
-        transcription: "[ччатту]",
-        category: "Еда",
-        example: "Ччатту ххуйну хъинну ччан бикӏайссар."
-    },
-    {
-        id: 12,
-        lak: "РохI",
-        ru: "Вода",
-        transcription: "[рохӏ]",
-        category: "Еда",
-        example: "РохI ччан бикӏайссар."
-    },
-    {
-        id: 13,
-        lak: "Кьюнкь",
-        ru: "Кошка",
-        transcription: "[кьюнкь]",
-        category: "Животные",
-        example: "Кьюнкь ххари дур ттущал."
-    },
-    {
-        id: 14,
-        lak: "Шавкь",
-        ru: "Собака",
-        transcription: "[шавкь]",
-        category: "Животные",
-        example: "Шавкь ляхълай ур."
-    },
-    {
-        id: 15,
-        lak: "Заман",
-        ru: "Время",
-        transcription: "[заман]",
-        category: "Основные слова",
-        example: "Заман хъунмасса дур."
-    },
-    {
-        id: 16,
-        lak: "Кӏану",
-        ru: "Место",
-        transcription: "[кӏану]",
-        category: "Основные слова",
-        example: "Кул кӏану дур?"
-    },
-    {
-        id: 17,
-        lak: "Ххуй",
-        ru: "Хороший",
-        transcription: "[ххуй]",
-        category: "Прилагательные",
-        example: "Ххуй инсан ур."
-    },
-    {
-        id: 18,
-        lak: "НахIу",
-        ru: "Плохой",
-        transcription: "[нахӏу]",
-        category: "Прилагательные",
-        example: "НахIу иш дур."
-    },
-    {
-        id: 19,
-        lak: "Кӏул",
-        ru: "Большой",
-        transcription: "[кӏул]",
-        category: "Прилагательные",
-        example: "Кӏул гьану дур."
-    },
-    {
-        id: 20,
-        lak: "Мур",
-        ru: "Маленький",
-        transcription: "[мур]",
-        category: "Прилагательные",
-        example: "Мур ливчӏунни."
-    },
-    {
-        id: 21,
-        lak: "Ца",
-        ru: "Один",
-        transcription: "[ца]",
-        category: "Числа",
-        example: "Ца инсан."
-    },
-    {
-        id: 22,
-        lak: "Кӏива",
-        ru: "Два",
-        transcription: "[кӏива]",
-        category: "Числа",
-        example: "Кӏива нитти-бутта."
-    },
-    {
-        id: 23,
-        lak: "Шамма",
-        ru: "Три",
-        transcription: "[шамма]",
-        category: "Числа",
-        example: "Шамма гьану."
-    },
-    {
-        id: 24,
-        lak: "Мокь",
-        ru: "Четыре",
-        transcription: "[мокь]",
-        category: "Числа",
-        example: "Мокь шавкь."
-    },
-    {
-        id: 25,
-        lak: "Шина",
-        ru: "Пять",
-        transcription: "[шина]",
-        category: "Числа",
-        example: "Шина цаппара."
-    },
-    {
-        id: 26,
-        lak: "Зий",
-        ru: "Работа",
-        transcription: "[зий]",
-        category: "Работа",
-        example: "Зий бан ччан бикӏайссар."
-    },
-    {
-        id: 27,
-        lak: "Ккасму",
-        ru: "Школа",
-        transcription: "[ккасму]",
-        category: "Образование",
-        example: "Ккасму лайкь дур."
-    },
-    {
-        id: 28,
-        lak: "Тӏабиаьт",
-        ru: "Природа",
-        transcription: "[тӏабиаьт]",
-        category: "Природа",
-        example: "Тӏабиаьт ххуй дур."
-    },
-    {
-        id: 29,
-        lak: "Маргь",
-        ru: "Солнце",
-        transcription: "[маргь]",
-        category: "Природа",
-        example: "Маргь ччан бикӏайссар."
-    },
-    {
-        id: 30,
-        lak: "Оьрму",
-        ru: "Жизнь",
-        transcription: "[оьрму]",
-        category: "Основные слова",
-        example: "Оьрму ххуй дур."
+    
+    /**
+     * Восстановление сессии при загрузке страницы
+     */
+    restoreSession() {
+        const currentUserData = localStorage.getItem('lakskyApp_currentUser');
+        if (currentUserData) {
+            this.currentUser = JSON.parse(currentUserData);
+            return true;
+        }
+        return false;
     }
-];
+};
+
+// ============================================
+// DATA LOADING
+// ============================================
+
+/**
+ * Словарь по умолчанию (используется как fallback)
+ */
+let DEFAULT_DICTIONARY = [];
+
+/**
+ * Загрузка словаря из JSON файла
+ * @returns {Promise<Array>} массив слов
+ */
+async function loadDictionary() {
+    try {
+        const response = await fetch('data/words.json');
+        if (!response.ok) {
+            throw new Error('Не удалось загрузить words.json');
+        }
+        DEFAULT_DICTIONARY = await response.json();
+        return DEFAULT_DICTIONARY;
+    } catch (error) {
+        console.error('Ошибка загрузки словаря:', error);
+        // Fallback встроенные данные если файл не загружен
+        DEFAULT_DICTIONARY = [
+            { id: 1, lak: "Салам", ru: "Здравствуйте", transcription: "[салам]", category: "Приветствия", example: "Салам, кунна кул?" },
+            { id: 2, lak: "Баркалла", ru: "Спасибо", transcription: "[баркалла]", category: "Приветствия", example: "Баркалла, зура тӏимамура!" },
+            { id: 3, lak: "НахIуш", ru: "Пока / До свидания", transcription: "[нахӏуш]", category: "Приветствия", example: "НахIуш, дявуксса кӏанттай!" },
+            { id: 4, lak: "Ва", ru: "Да", transcription: "[ва]", category: "Основные слова", example: "Ва, ттула нитти." },
+            { id: 5, lak: "Я", ru: "Нет", transcription: "[я]", category: "Основные слова", example: "Я, ттущал бакъа." },
+            { id: 6, lak: "Тту", ru: "Я", transcription: "[тту]", category: "Местоимения", example: "Тту лагма ялапар хъанахъиссар." },
+            { id: 7, lak: "Ичӏал", ru: "Ты", transcription: "[ичӏал]", category: "Местоимения", example: "Ичӏал куна кул?" },
+            { id: 8, lak: "Нитти", ru: "Мама", transcription: "[нитти]", category: "Семья", example: "Ттула нитти ххари буллуссар." },
+            { id: 9, lak: "Бутта", ru: "Папа", transcription: "[бутта]", category: "Семья", example: "Ттула бутта зий ур заводрай." },
+            { id: 10, lak: "Гьану", ru: "Дом", transcription: "[гьану]", category: "Дом", example: "Ттула гьану кӏулмур кӏанттур." }
+        ];
+        return DEFAULT_DICTIONARY;
+    }
+}
 
 // ============================================
 // STATE MANAGEMENT
@@ -278,17 +200,23 @@ const AppState = {
 };
 
 // ============================================
-// LOCAL STORAGE HELPERS
+// USER-AWARE STORAGE HELPERS
 // ============================================
 
 /**
- * Сохранение состояния в localStorage
+ * Сохранение состояния в localStorage с учётом пользователя
  */
 function saveState() {
+    if (!AuthSystem.isLoggedIn()) return;
+    
     try {
-        localStorage.setItem('lakskyApp_dictionary', JSON.stringify(AppState.dictionary));
-        localStorage.setItem('lakskyApp_learnedWords', JSON.stringify(AppState.learnedWords));
-        localStorage.setItem('lakskyApp_quizScore', JSON.stringify(AppState.quizScore));
+        const progress = AuthSystem.loadUserProgress(AuthSystem.currentUser.id);
+        progress.dictionary = AppState.dictionary;
+        progress.learnedWords = AppState.learnedWords;
+        progress.quizScore = AppState.quizScore;
+        AuthSystem.saveUserProgress(AuthSystem.currentUser.id, progress);
+        
+        // Сохраняем тему глобально
         localStorage.setItem('lakskyApp_theme', AppState.theme);
     } catch (e) {
         console.error('Ошибка сохранения в localStorage:', e);
@@ -296,35 +224,36 @@ function saveState() {
 }
 
 /**
- * Загрузка состояния из localStorage
+ * Загрузка состояния из localStorage для текущего пользователя
  * @returns {boolean} true если данные загружены, false если используются данные по умолчанию
  */
 function loadState() {
+    if (!AuthSystem.isLoggedIn()) return false;
+    
     try {
-        const dictData = localStorage.getItem('lakskyApp_dictionary');
-        const learnedData = localStorage.getItem('lakskyApp_learnedWords');
-        const scoreData = localStorage.getItem('lakskyApp_quizScore');
+        const userId = AuthSystem.currentUser.id;
+        const progress = AuthSystem.loadUserProgress(userId);
         const themeData = localStorage.getItem('lakskyApp_theme');
-
-        if (dictData) {
-            AppState.dictionary = JSON.parse(dictData);
+        
+        if (progress.dictionary && progress.dictionary.length > 0) {
+            AppState.dictionary = progress.dictionary;
         } else {
             AppState.dictionary = [...DEFAULT_DICTIONARY];
         }
-
-        if (learnedData) {
-            AppState.learnedWords = JSON.parse(learnedData);
+        
+        if (progress.learnedWords) {
+            AppState.learnedWords = progress.learnedWords;
         }
-
-        if (scoreData) {
-            AppState.quizScore = JSON.parse(scoreData);
+        
+        if (progress.quizScore) {
+            AppState.quizScore = progress.quizScore;
         }
-
+        
         if (themeData) {
             AppState.theme = themeData;
         }
-
-        return !!dictData;
+        
+        return !!progress.dictionary && progress.dictionary.length > 0;
     } catch (e) {
         console.error('Ошибка загрузки из localStorage:', e);
         AppState.dictionary = [...DEFAULT_DICTIONARY];
@@ -904,8 +833,135 @@ function initApp() {
     console.log('Приложение запущено. Слов loaded:', AppState.dictionary.length);
 }
 
+// ============================================
+// AUTH UI HANDLERS
+// ============================================
+
+/**
+ * Обновление UI авторизации
+ */
+function updateAuthUI() {
+    const authSection = document.getElementById('auth-section');
+    const mainApp = document.getElementById('main-app');
+    const userInfo = document.getElementById('user-info');
+    const authForms = document.getElementById('auth-forms');
+    const currentUsername = document.getElementById('current-username');
+    const headerUsername = document.getElementById('header-username');
+    
+    if (AuthSystem.isLoggedIn()) {
+        authSection.style.display = 'none';
+        mainApp.style.display = 'block';
+        userInfo.style.display = 'block';
+        authForms.style.display = 'none';
+        
+        if (currentUsername) currentUsername.textContent = AuthSystem.currentUser.username;
+        if (headerUsername) headerUsername.textContent = AuthSystem.currentUser.username;
+    } else {
+        authSection.style.display = 'flex';
+        mainApp.style.display = 'none';
+        userInfo.style.display = 'none';
+        authForms.style.display = 'block';
+    }
+}
+
+/**
+ * Показать ошибку авторизации
+ * @param {string} message - сообщение об ошибке
+ */
+function showAuthError(message) {
+    const errorEl = document.getElementById('auth-error');
+    if (errorEl) {
+        errorEl.textContent = message;
+        errorEl.style.display = 'block';
+        setTimeout(() => {
+            errorEl.style.display = 'none';
+        }, 5000);
+    }
+}
+
+/**
+ * Инициализация обработчиков авторизации
+ */
+function initAuthHandlers() {
+    // Переключение между формами
+    document.getElementById('show-register')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        document.getElementById('login-form').style.display = 'none';
+        document.getElementById('register-form').style.display = 'block';
+    });
+    
+    document.getElementById('show-login')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        document.getElementById('register-form').style.display = 'none';
+        document.getElementById('login-form').style.display = 'block';
+    });
+    
+    // Обработка входа
+    document.getElementById('login-form')?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const username = document.getElementById('login-username').value.trim();
+        const result = AuthSystem.login(username);
+        
+        if (result.success) {
+            loadState();
+            applyTheme(AppState.theme);
+            updateAuthUI();
+            switchTab('cards');
+        } else {
+            showAuthError(result.error);
+        }
+    });
+    
+    // Обработка регистрации
+    document.getElementById('register-form')?.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const username = document.getElementById('register-username').value.trim();
+        const result = AuthSystem.register(username);
+        
+        if (result.success) {
+            AuthSystem.login(username);
+            loadState();
+            applyTheme(AppState.theme);
+            updateAuthUI();
+            switchTab('cards');
+        } else {
+            showAuthError(result.error);
+        }
+    });
+    
+    // Выход из аккаунта
+    document.getElementById('logout-btn')?.addEventListener('click', () => {
+        saveState();
+        AuthSystem.logout();
+        updateAuthUI();
+    });
+    
+    document.getElementById('header-logout-btn')?.addEventListener('click', () => {
+        saveState();
+        AuthSystem.logout();
+        updateAuthUI();
+    });
+}
+
 // Запуск приложения после загрузки DOM
-document.addEventListener('DOMContentLoaded', initApp);
+document.addEventListener('DOMContentLoaded', async () => {
+    // Загрузка словаря из JSON файла
+    await loadDictionary();
+    
+    // Восстановление сессии
+    AuthSystem.restoreSession();
+    
+    // Инициализация обработчиков авторизации
+    initAuthHandlers();
+    
+    // Обновление UI авторизации
+    updateAuthUI();
+    
+    // Если пользователь авторизован, инициализируем приложение
+    if (AuthSystem.isLoggedIn()) {
+        initApp();
+    }
+});
 
 /*
  * ============================================
