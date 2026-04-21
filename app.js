@@ -196,7 +196,20 @@ const AppState = {
     quizScore: { correct: 0, wrong: 0 }, // Счёт в тесте
     currentCardIndex: 0,      // Текущая карточка
     theme: 'light',           // Тема оформления
-    currentTab: 'cards'       // Активная вкладка
+    currentTab: 'cards',      // Активная вкладка
+    
+    // Геймификация
+    xp: 0,                    // Опыт пользователя
+    level: 1,                 // Уровень пользователя
+    streak: 0,                // Серия дней подряд
+    lastStudyDate: null,      // Дата последнего занятия
+    achievements: [],         // Полученные достижения
+    
+    // Интервальное повторение (система Лейтнера)
+    // boxes: { wordId: boxNumber (1-5) }
+    leitnerBoxes: {},
+    // scheduledReviews: { wordId: nextReviewTimestamp }
+    scheduledReviews: {}
 };
 
 // ============================================
@@ -214,6 +227,15 @@ function saveState() {
         progress.dictionary = AppState.dictionary;
         progress.learnedWords = AppState.learnedWords;
         progress.quizScore = AppState.quizScore;
+        // Сохраняем данные геймификации
+        progress.xp = AppState.xp;
+        progress.level = AppState.level;
+        progress.streak = AppState.streak;
+        progress.lastStudyDate = AppState.lastStudyDate;
+        progress.achievements = AppState.achievements;
+        progress.leitnerBoxes = AppState.leitnerBoxes;
+        progress.scheduledReviews = AppState.scheduledReviews;
+        
         AuthSystem.saveUserProgress(AuthSystem.currentUser.id, progress);
         
         // Сохраняем тему глобально
@@ -249,9 +271,21 @@ function loadState() {
             AppState.quizScore = progress.quizScore;
         }
         
+        // Загрузка данных геймификации
+        AppState.xp = progress.xp || 0;
+        AppState.level = progress.level || 1;
+        AppState.streak = progress.streak || 0;
+        AppState.lastStudyDate = progress.lastStudyDate || null;
+        AppState.achievements = progress.achievements || [];
+        AppState.leitnerBoxes = progress.leitnerBoxes || {};
+        AppState.scheduledReviews = progress.scheduledReviews || {};
+        
         if (themeData) {
             AppState.theme = themeData;
         }
+        
+        // Проверка и обновление серии побед
+        updateStreak();
         
         return !!progress.dictionary && progress.dictionary.length > 0;
     } catch (e) {
@@ -267,9 +301,17 @@ function loadState() {
 function resetProgress() {
     AppState.learnedWords = [];
     AppState.quizScore = { correct: 0, wrong: 0 };
+    AppState.xp = 0;
+    AppState.level = 1;
+    AppState.streak = 0;
+    AppState.lastStudyDate = null;
+    AppState.achievements = [];
+    AppState.leitnerBoxes = {};
+    AppState.scheduledReviews = {};
     saveState();
     updateProgressUI();
     updateQuizScoreUI();
+    updateGamificationUI();
 }
 
 /**
@@ -281,6 +323,279 @@ function resetDictionary() {
     renderDictionary();
     updateStats();
     updateCategoryFilter();
+}
+
+// ============================================
+// GAMIFICATION SYSTEM
+// ============================================
+
+/**
+ * Конфигурация системы геймификации
+ */
+const GAMIFICATION_CONFIG = {
+    xpPerCorrectAnswer: 10,
+    xpPerWordLearned: 25,
+    xpPerDayStreak: 5,
+    levels: [
+        { level: 1, minXp: 0, title: 'Новичок' },
+        { level: 2, minXp: 100, title: 'Ученик' },
+        { level: 3, minXp: 300, title: 'Знающий' },
+        { level: 4, minXp: 600, title: 'Опытный' },
+        { level: 5, minXp: 1000, title: 'Эксперт' },
+        { level: 6, minXp: 1500, title: 'Мастер' },
+        { level: 7, minXp: 2500, title: 'Полиглот' }
+    ],
+    achievements: [
+        { id: 'first_word', name: 'Первый шаг', description: 'Выучить первое слово', icon: '🌟', condition: (state) => state.learnedWords.length >= 1 },
+        { id: 'first_10', name: 'Десяточка', description: 'Выучить 10 слов', icon: '🎯', condition: (state) => state.learnedWords.length >= 10 },
+        { id: 'first_25', name: 'Двадцать пять', description: 'Выучить 25 слов', icon: '🏆', condition: (state) => state.learnedWords.length >= 25 },
+        { id: 'streak_3', name: 'Три дня подряд', description: 'Заниматься 3 дня подряд', icon: '🔥', condition: (state) => state.streak >= 3 },
+        { id: 'streak_7', name: 'Недельный марафон', description: 'Заниматься 7 дней подряд', icon: '💪', condition: (state) => state.streak >= 7 },
+        { id: 'quiz_master', name: 'Мастер теста', description: 'Ответить правильно на 50 вопросов', icon: '📝', condition: (state) => state.quizScore.correct >= 50 },
+        { id: 'level_5', name: 'Опытный ученик', description: 'Достичь 5 уровня', icon: '⭐', condition: (state) => state.level >= 5 }
+    ]
+};
+
+/**
+ * Обновление серии побед (streak)
+ */
+function updateStreak() {
+    const today = new Date().toDateString();
+    const lastStudy = AppState.lastStudyDate ? new Date(AppState.lastStudyDate).toDateString() : null;
+    
+    if (lastStudy !== today) {
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        
+        if (lastStudy === yesterday.toDateString()) {
+            // Продолжаем серию
+            AppState.streak++;
+        } else if (lastStudy !== today) {
+            // Начинаем новую серию (если это не первый вход сегодня)
+            if (lastStudy) {
+                AppState.streak = 1;
+            }
+        }
+        AppState.lastStudyDate = new Date().toISOString();
+        saveState();
+        updateGamificationUI();
+    }
+}
+
+/**
+ * Начисление опыта
+ * @param {number} amount - количество XP
+ */
+function addXp(amount) {
+    AppState.xp += amount;
+    
+    // Проверка повышения уровня
+    const newLevel = calculateLevel(AppState.xp);
+    if (newLevel > AppState.level) {
+        AppState.level = newLevel;
+        showNotification(`🎉 Новый уровень: ${getLevelTitle(newLevel)}!`, 'success');
+    }
+    
+    // Проверка достижений
+    checkAchievements();
+    
+    saveState();
+    updateGamificationUI();
+}
+
+/**
+ * Расчёт уровня по опыту
+ * @param {number} xp - текущий опыт
+ * @returns {number} уровень
+ */
+function calculateLevel(xp) {
+    for (let i = GAMIFICATION_CONFIG.levels.length - 1; i >= 0; i--) {
+        if (xp >= GAMIFICATION_CONFIG.levels[i].minXp) {
+            return GAMIFICATION_CONFIG.levels[i].level;
+        }
+    }
+    return 1;
+}
+
+/**
+ * Получение названия уровня
+ * @param {number} level - номер уровня
+ * @returns {string} название
+ */
+function getLevelTitle(level) {
+    const levelData = GAMIFICATION_CONFIG.levels.find(l => l.level === level);
+    return levelData ? levelData.title : 'Ученик';
+}
+
+/**
+ * Проверка достижений
+ */
+function checkAchievements() {
+    const newState = { ...AppState };
+    
+    GAMIFICATION_CONFIG.achievements.forEach(achievement => {
+        if (!AppState.achievements.includes(achievement.id) && achievement.condition(newState)) {
+            AppState.achievements.push(achievement.id);
+            showNotification(`🏆 Достижение: ${achievement.name}!`, 'success');
+        }
+    });
+    
+    saveState();
+}
+
+/**
+ * Отметка слова как выученное с начислением XP
+ */
+function markAsLearned() {
+    const currentWord = AppState.dictionary[AppState.currentCardIndex];
+    if (currentWord && !AppState.learnedWords.includes(currentWord.id)) {
+        AppState.learnedWords.push(currentWord.id);
+        
+        // Начисление XP за выученное слово
+        addXp(GAMIFICATION_CONFIG.xpPerWordLearned);
+        
+        // Инициализация коробки Лейтнера для нового слова
+        if (!AppState.leitnerBoxes[currentWord.id]) {
+            AppState.leitnerBoxes[currentWord.id] = 1;
+            scheduleReview(currentWord.id, 1);
+        }
+        
+        saveState();
+        updateProgressUI();
+        
+        // Визуальная обратная связь
+        const btn = document.getElementById('mark-learned');
+        btn.classList.add('pulse');
+        setTimeout(() => btn.classList.remove('pulse'), 300);
+    }
+    
+    moveToNextCard();
+}
+
+/**
+ * Планирование повторения слова (система Лейтнера)
+ * @param {number} wordId - ID слова
+ * @param {number} box - номер коробки (1-5)
+ */
+function scheduleReview(wordId, box) {
+    const intervals = [1, 3, 7, 14, 30]; // дней для каждой коробки
+    const daysUntilReview = intervals[Math.min(box - 1, intervals.length - 1)];
+    const reviewDate = new Date();
+    reviewDate.setDate(reviewDate.getDate() + daysUntilReview);
+    AppState.scheduledReviews[wordId] = reviewDate.getTime();
+}
+
+/**
+ * Обработка правильного ответа в повторении
+ * @param {number} wordId - ID слова
+ */
+function handleCorrectReview(wordId) {
+    const currentBox = AppState.leitnerBoxes[wordId] || 1;
+    const newBox = Math.min(currentBox + 1, 5);
+    AppState.leitnerBoxes[wordId] = newBox;
+    scheduleReview(wordId, newBox);
+    addXp(GAMIFICATION_CONFIG.xpPerCorrectAnswer);
+}
+
+/**
+ * Обработка неправильного ответа в повторении
+ * @param {number} wordId - ID слова
+ */
+function handleWrongReview(wordId) {
+    // Возвращаем слово в первую коробку
+    AppState.leitnerBoxes[wordId] = 1;
+    scheduleReview(wordId, 1);
+}
+
+/**
+ * Получение слов для повторения
+ * @returns {Array} массив слов, которые нужно повторить
+ */
+function getWordsForReview() {
+    const now = Date.now();
+    return AppState.dictionary.filter(word => {
+        const reviewTime = AppState.scheduledReviews[word.id];
+        return reviewTime && reviewTime <= now;
+    });
+}
+
+/**
+ * Обновление UI геймификации
+ */
+function updateGamificationUI() {
+    const xpEl = document.getElementById('user-xp');
+    const levelEl = document.getElementById('user-level');
+    const streakEl = document.getElementById('user-streak');
+    const achievementsEl = document.getElementById('achievements-list');
+    const levelProgressEl = document.getElementById('level-progress');
+    
+    if (xpEl) xpEl.textContent = AppState.xp;
+    if (levelEl) levelEl.textContent = `${AppState.level} (${getLevelTitle(AppState.level)})`;
+    if (streakEl) streakEl.textContent = `${AppState.streak} дней 🔥`;
+    
+    // Прогресс до следующего уровня
+    if (levelProgressEl) {
+        const currentLevelData = GAMIFICATION_CONFIG.levels.find(l => l.level === AppState.level);
+        const nextLevelData = GAMIFICATION_CONFIG.levels.find(l => l.level === AppState.level + 1);
+        
+        if (nextLevelData) {
+            const progress = ((AppState.xp - currentLevelData.minXp) / (nextLevelData.minXp - currentLevelData.minXp)) * 100;
+            levelProgressEl.style.width = `${Math.min(progress, 100)}%`;
+        } else {
+            levelProgressEl.style.width = '100%';
+        }
+    }
+    
+    // Отображение достижений
+    if (achievementsEl) {
+        const unlockedAchievements = GAMIFICATION_CONFIG.achievements.filter(a => 
+            AppState.achievements.includes(a.id)
+        );
+        const lockedAchievements = GAMIFICATION_CONFIG.achievements.filter(a => 
+            !AppState.achievements.includes(a.id)
+        );
+        
+        achievementsEl.innerHTML = `
+            <div class="achievements-section">
+                <h3>🏆 Достижения (${unlockedAchievements.length}/${GAMIFICATION_CONFIG.achievements.length})</h3>
+                <div class="achievements-grid">
+                    ${unlockedAchievements.map(a => `
+                        <div class="achievement-item unlocked" title="${a.description}">
+                            <span class="achievement-icon">${a.icon}</span>
+                            <span class="achievement-name">${a.name}</span>
+                        </div>
+                    `).join('')}
+                    ${lockedAchievements.slice(0, 5).map(a => `
+                        <div class="achievement-item locked" title="${a.description}">
+                            <span class="achievement-icon">🔒</span>
+                            <span class="achievement-name">${a.name}</span>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+}
+
+/**
+ * Показ уведомления
+ * @param {string} message - текст уведомления
+ * @param {string} type - тип (success, error, info)
+ */
+function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = `notification notification-${type}`;
+    notification.textContent = message;
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.classList.add('show');
+    }, 10);
+    
+    setTimeout(() => {
+        notification.classList.remove('show');
+        setTimeout(() => notification.remove(), 300);
+    }, 3000);
 }
 
 // ============================================
@@ -472,6 +787,11 @@ function flipCard() {
 let currentQuizQuestion = null;
 let quizAnswered = false;
 
+// Статистика режима ввода текста
+let typingStats = { correct: 0, wrong: 0 };
+let currentTypingWord = null;
+let typingAnswered = false;
+
 /**
  * Инициализация теста
  */
@@ -481,6 +801,88 @@ function initQuiz() {
         return;
     }
     generateQuizQuestion();
+}
+
+/**
+ * Инициализация режима ввода текста
+ */
+function initTypingMode() {
+    if (AppState.dictionary.length === 0) {
+        showEmptyState('typing-word', 'Словарь пуст');
+        return;
+    }
+    typingStats = { correct: 0, wrong: 0 };
+    updateTypingStatsUI();
+    generateTypingQuestion();
+}
+
+/**
+ * Генерация нового вопроса для режима ввода текста
+ */
+function generateTypingQuestion() {
+    typingAnswered = false;
+    document.getElementById('next-typing').style.display = 'none';
+    document.getElementById('typing-feedback').className = 'typing-feedback';
+    document.getElementById('typing-feedback').textContent = '';
+    document.getElementById('typing-answer').value = '';
+    document.getElementById('typing-answer').disabled = false;
+    document.getElementById('typing-answer').focus();
+
+    // Выбор случайного слова для вопроса
+    const randomIndex = Math.floor(Math.random() * AppState.dictionary.length);
+    currentTypingWord = AppState.dictionary[randomIndex];
+
+    // Отображение вопроса
+    document.getElementById('typing-word').textContent = currentTypingWord.lak;
+}
+
+/**
+ * Проверка ответа в режиме ввода текста
+ */
+function checkTypingAnswer() {
+    if (typingAnswered) return;
+    
+    const userInput = document.getElementById('typing-answer').value.trim().toLowerCase();
+    const correctAnswer = currentTypingWord.ru.toLowerCase();
+    const feedback = document.getElementById('typing-feedback');
+    
+    typingAnswered = true;
+    document.getElementById('typing-answer').disabled = true;
+    document.getElementById('next-typing').style.display = 'inline-flex';
+
+    if (userInput === correctAnswer) {
+        feedback.textContent = '✓ Правильно! Молодец!';
+        feedback.className = 'typing-feedback correct';
+        typingStats.correct++;
+        
+        // Начисление XP за правильный ответ
+        addXp(GAMIFICATION_CONFIG.xpPerCorrectAnswer * 1.5); // Больше XP за ввод текста
+        
+        // Обработка для системы Лейтнера
+        if (currentTypingWord.id in AppState.leitnerBoxes) {
+            handleCorrectReview(currentTypingWord.id);
+        }
+    } else {
+        feedback.textContent = `✗ Неправильно. Правильный ответ: ${currentTypingWord.ru}`;
+        feedback.className = 'typing-feedback wrong';
+        typingStats.wrong++;
+        
+        // Обработка для системы Лейтнера
+        if (currentTypingWord.id in AppState.leitnerBoxes) {
+            handleWrongReview(currentTypingWord.id);
+        }
+    }
+    
+    updateTypingStatsUI();
+    saveState();
+}
+
+/**
+ * Обновление статистики режима ввода текста
+ */
+function updateTypingStatsUI() {
+    document.getElementById('typing-correct').textContent = typingStats.correct;
+    document.getElementById('typing-wrong').textContent = typingStats.wrong;
 }
 
 /**
@@ -545,6 +947,14 @@ function handleQuizAnswer(selectedId, btnElement) {
         feedback.textContent = '✓ Правильно!';
         feedback.className = 'quiz-feedback correct';
         AppState.quizScore.correct++;
+        
+        // Начисление XP за правильный ответ
+        addXp(GAMIFICATION_CONFIG.xpPerCorrectAnswer);
+        
+        // Обработка для системы Лейтнера
+        if (currentQuizQuestion.id in AppState.leitnerBoxes) {
+            handleCorrectReview(currentQuizQuestion.id);
+        }
     } else {
         btnElement.classList.add('wrong');
         btnElement.classList.add('shake');
@@ -558,6 +968,11 @@ function handleQuizAnswer(selectedId, btnElement) {
                 opt.classList.add('correct');
             }
         });
+        
+        // Обработка для системы Лейтнера
+        if (currentQuizQuestion.id in AppState.leitnerBoxes) {
+            handleWrongReview(currentQuizQuestion.id);
+        }
     }
 
     updateQuizScoreUI();
@@ -794,6 +1209,17 @@ function initApp() {
     // Тест: следующий вопрос
     document.getElementById('next-question').addEventListener('click', generateQuizQuestion);
     
+    // Режим ввода текста
+    document.getElementById('typing-submit').addEventListener('click', checkTypingAnswer);
+    document.getElementById('next-typing').addEventListener('click', generateTypingQuestion);
+    document.getElementById('typing-answer').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && !typingAnswered) {
+            checkTypingAnswer();
+        } else if (e.key === 'Enter' && typingAnswered) {
+            generateTypingQuestion();
+        }
+    });
+    
     // Словарь: поиск и фильтрация
     document.getElementById('search-input').addEventListener('input', renderDictionary);
     document.getElementById('category-filter').addEventListener('change', renderDictionary);
@@ -829,6 +1255,7 @@ function initApp() {
     updateCategoryFilter();
     renderCard();
     updateStats();
+    updateGamificationUI();
     
     console.log('Приложение запущено. Слов loaded:', AppState.dictionary.length);
 }

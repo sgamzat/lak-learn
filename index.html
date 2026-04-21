@@ -56,10 +56,32 @@
                 </button>
             </header>
 
+            <!-- Gamification Bar -->
+            <div class="gamification-bar">
+                <div class="gamification-item">
+                    <span class="gamification-label">Уровень</span>
+                    <span class="gamification-value" id="user-level">1 (Новичок)</span>
+                </div>
+                <div class="gamification-item">
+                    <span class="gamification-label">Опыт</span>
+                    <span class="gamification-value" id="user-xp">0 XP</span>
+                </div>
+                <div class="gamification-item">
+                    <span class="gamification-label">Серия</span>
+                    <span class="gamification-value" id="user-streak">0 дней 🔥</span>
+                </div>
+                <div class="level-progress-container">
+                    <div class="level-progress-bar">
+                        <div id="level-progress" class="level-progress-fill"></div>
+                    </div>
+                </div>
+            </div>
+
         <!-- Navigation Tabs -->
         <nav class="tabs">
             <button class="tab-btn active" data-tab="cards">Карточки</button>
             <button class="tab-btn" data-tab="quiz">Тест</button>
+            <button class="tab-btn" data-tab="typing">Ввод текста</button>
             <button class="tab-btn" data-tab="dictionary">Словарь</button>
             <button class="tab-btn" data-tab="settings">Настройки</button>
         </nav>
@@ -122,6 +144,30 @@
                 <button id="next-question" class="btn btn-primary" style="display: none;">Следующий вопрос</button>
             </section>
 
+            <!-- Typing Mode -->
+            <section id="typing" class="tab-content">
+                <div class="typing-header">
+                    <div class="typing-stats">
+                        <span>Правильно: <span id="typing-correct">0</span></span>
+                        <span>Ошибок: <span id="typing-wrong">0</span></span>
+                    </div>
+                </div>
+
+                <div class="typing-question">
+                    <p class="question-text">Введите перевод слова:</p>
+                    <div class="typing-word" id="typing-word"></div>
+                </div>
+
+                <div class="typing-input-container">
+                    <input type="text" id="typing-answer" class="typing-input" placeholder="Введите перевод..." autocomplete="off">
+                    <button id="typing-submit" class="btn btn-primary">Проверить</button>
+                </div>
+
+                <div id="typing-feedback" class="typing-feedback"></div>
+
+                <button id="next-typing" class="btn btn-secondary" style="display: none; margin-top: 16px;">Следующее слово</button>
+            </section>
+
             <!-- Dictionary Mode -->
             <section id="dictionary" class="tab-content">
                 <div class="search-filters">
@@ -173,6 +219,11 @@
                             <span class="stat-label">Категорий</span>
                         </div>
                     </div>
+                </div>
+
+                <!-- Достижения -->
+                <div class="settings-section" id="achievements-list">
+                    <!-- Достижения будут загружены динамически -->
                 </div>
 
                 <div class="settings-section">
