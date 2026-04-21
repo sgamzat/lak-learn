@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Изучение лакского языка</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <h1>📚 Лакский язык</h1>
+            <button id="theme-toggle" class="btn-icon" aria-label="Переключить тему">
+                <span class="theme-icon">🌙</span>
+            </button>
+        </header>
+
+        <!-- Navigation Tabs -->
+        <nav class="tabs">
+            <button class="tab-btn active" data-tab="cards">Карточки</button>
+            <button class="tab-btn" data-tab="quiz">Тест</button>
+            <button class="tab-btn" data-tab="dictionary">Словарь</button>
+            <button class="tab-btn" data-tab="settings">Настройки</button>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="content">
+            <!-- Cards Mode -->
+            <section id="cards" class="tab-content active">
+                <div class="progress-section">
+                    <div class="progress-info">
+                        <span>Прогресс обучения</span>
+                        <span id="progress-text">0/0</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div id="progress-fill" class="progress-fill"></div>
+                    </div>
+                </div>
+
+                <div class="card-container">
+                    <div id="flashcard" class="flashcard">
+                        <div class="card-front">
+                            <div class="word-lak" id="card-word"></div>
+                            <div class="click-hint">Нажмите для перевода</div>
+                        </div>
+                        <div class="card-back">
+                            <div class="word-ru" id="card-translation"></div>
+                            <div class="transcription" id="card-transcription"></div>
+                            <div class="example" id="card-example"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card-controls">
+                    <button id="prev-card" class="btn btn-secondary">← Назад</button>
+                    <button id="mark-learned" class="btn btn-success">✓ Выучено</button>
+                    <button id="next-card" class="btn btn-primary">Вперёд →</button>
+                </div>
+            </section>
+
+            <!-- Quiz Mode -->
+            <section id="quiz" class="tab-content">
+                <div class="quiz-header">
+                    <div class="score-board">
+                        <span class="score-correct">✓ <span id="score-correct">0</span></span>
+                        <span class="score-wrong">✗ <span id="score-wrong">0</span></span>
+                    </div>
+                </div>
+
+                <div class="quiz-question">
+                    <p class="question-text">Переведите слово:</p>
+                    <div class="quiz-word" id="quiz-word"></div>
+                </div>
+
+                <div id="quiz-options" class="quiz-options">
+                    <!-- Options will be generated dynamically -->
+                </div>
+
+                <div id="quiz-feedback" class="quiz-feedback"></div>
+
+                <button id="next-question" class="btn btn-primary" style="display: none;">Следующий вопрос</button>
+            </section>
+
+            <!-- Dictionary Mode -->
+            <section id="dictionary" class="tab-content">
+                <div class="search-filters">
+                    <input type="text" id="search-input" class="search-input" placeholder="Поиск по слову...">
+                    <select id="category-filter" class="category-filter">
+                        <option value="">Все категории</option>
+                    </select>
+                </div>
+
+                <div id="dictionary-list" class="dictionary-list">
+                    <!-- Dictionary items will be generated dynamically -->
+                </div>
+
+                <div id="empty-state" class="empty-state" style="display: none;">
+                    <p>Ничего не найдено</p>
+                </div>
+            </section>
+
+            <!-- Settings Mode -->
+            <section id="settings" class="tab-content">
+                <div class="settings-section">
+                    <h2>Управление словарём</h2>
+                    
+                    <div class="settings-group">
+                        <button id="export-json" class="btn btn-primary">📤 Экспорт JSON</button>
+                        <label for="import-json" class="btn btn-secondary">📥 Импорт JSON</label>
+                        <input type="file" id="import-json" accept=".json" style="display: none;">
+                    </div>
+
+                    <div class="settings-group">
+                        <button id="reset-progress" class="btn btn-danger">🔄 Сбросить прогресс</button>
+                        <button id="reset-dictionary" class="btn btn-danger">⚠️ Сбросить словарь</button>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h2>Статистика</h2>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <span class="stat-value" id="stat-total">0</span>
+                            <span class="stat-label">Всего слов</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value" id="stat-learned">0</span>
+                            <span class="stat-label">Выучено</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-value" id="stat-categories">0</span>
+                            <span class="stat-label">Категорий</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="settings-section">
+                    <h2>Информация</h2>
+                    <p class="info-text">
+                        Приложение для изучения лакского языка. Все данные хранятся локально в вашем браузере.
+                        Используйте экспорт/импорт для создания резервных копий и обмена словарями.
+                    </p>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
