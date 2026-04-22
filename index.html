@@ -18,7 +18,8 @@
                     <!-- Login Form -->
                     <form id="login-form" class="auth-form">
                         <h2>Вход</h2>
-                        <input type="text" id="login-username" placeholder="Имя пользователя" required minlength="3">
+                        <input type="email" id="login-email" placeholder="Email" required>
+                        <input type="password" id="login-password" placeholder="Пароль" required minlength="6">
                         <button type="submit" class="btn btn-primary">Войти</button>
                         <p class="auth-switch">Нет аккаунта? <a href="#" id="show-register">Зарегистрироваться</a></p>
                     </form>
@@ -27,6 +28,8 @@
                     <form id="register-form" class="auth-form" style="display: none;">
                         <h2>Регистрация</h2>
                         <input type="text" id="register-username" placeholder="Придумайте имя пользователя" required minlength="3">
+                        <input type="email" id="register-email" placeholder="Email" required>
+                        <input type="password" id="register-password" placeholder="Пароль (минимум 6 символов)" required minlength="6">
                         <button type="submit" class="btn btn-primary">Зарегистрироваться</button>
                         <p class="auth-switch">Уже есть аккаунт? <a href="#" id="show-login">Войти</a></p>
                     </form>
@@ -188,6 +191,8 @@
         </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
