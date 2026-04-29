@@ -1,22 +1,63 @@
 /* ============================================
    LAKSKY LANGUAGE LEARNING APP
-   Vanilla JavaScript (ES6+) + Supabase
+   Vanilla JavaScript (ES6+) + REST API
    ============================================ */
 
-const sbClient = window.supabaseClient || null;
+const API_BASE_URL = window.APP_CONFIG?.apiBaseUrl || '/api';
+const ACCESS_TOKEN_KEY = 'lak_learn_access_token';
+
+const ApiClient = {
+    getToken() {
+        return localStorage.getItem(ACCESS_TOKEN_KEY);
+    },
+
+    setToken(token) {
+        if (!token) {
+            localStorage.removeItem(ACCESS_TOKEN_KEY);
+            return;
+        }
+        localStorage.setItem(ACCESS_TOKEN_KEY, token);
+    },
+
+    async request(path, options = {}) {
+        const token = this.getToken();
+        const headers = {
+            'Content-Type': 'application/json',
+            ...(options.headers || {})
+        };
+
+        if (token) {
+            headers.Authorization = `Bearer ${token}`;
+        }
+
+        const response = await fetch(`${API_BASE_URL}${path}`, {
+            ...options,
+            headers
+        });
+
+        let payload = null;
+        try {
+            payload = await response.json();
+        } catch (_err) {
+            payload = null;
+        }
+
+        if (!response.ok) {
+            throw new Error(payload?.error || `HTTP ${response.status}`);
+        }
+
+        return payload;
+    }
+};
 
 // ============================================
-// USER AUTHENTICATION (SUPABASE)
+// USER AUTHENTICATION (JWT + API)
 // ============================================
 
 const AuthSystem = {
     currentUser: null,
 
     async register(username, email, password) {
-        if (!sbClient) {
-            return { success: false, error: 'Supabase client не инициализирован. Проверьте подключение SDK и файл supabase-config.js' };
-        }
-
         if (!username || username.trim().length < 3) {
             return { success: false, error: 'Имя должно содержать минимум 3 символа' };
         }
@@ -28,40 +69,21 @@ const AuthSystem = {
         }
 
         try {
-            const { data, error } = await sbClient.auth.signUp({
-                email: email.trim(),
-                password,
-                options: {
-                    data: {
-                        username: username.trim()
-                    }
-                }
+            const result = await ApiClient.request('/auth/register', {
+                method: 'POST',
+                body: JSON.stringify({
+                    username: username.trim(),
+                    email: email.trim(),
+                    password
+                })
             });
-
-            if (error) {
-                return { success: false, error: error.message };
-            }
-
-            if (!data.user) {
-                return { success: false, error: 'Не удалось создать пользователя' };
-            }
-
-            // Если email confirmation включен, сессии может не быть сразу
-            if (!data.session) {
-                return {
-                    success: true,
-                    pendingConfirmation: true,
-                    message: 'Регистрация успешна. Подтвердите email, затем выполните вход.'
-                };
-            }
-
-            await this.ensureProfile(data.user.id, username.trim());
+            ApiClient.setToken(result.token);
 
             this.currentUser = {
-                id: data.user.id,
-                email: data.user.email,
-                username: profile.username || username.trim(),
-                isAdmin: Boolean(profile.is_admin)
+                id: result.user.id,
+                email: result.user.email,
+                username: result.user.username || username.trim(),
+                isAdmin: Boolean(result.user.is_admin)
             };
 
             return { success: true, user: this.currentUser };
@@ -71,33 +93,22 @@ const AuthSystem = {
     },
 
     async login(email, password) {
-        if (!sbClient) {
-            return { success: false, error: 'Supabase client не инициализирован. Проверьте подключение SDK и файл supabase-config.js' };
-        }
-
         if (!email || !password) {
             return { success: false, error: 'Введите email и пароль' };
         }
 
         try {
-            const { data, error } = await sbClient.auth.signInWithPassword({
-                email: email.trim(),
-                password
+            const result = await ApiClient.request('/auth/login', {
+                method: 'POST',
+                body: JSON.stringify({ email: email.trim(), password })
             });
-
-            if (error) {
-                return { success: false, error: error.message };
-            }
-
-            const authUser = data.user;
-            const fallbackName = authUser?.user_metadata?.username || (authUser?.email || '').split('@')[0] || 'Пользователь';
-            const profile = await this.ensureProfile(authUser.id, fallbackName);
+            ApiClient.setToken(result.token);
 
             this.currentUser = {
-                id: authUser.id,
-                email: authUser.email,
-                username: profile.username || fallbackName,
-                isAdmin: Boolean(profile.is_admin)
+                id: result.user.id,
+                email: result.user.email,
+                username: result.user.username || 'Пользователь',
+                isAdmin: Boolean(result.user.is_admin)
             };
 
             return { success: true, user: this.currentUser };
@@ -107,10 +118,7 @@ const AuthSystem = {
     },
 
     async logout() {
-        const { error } = await sbClient.auth.signOut();
-        if (error) {
-            console.error('Ошибка выхода:', error);
-        }
+        ApiClient.setToken(null);
         this.currentUser = null;
     },
 
@@ -119,68 +127,25 @@ const AuthSystem = {
     },
 
     async restoreSession() {
-        if (!sbClient) {
+        if (!ApiClient.getToken()) {
             return false;
         }
 
-        const { data, error } = await sbClient.auth.getSession();
-        if (error) {
-            console.error('Ошибка восстановления сессии:', error);
+        try {
+            const result = await ApiClient.request('/auth/me');
+            const user = result.user;
+            this.currentUser = {
+                id: user.id,
+                email: user.email,
+                username: user.username || 'Пользователь',
+                isAdmin: Boolean(user.is_admin)
+            };
+            return true;
+        } catch (_e) {
+            ApiClient.setToken(null);
+            this.currentUser = null;
             return false;
         }
-
-        const session = data.session;
-        if (!session?.user) {
-            return false;
-        }
-
-        const authUser = session.user;
-        const fallbackName = authUser?.user_metadata?.username || (authUser?.email || '').split('@')[0] || 'Пользователь';
-        const profile = await this.ensureProfile(authUser.id, fallbackName);
-
-        this.currentUser = {
-            id: authUser.id,
-            email: authUser.email,
-            username: profile.username || fallbackName,
-            isAdmin: Boolean(profile.is_admin)
-        };
-
-        return true;
-    },
-
-    async ensureProfile(userId, username) {
-        const { data, error } = await sbClient
-            .from('profiles')
-            .select('id, username, is_admin')
-            .eq('id', userId)
-            .maybeSingle();
-
-        if (error) {
-            console.error('Ошибка чтения профиля:', error);
-        }
-
-        if (data) {
-            return data;
-        }
-
-        const payload = {
-            id: userId,
-            username: username || 'Пользователь',
-            updated_at: new Date().toISOString()
-        };
-
-        const { data: created, error: createError } = await sbClient
-            .from('profiles')
-            .upsert(payload, { onConflict: 'id' })
-            .select('id, username, is_admin')
-            .single();
-
-        if (createError) {
-            console.error('Ошибка создания профиля:', createError);
-            return { id: userId, username: payload.username, is_admin: false };
-        }
-
-        return created;
     }
 };
 
@@ -215,19 +180,9 @@ async function loadDictionaryFromFile() {
     return json.map((item, idx) => normalizeWord(item, idx));
 }
 
-async function loadDictionaryFromSupabase() {
-    if (!sbClient) {
-        throw new Error('Supabase client не инициализирован');
-    }
-
-    const { data, error } = await sbClient
-        .from('words')
-        .select('id, lak, ru, transcription, category, example')
-        .order('id', { ascending: true });
-
-    if (error) {
-        throw error;
-    }
+async function loadDictionaryFromApi() {
+    const result = await ApiClient.request('/words');
+    const data = result?.data;
 
     if (!Array.isArray(data)) {
         return [];
@@ -238,7 +193,7 @@ async function loadDictionaryFromSupabase() {
 
 async function loadDictionary() {
     try {
-        const words = await loadDictionaryFromSupabase();
+        const words = await loadDictionaryFromApi();
         if (words.length > 0) {
             DEFAULT_DICTIONARY = words;
             return words;
@@ -248,7 +203,7 @@ async function loadDictionary() {
         DEFAULT_DICTIONARY = await loadDictionaryFromFile();
         return DEFAULT_DICTIONARY;
     } catch (error) {
-        console.error('Ошибка загрузки словаря из Supabase:', error);
+        console.error('Ошибка загрузки словаря из API:', error);
         try {
             DEFAULT_DICTIONARY = await loadDictionaryFromFile();
             return DEFAULT_DICTIONARY;
@@ -289,7 +244,7 @@ function getDefaultProgress() {
 }
 
 // ============================================
-// STORAGE HELPERS (SUPABASE)
+// STORAGE HELPERS (API)
 // ============================================
 
 async function saveState() {
@@ -297,25 +252,19 @@ async function saveState() {
 
     try {
         const payload = {
-            user_id: AuthSystem.currentUser.id,
-            // Словарь общий (из таблицы words), поэтому тут не сохраняем dictionary
             learned_words: AppState.learnedWords,
             quiz_correct: AppState.quizScore.correct,
             quiz_wrong: AppState.quizScore.wrong,
             theme: AppState.theme,
-            current_card_index: AppState.currentCardIndex,
-            updated_at: new Date().toISOString()
+            current_card_index: AppState.currentCardIndex
         };
 
-        const { error } = await sbClient
-            .from('user_progress')
-            .upsert(payload, { onConflict: 'user_id' });
-
-        if (error) {
-            throw error;
-        }
+        await ApiClient.request('/progress', {
+            method: 'PUT',
+            body: JSON.stringify(payload)
+        });
     } catch (e) {
-        console.error('Ошибка сохранения прогресса в Supabase:', e);
+        console.error('Ошибка сохранения прогресса в API:', e);
     }
 }
 
@@ -323,18 +272,8 @@ async function loadState() {
     if (!AuthSystem.isLoggedIn()) return false;
 
     try {
-        const userId = AuthSystem.currentUser.id;
-        const { data, error } = await sbClient
-            .from('user_progress')
-            .select('user_id, learned_words, quiz_correct, quiz_wrong, theme, current_card_index')
-            .eq('user_id', userId)
-            .maybeSingle();
-
-        if (error) {
-            throw error;
-        }
-
-        const progress = data || getDefaultProgress();
+        const result = await ApiClient.request('/progress');
+        const progress = result?.data || getDefaultProgress();
 
         // Словарь всегда общий
         AppState.dictionary = [...DEFAULT_DICTIONARY];
@@ -354,13 +293,9 @@ async function loadState() {
         const safeIndex = Number.isInteger(progress.current_card_index) ? progress.current_card_index : 0;
         AppState.currentCardIndex = Math.min(Math.max(safeIndex, 0), maxIndex);
 
-        if (!data) {
-            await saveState();
-        }
-
         return true;
     } catch (e) {
-        console.error('Ошибка загрузки прогресса из Supabase:', e);
+        console.error('Ошибка загрузки прогресса из API:', e);
 
         AppState.dictionary = [...DEFAULT_DICTIONARY];
         AppState.learnedWords = [];
@@ -511,16 +446,19 @@ async function saveAdminWord(event) {
         return;
     }
 
-    let query = sbClient.from('words');
-    if (idRaw) {
-        query = query.update(payload).eq('id', Number(idRaw));
-    } else {
-        query = query.insert(payload);
-    }
-
-    const { error } = await query;
-
-    if (error) {
+    try {
+        if (idRaw) {
+            await ApiClient.request(`/words/${Number(idRaw)}`, {
+                method: 'PUT',
+                body: JSON.stringify(payload)
+            });
+        } else {
+            await ApiClient.request('/words', {
+                method: 'POST',
+                body: JSON.stringify(payload)
+            });
+        }
+    } catch (error) {
         console.error('Ошибка сохранения слова:', error);
         alert(`Не удалось сохранить слово: ${error.message}`);
         return;
@@ -570,8 +508,11 @@ async function loadAdminUsers() {
 
     list.innerHTML = '<p class="info-text">Загрузка пользователей...</p>';
 
-    const { data, error } = await sbClient.rpc('admin_list_users');
-    if (error) {
+    let data = [];
+    try {
+        const result = await ApiClient.request('/admin/users');
+        data = Array.isArray(result?.data) ? result.data : [];
+    } catch (error) {
         console.error('Ошибка загрузки пользователей:', error);
         list.innerHTML = `<p class="info-text">Ошибка загрузки пользователей: ${escapeHtml(error.message)}</p>`;
         return;
@@ -854,7 +795,7 @@ function exportDictionary() {
 }
 
 function importDictionary() {
-    alert('Словарь общий и хранится в Supabase (таблица words). Импорт выполняется через админ-панель Supabase.');
+    alert('Словарь общий и хранится в PostgreSQL. Импорт выполняется через backend/БД или админ-панель приложения.');
 }
 
 // ============================================
@@ -978,7 +919,7 @@ function bindAppHandlers() {
     });
 
     document.getElementById('reset-dictionary').addEventListener('click', async () => {
-        if (confirm('Перезагрузить словарь из Supabase?')) {
+        if (confirm('Перезагрузить словарь из PostgreSQL?')) {
             await resetDictionary();
             alert('Словарь перезагружен');
         }
@@ -1107,13 +1048,6 @@ function initAuthHandlers() {
                 return;
             }
 
-            if (result.pendingConfirmation) {
-                showAuthError(result.message, 'success');
-                document.getElementById('register-form').style.display = 'none';
-                document.getElementById('login-form').style.display = 'block';
-                return;
-            }
-
             await loadDictionary();
             updateAuthUI();
             await initApp();
@@ -1144,13 +1078,11 @@ function initAuthHandlers() {
 // ============================================
 
 document.addEventListener('DOMContentLoaded', async () => {
-    if (!sbClient) {
-        showAuthError('Supabase SDK не загружен. Откройте приложение через локальный сервер и проверьте доступ к CDN.', 'error');
-        return;
-    }
-
-    await loadDictionary();
     await AuthSystem.restoreSession();
+
+    if (AuthSystem.isLoggedIn()) {
+        await loadDictionary();
+    }
 
     initAuthHandlers();
     updateAuthUI();

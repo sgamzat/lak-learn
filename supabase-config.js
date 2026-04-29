@@ -1,13 +1,9 @@
 /* ============================================
-   SUPABASE CONFIG
+   APP CONFIG (REST API)
    ============================================ */
 
-const SUPABASE_URL = 'https://vftveigtokamnhjclciz.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_LccKTCGMI6KJZgxoq-aL7Q_ssl58SUn';
-
-if (!window.supabase) {
-    console.error('Supabase SDK не загружен (CDN недоступен или заблокирован)');
-    window.supabaseClient = null;
-} else {
-    window.supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-}
+window.APP_CONFIG = {
+    // Если фронтенд и backend на одном origin, оставьте '/api'
+    // Пример для раздельного запуска: 'http://localhost:3000/api'
+    apiBaseUrl: '/api'
+};

@@ -1,0 +1,614 @@
+# LAK LEARN — полная документация проекта
+
+Проект: веб‑приложение для изучения лакского языка.
+
+Технологический стек:
+- Backend: Node.js + Express (см. [`server/index.js`](server/index.js))
+- Auth: JWT (см. [`server/auth.js`](server/auth.js))
+- БД: PostgreSQL (схема в [`postgres-setup.sql`](postgres-setup.sql))
+- Frontend: Vanilla JS + HTML + CSS (см. [`app.js`](app.js), [`index.html`](index.html), [`style.css`](style.css))
+- Инфраструктура: Docker Compose + Nginx (см. [`docker-compose.yml`](docker-compose.yml), [`nginx/nginx.conf`](nginx/nginx.conf))
+
+---
+
+## 1) Архитектура и поток данных
+
+1. Браузер открывает UI из [`index.html`](index.html), логика на клиенте в [`app.js`](app.js).
+2. Клиент ходит в REST API по пути `/api` (конфиг в [`supabase-config.js`](supabase-config.js)).
+3. API в [`server/index.js`](server/index.js) валидирует запросы, проверяет JWT и роль admin.
+4. API работает с PostgreSQL через пул подключений в [`server/db.js`](server/db.js).
+5. Все долгоживущие данные (пользователи, словарь, прогресс) хранятся в PostgreSQL.
+
+---
+
+## 2) Назначение каждого файла в репозитории
+
+### Корень проекта
+
+- [`package.json`](package.json) — npm-скрипты и зависимости.
+  - Запуск production: скрипт `start`.
+  - Запуск dev с watch: скрипт `dev`.
+- [`README`](README) — эта документация.
+- [`index.html`](index.html) — разметка UI (авторизация, карточки, тест, словарь, настройки, админка).
+- [`style.css`](style.css) — стили интерфейса.
+- [`app.js`](app.js) — клиентская бизнес-логика: auth UI, работа со словарём, прогрессом, админ-панелью.
+- [`supabase-config.js`](supabase-config.js) — runtime-конфиг frontend API base URL (`window.APP_CONFIG`).
+
+### SQL/миграции
+
+- [`postgres-setup.sql`](postgres-setup.sql) — **актуальная** схема PostgreSQL для Node+JWT-архитектуры.
+- [`supabase-seed-words.sql`](supabase-seed-words.sql) — seed слов в таблицу `public.words`.
+- [`supabase-setup.sql`](supabase-setup.sql) — **legacy** скрипт для Supabase (`auth.users`, RLS-политики).
+- [`supabase-admin-migration.sql`](supabase-admin-migration.sql) — **legacy** админ-миграция для Supabase-политик/RPC.
+- [`supabase-admin-rollback.sql`](supabase-admin-rollback.sql) — **legacy** откат Supabase админ-миграции.
+
+### Инфраструктура
+
+- [`Dockerfile`](Dockerfile) — контейнер приложения Node.
+- [`docker-compose.yml`](docker-compose.yml) — orchestration: `postgres` + `app` + `nginx`.
+- [`.env.docker.example`](.env.docker.example) — шаблон env для Docker запуска.
+- [`nginx/nginx.conf`](nginx/nginx.conf) — reverse proxy на сервис `app:3000`.
+- [`.dockerignore`](.dockerignore) — сейчас практически пустой (строки закомментированы).
+
+### Backend
+
+- [`server/index.js`](server/index.js) — HTTP API, CORS, маршруты, статика, graceful shutdown.
+- [`server/auth.js`](server/auth.js) — подпись/проверка JWT + middleware авторизации/роли admin.
+- [`server/db.js`](server/db.js) — конфигурация `pg.Pool`, обёртка запросов к БД.
+
+### Данные и git-правила
+
+- [`data/words.json`](data/words.json) — fallback-словарь для frontend, если БД пуста/недоступна.
+- [`.gitignore`](.gitignore) — исключения из git.
+
+---
+
+## 3) Переменные окружения
+
+Локально проект читает переменные из файла `.env` через `dotenv` (см. [`server/db.js`](server/db.js) и [`server/auth.js`](server/auth.js)).
+
+Минимально необходимые переменные:
+
+- `PGHOST`
+- `PGPORT`
+- `PGUSER`
+- `PGPASSWORD`
+- `PGDATABASE`
+- `JWT_SECRET`
+- `JWT_EXPIRES_IN` (необязательно, по умолчанию `7d`)
+- `CORS_ORIGIN`
+- `PORT` (необязательно, по умолчанию `3000`)
+
+Пример `.env` для локального запуска:
+
+```dotenv
+PGHOST=127.0.0.1
+PGPORT=5432
+PGUSER=postgres
+PGPASSWORD=postgres
+PGDATABASE=lak_learn
+
+JWT_SECRET=change_me_very_strong_secret
+JWT_EXPIRES_IN=7d
+
+CORS_ORIGIN=http://localhost:3000
+PORT=3000
+```
+
+---
+
+## 4) Подготовка PostgreSQL
+
+### 4.1 Создание схемы
+
+Выполнить SQL:
+
+1. [`postgres-setup.sql`](postgres-setup.sql)
+2. (опционально) [`supabase-seed-words.sql`](supabase-seed-words.sql)
+
+### 4.2 Что делает PostgreSQL в проекте
+
+PostgreSQL — центральное state-хранилище приложения. Он хранит:
+
+1. Учётные записи и хэши паролей
+2. Профили пользователей и роль администратора
+3. Персональный прогресс обучения
+4. Глобальный словарь слов
+
+Подробно по таблицам (из [`postgres-setup.sql`](postgres-setup.sql)):
+
+- `public.users`
+  - `id` (UUID)
+  - `email` (уникальный)
+  - `password_hash` (bcrypt hash)
+  - `created_at`, `updated_at`
+  - Назначение: локальная аутентификация приложения
+
+- `public.profiles`
+  - `id` (UUID, FK на `users.id`)
+  - `username`
+  - `is_admin` (boolean)
+  - `created_at`, `updated_at`
+  - Назначение: профиль и права пользователя
+
+- `public.user_progress`
+  - `user_id` (UUID, FK на `users.id`)
+  - `learned_words` (массив ID слов)
+  - `quiz_correct`, `quiz_wrong`
+  - `theme` (`light|dark`)
+  - `current_card_index`
+  - `updated_at`
+  - Назначение: персональный прогресс в обучении
+
+- `public.words`
+  - `id` (bigint identity)
+  - `lak`, `ru`, `transcription`, `category`, `example`
+  - `created_at`, `updated_at`
+  - Назначение: общий словарь для всех пользователей
+
+Также есть индексы и триггеры для автоматического обновления `updated_at`.
+
+---
+
+## 5) Как запустить проект
+
+## 5.1 Локально (без Docker)
+
+1. Установить зависимости:
+
+```bash
+npm install
+```
+
+2. Подготовить `.env` (см. раздел выше).
+
+3. Запустить сервер:
+
+```bash
+npm start
+```
+
+или dev-режим:
+
+```bash
+npm run dev
+```
+
+Приложение будет доступно на `http://localhost:3000`.
+
+## 5.2 Через Docker Compose
+
+1. Скопировать [` .env.docker.example`](.env.docker.example) в `.env.docker`.
+2. Обязательно заменить `JWT_SECRET` на безопасный.
+3. Поднять стек:
+
+```bash
+docker compose --env-file .env.docker up -d --build
+```
+
+4. Проверить статус:
+
+```bash
+docker compose --env-file .env.docker ps
+```
+
+5. Приложение доступно по `http://localhost` (через Nginx).
+
+Остановка:
+
+```bash
+docker compose --env-file .env.docker down
+```
+
+Остановка с удалением тома БД:
+
+```bash
+docker compose --env-file .env.docker down -v
+```
+
+---
+
+## 6) Администрирование проекта
+
+## 6.1 Как сделать пользователя админом
+
+После регистрации пользователя выполнить SQL:
+
+```sql
+update public.profiles
+set is_admin = true
+where id = '<USER_UUID>';
+```
+
+Как найти UUID:
+
+```sql
+select p.id, p.username, u.email
+from public.profiles p
+join public.users u on u.id = p.id
+order by p.created_at desc;
+```
+
+Проверка админов:
+
+```sql
+select p.id, p.username, u.email, p.is_admin
+from public.profiles p
+join public.users u on u.id = p.id
+where p.is_admin = true;
+```
+
+Снять права админа:
+
+```sql
+update public.profiles
+set is_admin = false
+where id = '<USER_UUID>';
+```
+
+## 6.2 Что может админ
+
+Админ может:
+- Добавлять слова: `POST /api/words`
+- Редактировать слова: `PUT /api/words/:id`
+- Просматривать список пользователей: `GET /api/admin/users`
+
+Проверка прав реализована в middleware `adminRequired` (см. [`server/auth.js`](server/auth.js)).
+
+## 6.3 Healthcheck и эксплуатация
+
+- Health endpoint: `GET /api/health` (см. [`server/index.js`](server/index.js))
+- Проверка Docker контейнеров:
+
+```bash
+docker compose --env-file .env.docker ps
+```
+
+- Логи приложения:
+
+```bash
+docker compose --env-file .env.docker logs -f app
+```
+
+- Логи PostgreSQL:
+
+```bash
+docker compose --env-file .env.docker logs -f postgres
+```
+
+## 6.4 Резервные копии PostgreSQL
+
+Пример бэкапа:
+
+```bash
+docker exec -t lak-postgres pg_dump -U postgres -d lak_learn > backup.sql
+```
+
+Пример восстановления:
+
+```bash
+cat backup.sql | docker exec -i lak-postgres psql -U postgres -d lak_learn
+```
+
+---
+
+## 7) API — подробная документация
+
+Базовый префикс: `/api`
+
+Для защищённых endpoint передавать header:
+
+```http
+Authorization: Bearer <JWT_TOKEN>
+```
+
+### 7.1 Системные
+
+#### `GET /api/health`
+
+Назначение: проверить доступность API и БД.
+
+Ответ `200`:
+
+```json
+{ "ok": true }
+```
+
+Ответ `500`:
+
+```json
+{ "ok": false, "error": "..." }
+```
+
+### 7.2 Авторизация
+
+#### `POST /api/auth/register`
+
+Создаёт пользователя, профиль, начальный прогресс и возвращает JWT.
+
+Тело запроса:
+
+```json
+{
+  "username": "string, min 3",
+  "email": "valid email",
+  "password": "string, min 6"
+}
+```
+
+Успех `201`:
+
+```json
+{
+  "token": "<jwt>",
+  "user": {
+    "id": "uuid",
+    "username": "Имя",
+    "is_admin": false,
+    "email": "mail@example.com"
+  }
+}
+```
+
+Ошибки:
+- `400` — невалидные поля
+- `409` — email уже существует
+- `500` — внутренняя ошибка
+
+#### `POST /api/auth/login`
+
+Логин по email/паролю, сравнение пароля через bcrypt.
+
+Тело:
+
+```json
+{
+  "email": "mail@example.com",
+  "password": "secret"
+}
+```
+
+Успех `200`:
+
+```json
+{
+  "token": "<jwt>",
+  "user": {
+    "id": "uuid",
+    "email": "mail@example.com",
+    "username": "Имя",
+    "is_admin": false
+  }
+}
+```
+
+Ошибки:
+- `400` — пустой email/password
+- `401` — неверный логин/пароль
+- `500` — внутренняя ошибка
+
+#### `GET /api/auth/me`
+
+Возвращает профиль текущего пользователя по токену.
+
+Успех `200`:
+
+```json
+{
+  "user": {
+    "id": "uuid",
+    "username": "Имя",
+    "is_admin": false,
+    "email": "mail@example.com"
+  }
+}
+```
+
+Ошибки:
+- `401` — токен отсутствует/некорректен
+- `404` — пользователь не найден
+
+### 7.3 Словарь
+
+#### `GET /api/words`
+
+Возвращает весь словарь.
+
+Успех `200`:
+
+```json
+{
+  "data": [
+    {
+      "id": 1,
+      "lak": "Салам",
+      "ru": "Здравствуйте",
+      "transcription": "[салам]",
+      "category": "Приветствия",
+      "example": "Салам, ..."
+    }
+  ]
+}
+```
+
+#### `POST /api/words` (admin)
+
+Добавляет слово в словарь.
+
+Тело:
+
+```json
+{
+  "lak": "...",
+  "ru": "...",
+  "transcription": "...",
+  "category": "...",
+  "example": "..."
+}
+```
+
+Успех `201`:
+
+```json
+{ "data": { "id": 123, "lak": "...", "ru": "...", "transcription": "...", "category": "...", "example": "..." } }
+```
+
+Ошибки:
+- `400` — не заполнены обязательные поля
+- `401` — нет авторизации
+- `403` — недостаточно прав (не admin)
+
+#### `PUT /api/words/:id` (admin)
+
+Обновляет существующее слово.
+
+Тело такое же, как у создания.
+
+Успех `200`:
+
+```json
+{ "data": { "id": 123, "lak": "...", "ru": "...", "transcription": "...", "category": "...", "example": "..." } }
+```
+
+Ошибки:
+- `404` — слово не найдено
+- `403` — нет прав
+
+### 7.4 Прогресс
+
+#### `GET /api/progress`
+
+Возвращает прогресс текущего пользователя.
+
+Если записи нет, API возвращает значения по умолчанию.
+
+Успех `200`:
+
+```json
+{
+  "data": {
+    "user_id": "uuid",
+    "learned_words": [1, 2, 3],
+    "quiz_correct": 12,
+    "quiz_wrong": 4,
+    "theme": "light",
+    "current_card_index": 5
+  }
+}
+```
+
+#### `PUT /api/progress`
+
+Создаёт/обновляет прогресс (upsert).
+
+Тело:
+
+```json
+{
+  "learned_words": [1, 2, 3],
+  "quiz_correct": 12,
+  "quiz_wrong": 4,
+  "theme": "dark",
+  "current_card_index": 5
+}
+```
+
+Успех `200`: возвращает сохранённый объект `data`.
+
+### 7.5 Админ
+
+#### `GET /api/admin/users` (admin)
+
+Список пользователей.
+
+Успех `200`:
+
+```json
+{
+  "data": [
+    {
+      "id": "uuid",
+      "username": "user1",
+      "email": "user1@mail.com",
+      "created_at": "2026-01-01T00:00:00.000Z"
+    }
+  ]
+}
+```
+
+Ошибки:
+- `401` — без токена
+- `403` — не admin
+
+---
+
+## 8) Безопасность и ограничения
+
+1. JWT обязателен для всех endpoint, кроме `register`, `login`, `health`.
+2. Секрет должен быть сложным и уникальным в каждом окружении.
+3. Для production задавать конкретный `CORS_ORIGIN`, не `*`.
+4. Пароли в БД хранятся как hash (bcrypt), а не в открытом виде.
+5. Для SQL-запросов используются параметризованные запросы (защита от SQL injection).
+
+---
+
+## 9) Кандидаты на удаление/реорганизацию
+
+Ниже — безопасные кандидаты на очистку репозитория (после проверки ваших процессов):
+
+1. [`supabase-setup.sql`](supabase-setup.sql) — legacy Supabase-схема, не используется Node backend.
+2. [`supabase-admin-migration.sql`](supabase-admin-migration.sql) — legacy для Supabase RLS/RPC.
+3. [`supabase-admin-rollback.sql`](supabase-admin-rollback.sql) — rollback legacy Supabase миграции.
+
+Условно-кандидат (решение по процессу деплоя):
+
+4. [`supabase-seed-words.sql`](supabase-seed-words.sql) — можно оставить как seed; удалить, если сидирование ведёте иначе.
+
+Требует доработки, а не удаления:
+
+5. [`.dockerignore`](.dockerignore) — файл есть, но все правила закомментированы. Лучше актуализировать, чтобы не отправлять лишнее в Docker build context.
+
+Рекомендуемый минимум для ` .dockerignore`:
+
+```dockerignore
+node_modules
+.git
+.env
+.env.*
+npm-debug.log
+README
+```
+
+---
+
+## 10) Возможные несоответствия, которые стоит поправить
+
+1. В старой версии документации была ссылка на `.env.example`, но файла нет в репозитории.
+   - Рекомендуется добавить отдельный шаблон `.env.example` для локального запуска.
+2. Название [`supabase-config.js`](supabase-config.js) может вводить в заблуждение, так как Supabase SDK больше не используется.
+   - Рекомендуется переименовать в `app-config.js` и обновить импорт в [`index.html`](index.html).
+
+---
+
+## 11) Быстрый чек-лист запуска с нуля
+
+1. Поднять PostgreSQL.
+2. Выполнить [`postgres-setup.sql`](postgres-setup.sql).
+3. (Опционально) загрузить слова через [`supabase-seed-words.sql`](supabase-seed-words.sql).
+4. Заполнить `.env`.
+5. Выполнить `npm install`.
+6. Выполнить `npm start`.
+7. Зарегистрировать пользователя.
+8. Выдать admin-права SQL-запросом к `public.profiles`.
+9. Проверить вход в админ-вкладку и операции словаря.
+
+---
+
+## 12) Основные исходники для поддержки проекта
+
+- Backend API: [`server/index.js`](server/index.js)
+- Auth/JWT middleware: [`server/auth.js`](server/auth.js)
+- Подключение к БД: [`server/db.js`](server/db.js)
+- Клиентское приложение: [`app.js`](app.js)
+- Схема БД: [`postgres-setup.sql`](postgres-setup.sql)
+- Docker стек: [`docker-compose.yml`](docker-compose.yml), [`Dockerfile`](Dockerfile), [`nginx/nginx.conf`](nginx/nginx.conf)
