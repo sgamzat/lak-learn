@@ -10,6 +10,8 @@ services:
     volumes:
       - pg_data:/var/lib/postgresql/data
       - ./postgres-setup.sql:/docker-entrypoint-initdb.d/01-postgres-setup.sql:ro
+      - ./migrations/20260429_lak_html_stage1.sql:/docker-entrypoint-initdb.d/02-lak-stage1.sql:ro
+      - ./data/lak_seed.sql:/docker-entrypoint-initdb.d/03-lak-seed.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-lak_learn}"]
       interval: 5s

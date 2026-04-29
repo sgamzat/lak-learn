@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
+import fs from 'fs/promises';
 import { fileURLToPath } from 'url';
 import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv';
@@ -15,6 +16,17 @@ const PORT = Number(process.env.PORT || 3000);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '..');
+const seedDir = path.join(rootDir, 'data', 'seed');
+
+async function readSeedJson(fileName, fallback = null) {
+    try {
+        const fullPath = path.join(seedDir, fileName);
+        const raw = await fs.readFile(fullPath, 'utf8');
+        return JSON.parse(raw);
+    } catch (_e) {
+        return fallback;
+    }
+}
 
 const corsOrigin = process.env.CORS_ORIGIN || '*';
 const allowAllCors = corsOrigin === '*';
@@ -166,9 +178,128 @@ app.get('/api/words', authRequired, async (_req, res) => {
              from public.words
              order by id asc`
         );
-        return res.json({ data: result.rows });
+
+        if (result.rowCount > 0) {
+            return res.json({ data: result.rows });
+        }
+
+        const fallback = await readSeedJson('dictionary.json', []);
+        return res.json({ data: Array.isArray(fallback) ? fallback : [] });
     } catch (e) {
-        return res.status(500).json({ error: 'Ошибка загрузки словаря', details: e.message });
+        const fallback = await readSeedJson('dictionary.json', []);
+        return res.json({ data: Array.isArray(fallback) ? fallback : [] });
+    }
+});
+
+app.get('/api/alphabet', authRequired, async (_req, res) => {
+    try {
+        const result = await query(
+            `select id, source, order_index, row_index, col_index, pair_text, letter_upper, letter_lower
+             from public.alphabet_letters
+             order by order_index asc`
+        );
+
+        if (result.rowCount > 0) {
+            return res.json({ data: result.rows });
+        }
+
+        const fallback = await readSeedJson('alphabet.json', []);
+        return res.json({ data: Array.isArray(fallback) ? fallback : [] });
+    } catch (_e) {
+        const fallback = await readSeedJson('alphabet.json', []);
+        return res.json({ data: Array.isArray(fallback) ? fallback : [] });
+    }
+});
+
+app.get('/api/phrasebook/sections', authRequired, async (_req, res) => {
+    try {
+        const result = await query(
+            `select id, source, source_section, title_ru, title_lak, section_type, order_index
+             from public.phrasebook_sections
+             order by order_index asc`
+        );
+
+        if (result.rowCount > 0) {
+            return res.json({ data: result.rows });
+        }
+
+        const fallback = await readSeedJson('phrasebook_sections.json', []);
+        return res.json({ data: Array.isArray(fallback) ? fallback : [] });
+    } catch (_e) {
+        const fallback = await readSeedJson('phrasebook_sections.json', []);
+        return res.json({ data: Array.isArray(fallback) ? fallback : [] });
+    }
+});
+
+app.get('/api/phrasebook/entries', authRequired, async (req, res) => {
+    const sourceSection = String(req.query.section || '').trim();
+
+    try {
+        if (sourceSection) {
+            const result = await query(
+                `select e.id, e.section_id, e.source, e.source_section, e.order_index, e.ru, e.lak, e.normalized_key,
+                        s.title_ru as section_title_ru, s.title_lak as section_title_lak, s.section_type
+                 from public.phrasebook_entries e
+                 join public.phrasebook_sections s on s.id = e.section_id
+                 where e.source_section = $1
+                 order by e.order_index asc`,
+                [sourceSection]
+            );
+            if (result.rowCount > 0) {
+                return res.json({ data: result.rows });
+            }
+        } else {
+            const result = await query(
+                `select e.id, e.section_id, e.source, e.source_section, e.order_index, e.ru, e.lak, e.normalized_key,
+                        s.title_ru as section_title_ru, s.title_lak as section_title_lak, s.section_type
+                 from public.phrasebook_entries e
+                 join public.phrasebook_sections s on s.id = e.section_id
+                 order by s.order_index asc, e.order_index asc`
+            );
+            if (result.rowCount > 0) {
+                return res.json({ data: result.rows });
+            }
+        }
+
+        const fallback = await readSeedJson('phrasebook_entries.json', []);
+        const fallbackRows = Array.isArray(fallback) ? fallback : [];
+        const data = sourceSection
+            ? fallbackRows.filter(item => String(item.source_section) === sourceSection)
+            : fallbackRows;
+        return res.json({ data });
+    } catch (_e) {
+        const fallback = await readSeedJson('phrasebook_entries.json', []);
+        const fallbackRows = Array.isArray(fallback) ? fallback : [];
+        const data = sourceSection
+            ? fallbackRows.filter(item => String(item.source_section) === sourceSection)
+            : fallbackRows;
+        return res.json({ data });
+    }
+});
+
+app.get('/api/reading-notes', authRequired, async (_req, res) => {
+    try {
+        const result = await query(
+            `select id, source, note_type, order_index, title, content
+             from public.reading_notes
+             order by note_type asc, order_index asc`
+        );
+
+        if (result.rowCount > 0) {
+            const notes = result.rows
+                .filter(row => row.note_type === 'note')
+                .map(row => ({ id: row.id, title: row.title, text: row.content }));
+            const pronunciation_rules = result.rows
+                .filter(row => row.note_type === 'rule')
+                .map(row => ({ id: row.id, symbol: row.title, description: row.content }));
+            return res.json({ data: { notes, pronunciation_rules } });
+        }
+
+        const fallback = await readSeedJson('reading_notes.json', { notes: [], pronunciation_rules: [] });
+        return res.json({ data: fallback || { notes: [], pronunciation_rules: [] } });
+    } catch (_e) {
+        const fallback = await readSeedJson('reading_notes.json', { notes: [], pronunciation_rules: [] });
+        return res.json({ data: fallback || { notes: [], pronunciation_rules: [] } });
     }
 });
 

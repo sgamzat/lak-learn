@@ -975,3 +975,57 @@ body {
 .shake {
     animation: shake 0.3s ease;
 }
+
+/* ============================================
+   ALPHABET / PHRASEBOOK / NOTES
+   ============================================ */
+.alphabet-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 10px;
+}
+
+.alphabet-cell {
+    background: var(--bg-card);
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 10px;
+    text-align: center;
+}
+
+.alphabet-main {
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.alphabet-sub {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+}
+
+.notes-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.note-item {
+    background: var(--bg-card);
+    border: 2px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 14px;
+}
+
+.note-item h3 {
+    font-size: 1rem;
+    margin-bottom: 8px;
+    color: var(--accent-primary);
+}
+
+.note-item p {
+    color: var(--text-primary);
+}
+
+.rule-item h3 {
+    font-size: 1.1rem;
+}

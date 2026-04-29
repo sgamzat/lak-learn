@@ -64,6 +64,9 @@
             <button class="tab-btn active" data-tab="cards">Карточки</button>
             <button class="tab-btn" data-tab="quiz">Тест</button>
             <button class="tab-btn" data-tab="dictionary">Словарь</button>
+            <button class="tab-btn" data-tab="alphabet">Алфавит</button>
+            <button class="tab-btn" data-tab="phrasebook">Разговорник</button>
+            <button class="tab-btn" data-tab="notes">Конспект</button>
             <button class="tab-btn" data-tab="settings">Настройки</button>
             <button id="admin-tab-btn" class="tab-btn hidden" data-tab="admin">Админ</button>
         </nav>
@@ -141,6 +144,44 @@
 
                 <div id="empty-state" class="empty-state" style="display: none;">
                     <p>Ничего не найдено</p>
+                </div>
+            </section>
+
+            <!-- Alphabet Mode -->
+            <section id="alphabet" class="tab-content">
+                <div class="settings-section">
+                    <h2>Лакский алфавит</h2>
+                    <p class="info-text">Таблица букв на основе разговорника Л. А. Дигиева.</p>
+                    <div id="alphabet-table" class="alphabet-grid"></div>
+                </div>
+            </section>
+
+            <!-- Phrasebook Mode -->
+            <section id="phrasebook" class="tab-content">
+                <div class="search-filters">
+                    <select id="phrasebook-section-filter" class="category-filter">
+                        <option value="">Все разделы</option>
+                    </select>
+                    <input type="text" id="phrasebook-search" class="search-input" placeholder="Поиск по разговорнику...">
+                </div>
+
+                <div id="phrasebook-list" class="dictionary-list"></div>
+
+                <div id="phrasebook-empty-state" class="empty-state" style="display: none;">
+                    <p>По запросу ничего не найдено</p>
+                </div>
+            </section>
+
+            <!-- Reading Notes Mode -->
+            <section id="notes" class="tab-content">
+                <div class="settings-section">
+                    <h2>Конспект: чтение и произношение</h2>
+                    <div id="reading-notes-list" class="notes-list"></div>
+                </div>
+
+                <div class="settings-section">
+                    <h2>Правила и специфические звуки</h2>
+                    <div id="pronunciation-rules-list" class="notes-list"></div>
                 </div>
             </section>
 

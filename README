@@ -106,6 +106,62 @@ PORT=3000
 1. [`postgres-setup.sql`](postgres-setup.sql)
 2. (опционально) [`supabase-seed-words.sql`](supabase-seed-words.sql)
 
+### 4.3 Импорт данных из [`lak_words.html`](lak_words.html)
+
+Для Этапа 1 добавлен миграционный файл [`migrations/20260429_lak_html_stage1.sql`](migrations/20260429_lak_html_stage1.sql) и ETL-скрипт [`scripts/import-lak-html.js`](scripts/import-lak-html.js).
+
+Порядок запуска:
+
+1. Установить зависимости (включая `cheerio`):
+
+```bash
+npm install
+```
+
+2. Применить базовую схему:
+
+```bash
+psql "$DATABASE_URL" -f postgres-setup.sql
+```
+
+3. Применить миграцию Stage 1:
+
+```bash
+psql "$DATABASE_URL" -f migrations/20260429_lak_html_stage1.sql
+```
+
+4. Запустить импорт:
+
+```bash
+npm run import:lak-html
+```
+
+Что делает импорт:
+- наполняет таблицу алфавита `public.alphabet_letters`;
+- наполняет разделы разговорника/словаря в `public.phrasebook_sections` и `public.phrasebook_entries`;
+- расширяет `public.words` записями из источника `digiev_html` (без изменения UI).
+
+### 4.4 Переносимая стартовая база (SQL + JSON)
+
+Для стабильного развёртывания добавлен генератор стартовой базы из [`lak_words.html`](lak_words.html): [`scripts/build-lak-seed.js`](scripts/build-lak-seed.js).
+
+Команда генерации:
+
+```bash
+npm run build:lak-seed
+```
+
+Артефакты:
+- [`data/lak_seed.sql`](data/lak_seed.sql) — единый SQL seed для PostgreSQL;
+- [`data/seed/alphabet.json`](data/seed/alphabet.json);
+- [`data/seed/phrasebook_sections.json`](data/seed/phrasebook_sections.json);
+- [`data/seed/phrasebook_entries.json`](data/seed/phrasebook_entries.json);
+- [`data/seed/dictionary.json`](data/seed/dictionary.json);
+- [`data/seed/reading_notes.json`](data/seed/reading_notes.json);
+- [`data/seed/manifest.json`](data/seed/manifest.json).
+
+Эти файлы используются как переносимый источник данных и fallback для API/фронтенда.
+
 ### 4.2 Что делает PostgreSQL в проекте
 
 PostgreSQL — центральное state-хранилище приложения. Он хранит:
@@ -180,19 +236,30 @@ npm run dev
 
 1. Скопировать [` .env.docker.example`](.env.docker.example) в `.env.docker`.
 2. Обязательно заменить `JWT_SECRET` на безопасный.
-3. Поднять стек:
+3. (рекомендуется) Сгенерировать актуальный seed из [`lak_words.html`](lak_words.html):
+
+```bash
+npm run build:lak-seed
+```
+
+4. Поднять стек:
 
 ```bash
 docker compose --env-file .env.docker up -d --build
 ```
 
-4. Проверить статус:
+При первом старте PostgreSQL автоматически применяет:
+- [`postgres-setup.sql`](postgres-setup.sql);
+- [`migrations/20260429_lak_html_stage1.sql`](migrations/20260429_lak_html_stage1.sql);
+- [`data/lak_seed.sql`](data/lak_seed.sql).
+
+5. Проверить статус:
 
 ```bash
 docker compose --env-file .env.docker ps
 ```
 
-5. Приложение доступно по `http://localhost` (через Nginx).
+6. Приложение доступно по `http://localhost` (через Nginx).
 
 Остановка:
 
@@ -205,6 +272,8 @@ docker compose --env-file .env.docker down
 ```bash
 docker compose --env-file .env.docker down -v
 ```
+
+Важно: если контейнер уже запускался и том `pg_data` существует, init-скрипты не переисполняются. Для повторной полной инициализации используйте `down -v`.
 
 ---
 

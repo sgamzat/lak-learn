@@ -5,10 +5,13 @@
   "type": "module",
   "scripts": {
     "start": "node server/index.js",
-    "dev": "node --watch server/index.js"
+    "dev": "node --watch server/index.js",
+    "import:lak-html": "node scripts/import-lak-html.js",
+    "build:lak-seed": "node scripts/build-lak-seed.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
+    "cheerio": "^1.1.2",
     "cors": "^2.8.5",
     "dotenv": "^16.6.1",
     "express": "^4.21.2",

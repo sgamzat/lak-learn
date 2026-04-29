@@ -154,6 +154,10 @@ const AuthSystem = {
 // ============================================
 
 let DEFAULT_DICTIONARY = [];
+let DEFAULT_ALPHABET = [];
+let DEFAULT_PHRASEBOOK_SECTIONS = [];
+let DEFAULT_PHRASEBOOK_ENTRIES = [];
+let DEFAULT_READING_NOTES = { notes: [], pronunciation_rules: [] };
 
 function normalizeWord(item, index = 0) {
     return {
@@ -164,6 +168,54 @@ function normalizeWord(item, index = 0) {
         category: String(item.category ?? 'Без категории').trim(),
         example: String(item.example ?? '').trim()
     };
+}
+
+function normalizeAlphabetLetter(item, index = 0) {
+    return {
+        id: Number(item.id ?? index + 1),
+        order_index: Number(item.order_index ?? index + 1),
+        row_index: Number(item.row_index ?? 0),
+        col_index: Number(item.col_index ?? 0),
+        pair_text: String(item.pair_text ?? '').trim(),
+        letter_upper: String(item.letter_upper ?? '').trim(),
+        letter_lower: String(item.letter_lower ?? '').trim()
+    };
+}
+
+function normalizePhraseSection(item, index = 0) {
+    return {
+        id: Number(item.id ?? index + 1),
+        source_section: String(item.source_section ?? '').trim(),
+        title_ru: String(item.title_ru ?? '').trim(),
+        title_lak: String(item.title_lak ?? '').trim(),
+        section_type: String(item.section_type ?? '').trim(),
+        order_index: Number(item.order_index ?? index + 1)
+    };
+}
+
+function normalizePhraseEntry(item, index = 0) {
+    return {
+        id: Number(item.id ?? index + 1),
+        section_id: Number(item.section_id ?? 0),
+        source_section: String(item.source_section ?? '').trim(),
+        section_title_ru: String(item.section_title_ru ?? '').trim(),
+        section_type: String(item.section_type ?? '').trim(),
+        order_index: Number(item.order_index ?? index + 1),
+        ru: String(item.ru ?? '').trim(),
+        lak: String(item.lak ?? '').trim()
+    };
+}
+
+async function loadSeedJson(fileName, fallback) {
+    try {
+        const response = await fetch(`data/seed/${fileName}`);
+        if (!response.ok) {
+            return fallback;
+        }
+        return await response.json();
+    } catch (_e) {
+        return fallback;
+    }
 }
 
 async function loadDictionaryFromFile() {
@@ -215,12 +267,102 @@ async function loadDictionary() {
     }
 }
 
+async function loadAlphabet() {
+    try {
+        const result = await ApiClient.request('/alphabet');
+        const data = Array.isArray(result?.data) ? result.data : [];
+        if (data.length > 0) {
+            DEFAULT_ALPHABET = data.map((item, idx) => normalizeAlphabetLetter(item, idx));
+            return DEFAULT_ALPHABET;
+        }
+    } catch (_e) {
+        // fallback below
+    }
+
+    const fallback = await loadSeedJson('alphabet.json', []);
+    DEFAULT_ALPHABET = Array.isArray(fallback)
+        ? fallback.map((item, idx) => normalizeAlphabetLetter(item, idx))
+        : [];
+    return DEFAULT_ALPHABET;
+}
+
+async function loadPhrasebookSections() {
+    try {
+        const result = await ApiClient.request('/phrasebook/sections');
+        const data = Array.isArray(result?.data) ? result.data : [];
+        if (data.length > 0) {
+            DEFAULT_PHRASEBOOK_SECTIONS = data.map((item, idx) => normalizePhraseSection(item, idx));
+            return DEFAULT_PHRASEBOOK_SECTIONS;
+        }
+    } catch (_e) {
+        // fallback below
+    }
+
+    const fallback = await loadSeedJson('phrasebook_sections.json', []);
+    DEFAULT_PHRASEBOOK_SECTIONS = Array.isArray(fallback)
+        ? fallback.map((item, idx) => normalizePhraseSection(item, idx))
+        : [];
+    return DEFAULT_PHRASEBOOK_SECTIONS;
+}
+
+async function loadPhrasebookEntries() {
+    try {
+        const result = await ApiClient.request('/phrasebook/entries');
+        const data = Array.isArray(result?.data) ? result.data : [];
+        if (data.length > 0) {
+            DEFAULT_PHRASEBOOK_ENTRIES = data.map((item, idx) => normalizePhraseEntry(item, idx));
+            return DEFAULT_PHRASEBOOK_ENTRIES;
+        }
+    } catch (_e) {
+        // fallback below
+    }
+
+    const fallback = await loadSeedJson('phrasebook_entries.json', []);
+    DEFAULT_PHRASEBOOK_ENTRIES = Array.isArray(fallback)
+        ? fallback.map((item, idx) => normalizePhraseEntry(item, idx))
+        : [];
+    return DEFAULT_PHRASEBOOK_ENTRIES;
+}
+
+async function loadReadingNotes() {
+    try {
+        const result = await ApiClient.request('/reading-notes');
+        const data = result?.data;
+        if (data && Array.isArray(data.notes) && Array.isArray(data.pronunciation_rules)) {
+            DEFAULT_READING_NOTES = data;
+            return DEFAULT_READING_NOTES;
+        }
+    } catch (_e) {
+        // fallback below
+    }
+
+    const fallback = await loadSeedJson('reading_notes.json', { notes: [], pronunciation_rules: [] });
+    DEFAULT_READING_NOTES = {
+        notes: Array.isArray(fallback?.notes) ? fallback.notes : [],
+        pronunciation_rules: Array.isArray(fallback?.pronunciation_rules) ? fallback.pronunciation_rules : []
+    };
+    return DEFAULT_READING_NOTES;
+}
+
+async function loadSupplementaryData() {
+    await Promise.all([
+        loadAlphabet(),
+        loadPhrasebookSections(),
+        loadPhrasebookEntries(),
+        loadReadingNotes()
+    ]);
+}
+
 // ============================================
 // STATE MANAGEMENT
 // ============================================
 
 const AppState = {
     dictionary: [],
+    alphabet: [],
+    phrasebookSections: [],
+    phrasebookEntries: [],
+    readingNotes: { notes: [], pronunciation_rules: [] },
     learnedWords: [],
     quizScore: { correct: 0, wrong: 0 },
     currentCardIndex: 0,
@@ -376,6 +518,15 @@ function switchTab(tabId) {
             break;
         case 'dictionary':
             renderDictionary();
+            break;
+        case 'alphabet':
+            renderAlphabet();
+            break;
+        case 'phrasebook':
+            renderPhrasebook();
+            break;
+        case 'notes':
+            renderReadingNotes();
             break;
         case 'settings':
             updateStats();
@@ -776,6 +927,108 @@ function updateCategoryFilter() {
         categories.map(cat => `<option value="${escapeHtml(cat)}">${escapeHtml(cat)}</option>`).join('');
 }
 
+function renderAlphabet() {
+    const container = document.getElementById('alphabet-table');
+    if (!container) return;
+
+    const letters = Array.isArray(AppState.alphabet) ? AppState.alphabet : [];
+    if (letters.length === 0) {
+        container.innerHTML = '<p class="info-text">Алфавит пока не загружен</p>';
+        return;
+    }
+
+    container.innerHTML = letters
+        .sort((a, b) => Number(a.order_index) - Number(b.order_index))
+        .map(letter => `
+            <div class="alphabet-cell">
+                <div class="alphabet-main">${escapeHtml(letter.pair_text)}</div>
+                <div class="alphabet-sub">${escapeHtml(letter.letter_upper)} · ${escapeHtml(letter.letter_lower)}</div>
+            </div>
+        `)
+        .join('');
+}
+
+function updatePhrasebookSectionFilter() {
+    const select = document.getElementById('phrasebook-section-filter');
+    if (!select) return;
+
+    const sections = [...AppState.phrasebookSections]
+        .sort((a, b) => Number(a.order_index) - Number(b.order_index));
+
+    select.innerHTML =
+        '<option value="">Все разделы</option>' +
+        sections.map(s => `<option value="${escapeHtml(s.source_section)}">${escapeHtml(s.title_ru)}</option>`).join('');
+}
+
+function renderPhrasebook() {
+    const sectionFilter = document.getElementById('phrasebook-section-filter');
+    const searchInput = document.getElementById('phrasebook-search');
+    const listContainer = document.getElementById('phrasebook-list');
+    const emptyState = document.getElementById('phrasebook-empty-state');
+
+    if (!sectionFilter || !searchInput || !listContainer || !emptyState) return;
+
+    const section = String(sectionFilter.value || '');
+    const search = String(searchInput.value || '').toLowerCase();
+
+    const filtered = AppState.phrasebookEntries
+        .filter(item => !section || item.source_section === section)
+        .filter(item => {
+            if (!search) return true;
+            return item.ru.toLowerCase().includes(search) || item.lak.toLowerCase().includes(search);
+        });
+
+    if (filtered.length === 0) {
+        listContainer.style.display = 'none';
+        emptyState.style.display = 'block';
+        return;
+    }
+
+    listContainer.style.display = 'flex';
+    emptyState.style.display = 'none';
+
+    listContainer.innerHTML = filtered
+        .map(item => `
+            <div class="dict-item">
+                <div class="dict-header">
+                    <span class="dict-lak">${escapeHtml(item.lak)}</span>
+                    <span class="dict-category">${escapeHtml(item.section_title_ru || item.source_section)}</span>
+                </div>
+                <div class="dict-ru">${escapeHtml(item.ru)}</div>
+            </div>
+        `)
+        .join('');
+}
+
+function renderReadingNotes() {
+    const notesList = document.getElementById('reading-notes-list');
+    const rulesList = document.getElementById('pronunciation-rules-list');
+    if (!notesList || !rulesList) return;
+
+    const notes = Array.isArray(AppState.readingNotes?.notes) ? AppState.readingNotes.notes : [];
+    const rules = Array.isArray(AppState.readingNotes?.pronunciation_rules)
+        ? AppState.readingNotes.pronunciation_rules
+        : [];
+
+    notesList.innerHTML = notes.length > 0
+        ? notes.map(note => `
+            <div class="note-item">
+                <h3>${escapeHtml(note.title || 'Заметка')}</h3>
+                <p>${escapeHtml(note.text || '')}</p>
+            </div>
+        `).join('')
+        : '<p class="info-text">Конспект пока не загружен</p>';
+
+    rulesList.innerHTML = rules.length > 0
+        ? rules.map(rule => `
+            <div class="note-item rule-item">
+                <h3>${escapeHtml(rule.symbol || '')}</h3>
+                <p>${escapeHtml(rule.description || '')}</p>
+            </div>
+        `).join('')
+        : '<p class="info-text">Правила произношения пока не загружены</p>';
+}
+
 // ============================================
 // IMPORT/EXPORT
 // ============================================
@@ -907,6 +1160,8 @@ function bindAppHandlers() {
 
     document.getElementById('search-input').addEventListener('input', renderDictionary);
     document.getElementById('category-filter').addEventListener('change', renderDictionary);
+    document.getElementById('phrasebook-section-filter')?.addEventListener('change', renderPhrasebook);
+    document.getElementById('phrasebook-search')?.addEventListener('input', renderPhrasebook);
 
     document.getElementById('export-json').addEventListener('click', exportDictionary);
     document.getElementById('import-json').addEventListener('change', () => importDictionary());
@@ -935,7 +1190,16 @@ function bindAppHandlers() {
 }
 
 async function initApp() {
+    await loadSupplementaryData();
     await loadState();
+
+    AppState.alphabet = [...DEFAULT_ALPHABET];
+    AppState.phrasebookSections = [...DEFAULT_PHRASEBOOK_SECTIONS];
+    AppState.phrasebookEntries = [...DEFAULT_PHRASEBOOK_ENTRIES];
+    AppState.readingNotes = {
+        notes: [...(DEFAULT_READING_NOTES.notes || [])],
+        pronunciation_rules: [...(DEFAULT_READING_NOTES.pronunciation_rules || [])]
+    };
 
     applyTheme(AppState.theme);
     bindAppHandlers();
@@ -949,8 +1213,12 @@ async function initApp() {
     updateProgressUI();
     updateQuizScoreUI();
     updateCategoryFilter();
+    updatePhrasebookSectionFilter();
     renderCard();
     renderDictionary();
+    renderAlphabet();
+    renderPhrasebook();
+    renderReadingNotes();
     updateStats();
     updateAdminUI();
     renderAdminWordsList();

@@ -1,0 +1,902 @@
+[
+  {
+    "id": 1,
+    "source": "digiev_html",
+    "source_section": "glava01",
+    "section_type": "phrasebook",
+    "order_index": 1,
+    "title_ru": "ОБРАЩЕНИЕ",
+    "title_lak": "ЦIУХХАВУ"
+  },
+  {
+    "id": 2,
+    "source": "digiev_html",
+    "source_section": "glava02",
+    "section_type": "phrasebook",
+    "order_index": 2,
+    "title_ru": "ПРИВЕТСТВИЕ",
+    "title_lak": "ЯХШИ-ХАШ БАВУ"
+  },
+  {
+    "id": 3,
+    "source": "digiev_html",
+    "source_section": "glava03",
+    "section_type": "phrasebook",
+    "order_index": 3,
+    "title_ru": "ПРОЩАНИЕ",
+    "title_lak": "ХIАЛАЛ ШАВУ"
+  },
+  {
+    "id": 4,
+    "source": "digiev_html",
+    "source_section": "glava04",
+    "section_type": "phrasebook",
+    "order_index": 4,
+    "title_ru": "ПРОСЬБА",
+    "title_lak": "ТАВАКЪЮ"
+  },
+  {
+    "id": 5,
+    "source": "digiev_html",
+    "source_section": "glava05",
+    "section_type": "phrasebook",
+    "order_index": 5,
+    "title_ru": "БЛАГОДАРНОСТЬ. РАДОСТЬ",
+    "title_lak": "БАРЧАЛЛАГЬ. ХХАРИШИВУ"
+  },
+  {
+    "id": 6,
+    "source": "digiev_html",
+    "source_section": "glava06",
+    "section_type": "phrasebook",
+    "order_index": 6,
+    "title_ru": "ПРИГЛАШЕНИЕ",
+    "title_lak": "ОЬВЧАВУ (ХЪАМАЛУ)"
+  },
+  {
+    "id": 7,
+    "source": "digiev_html",
+    "source_section": "glava07",
+    "section_type": "phrasebook",
+    "order_index": 7,
+    "title_ru": "ИЗВИНЕНИЕ",
+    "title_lak": "БАГЪИШЛА ШАВУ"
+  },
+  {
+    "id": 8,
+    "source": "digiev_html",
+    "source_section": "glava08",
+    "section_type": "phrasebook",
+    "order_index": 8,
+    "title_ru": "ПОЗДРАВЛЕНИЕ",
+    "title_lak": "БАРЧА БАВУ"
+  },
+  {
+    "id": 9,
+    "source": "digiev_html",
+    "source_section": "glava09",
+    "section_type": "phrasebook",
+    "order_index": 9,
+    "title_ru": "СОЖАЛЕНИЕ. СОЧУВСТВИЕ. СОБОЛЕЗНОВАНИЕ",
+    "title_lak": "ХIАЙПШИВУ. ДАКIЦIУЦIАВУ. ЖИЖАРА БАВУ"
+  },
+  {
+    "id": 10,
+    "source": "digiev_html",
+    "source_section": "glava10",
+    "section_type": "phrasebook",
+    "order_index": 10,
+    "title_ru": "СОГЛАСИЕ",
+    "title_lak": "РЯЗИШИВУ"
+  },
+  {
+    "id": 11,
+    "source": "digiev_html",
+    "source_section": "glava11",
+    "section_type": "phrasebook",
+    "order_index": 11,
+    "title_ru": "ОТКАЗ",
+    "title_lak": "ОТКАЗ БАВУ"
+  },
+  {
+    "id": 12,
+    "source": "digiev_html",
+    "source_section": "glava12",
+    "section_type": "phrasebook",
+    "order_index": 12,
+    "title_ru": "ВОПРОСЫ",
+    "title_lak": "СУАЛЛУ"
+  },
+  {
+    "id": 13,
+    "source": "digiev_html",
+    "source_section": "glava13",
+    "section_type": "phrasebook",
+    "order_index": 13,
+    "title_ru": "ОТВЕТЫ",
+    "title_lak": "ЖАВАБРУ"
+  },
+  {
+    "id": 14,
+    "source": "digiev_html",
+    "source_section": "glava14",
+    "section_type": "phrasebook",
+    "order_index": 14,
+    "title_ru": "ЗНАКОМСТВО. РАЗГОВОР",
+    "title_lak": "КIУЛ ШАВУ. ИХТИЛАТ"
+  },
+  {
+    "id": 15,
+    "source": "digiev_html",
+    "source_section": "glava15",
+    "section_type": "phrasebook",
+    "order_index": 15,
+    "title_ru": "ОДОБРЕНИЕ",
+    "title_lak": "РЯЗИШИН"
+  },
+  {
+    "id": 16,
+    "source": "digiev_html",
+    "source_section": "glava16",
+    "section_type": "phrasebook",
+    "order_index": 16,
+    "title_ru": "ДРУЖБА",
+    "title_lak": "ДУСШИВУ"
+  },
+  {
+    "id": 17,
+    "source": "digiev_html",
+    "source_section": "glava17",
+    "section_type": "phrasebook",
+    "order_index": 17,
+    "title_ru": "ЛЮБОВЬ",
+    "title_lak": "ХХИРАШИВУ"
+  },
+  {
+    "id": 18,
+    "source": "digiev_html",
+    "source_section": "glava18",
+    "section_type": "phrasebook",
+    "order_index": 18,
+    "title_ru": "НРАВИТЬСЯ",
+    "title_lak": "ХХУЙ ДИЗАН"
+  },
+  {
+    "id": 19,
+    "source": "digiev_html",
+    "source_section": "glava19",
+    "section_type": "phrasebook",
+    "order_index": 19,
+    "title_ru": "ТОСТ",
+    "title_lak": "МАХЪ (КЬУРУРАХССА)"
+  },
+  {
+    "id": 20,
+    "source": "digiev_html",
+    "source_section": "glava20",
+    "section_type": "phrasebook",
+    "order_index": 20,
+    "title_ru": "РАЗГОВОР ПО ТЕЛЕФОНУ",
+    "title_lak": "ТЕЛЕФОННАЛУВУХССА ИХТИЛАТ"
+  },
+  {
+    "id": 21,
+    "source": "digiev_html",
+    "source_section": "glava21",
+    "section_type": "phrasebook",
+    "order_index": 21,
+    "title_ru": "ЛИЧНЫЕ ДАННЫЕ",
+    "title_lak": "ЦАЛА АХIВАЛ"
+  },
+  {
+    "id": 22,
+    "source": "digiev_html",
+    "source_section": "glava22",
+    "section_type": "phrasebook",
+    "order_index": 22,
+    "title_ru": "ВОЗРАСТНЫЕ ДАННЫЕ",
+    "title_lak": "ОЬРМУЛУЛ ХIАЛ"
+  },
+  {
+    "id": 23,
+    "source": "digiev_html",
+    "source_section": "glava23",
+    "section_type": "phrasebook",
+    "order_index": 23,
+    "title_ru": "СЕМЬЯ",
+    "title_lak": "КУЛПАТ"
+  },
+  {
+    "id": 24,
+    "source": "digiev_html",
+    "source_section": "glava24",
+    "section_type": "phrasebook",
+    "order_index": 24,
+    "title_ru": "РОДСТВЕННЫЕ ОТНОШЕНИЯ",
+    "title_lak": "КУННАН-КУ ГЪАНШИВУ"
+  },
+  {
+    "id": 25,
+    "source": "digiev_html",
+    "source_section": "glava25",
+    "section_type": "phrasebook",
+    "order_index": 25,
+    "title_ru": "АДРЕС. ДОМ",
+    "title_lak": "АДРЕС. КЪАТТА"
+  },
+  {
+    "id": 26,
+    "source": "digiev_html",
+    "source_section": "glava26",
+    "section_type": "phrasebook",
+    "order_index": 26,
+    "title_ru": "В ГОСТЯХ",
+    "title_lak": "ХЪАМАЛУ"
+  },
+  {
+    "id": 27,
+    "source": "digiev_html",
+    "source_section": "glava27",
+    "section_type": "phrasebook",
+    "order_index": 27,
+    "title_ru": "ЗНАНИЕ И ИЗУЧЕНИЕ ЯЗЫКОВ",
+    "title_lak": "МАЗРУ КIУЛШИВУ ВА ЛАХЬХЬАВУ"
+  },
+  {
+    "id": 28,
+    "source": "digiev_html",
+    "source_section": "glava28",
+    "section_type": "phrasebook",
+    "order_index": 28,
+    "title_ru": "НАЦИОНАЛЬНОСТЬ",
+    "title_lak": "МИЛЛАТ"
+  },
+  {
+    "id": 29,
+    "source": "digiev_html",
+    "source_section": "glava29",
+    "section_type": "phrasebook",
+    "order_index": 29,
+    "title_ru": "НАРОД",
+    "title_lak": "ХАЛКЪ"
+  },
+  {
+    "id": 30,
+    "source": "digiev_html",
+    "source_section": "glava30",
+    "section_type": "phrasebook",
+    "order_index": 30,
+    "title_ru": "ОБЫЧАЙ",
+    "title_lak": "АЬДАТ"
+  },
+  {
+    "id": 31,
+    "source": "digiev_html",
+    "source_section": "glava31",
+    "section_type": "phrasebook",
+    "order_index": 31,
+    "title_ru": "ПРОФЕССИЯ. СПЕЦИАЛЬНОСТЬ. РАБОТА",
+    "title_lak": "ПИША. САНЯТ. ДАВУ"
+  },
+  {
+    "id": 32,
+    "source": "digiev_html",
+    "source_section": "glava32",
+    "section_type": "phrasebook",
+    "order_index": 32,
+    "title_ru": "ОБРАЗОВАНИЕ. УЧЕБНЫЕ ЗАВЕДЕНИЯ",
+    "title_lak": "ДУККАВУ. ДУККАВРИЛ ИДАРАРТТУ"
+  },
+  {
+    "id": 33,
+    "source": "digiev_html",
+    "source_section": "glava33",
+    "section_type": "phrasebook",
+    "order_index": 33,
+    "title_ru": "ШКОЛА. КЛАСС. УРОК",
+    "title_lak": "ШКОЛА. КЛАСС. ДАРС"
+  },
+  {
+    "id": 34,
+    "source": "digiev_html",
+    "source_section": "glava34",
+    "section_type": "phrasebook",
+    "order_index": 34,
+    "title_ru": "НАУКА",
+    "title_lak": "ЭЛМУ"
+  },
+  {
+    "id": 35,
+    "source": "digiev_html",
+    "source_section": "glava35",
+    "section_type": "phrasebook",
+    "order_index": 35,
+    "title_ru": "ГАЗЕТЫ. ЖУРНАЛЫ",
+    "title_lak": "ККАЗИТРУ. ЖУРНАЛЛУ"
+  },
+  {
+    "id": 36,
+    "source": "digiev_html",
+    "source_section": "glava36",
+    "section_type": "phrasebook",
+    "order_index": 36,
+    "title_ru": "В КНИЖНОМ МАГАЗИНЕ",
+    "title_lak": "ЛУТТИРДАЛ МАГАЗИНДАЛУВУ"
+  },
+  {
+    "id": 37,
+    "source": "digiev_html",
+    "source_section": "glava37",
+    "section_type": "phrasebook",
+    "order_index": 37,
+    "title_ru": "В БИБЛИОТЕКЕ",
+    "title_lak": "БИБЛИОТЕКАЛУВУ"
+  },
+  {
+    "id": 38,
+    "source": "digiev_html",
+    "source_section": "glava38",
+    "section_type": "phrasebook",
+    "order_index": 38,
+    "title_ru": "РАДИО. ТЕЛЕВИДЕНИЕ",
+    "title_lak": "РАДИО. ТЕЛЕВИДЕНИЕ"
+  },
+  {
+    "id": 39,
+    "source": "digiev_html",
+    "source_section": "glava39",
+    "section_type": "phrasebook",
+    "order_index": 39,
+    "title_ru": "ПРАЗДНИКИ",
+    "title_lak": "БАЙРАННУ"
+  },
+  {
+    "id": 40,
+    "source": "digiev_html",
+    "source_section": "glava40",
+    "section_type": "phrasebook",
+    "order_index": 40,
+    "title_ru": "ПОЧТА. ТЕЛЕФОН. ТЕЛЕГРАФ",
+    "title_lak": "ПОЧТА. ТЕЛЕФОН. ТЕЛЕГРАФ"
+  },
+  {
+    "id": 41,
+    "source": "digiev_html",
+    "source_section": "glava41",
+    "section_type": "phrasebook",
+    "order_index": 41,
+    "title_ru": "ОТДЫХ. ОТПУСК",
+    "title_lak": "БИГЬА ЛАГАВУ. ОТПУСК"
+  },
+  {
+    "id": 42,
+    "source": "digiev_html",
+    "source_section": "glava42",
+    "section_type": "phrasebook",
+    "order_index": 42,
+    "title_ru": "СПОРТ",
+    "title_lak": "СПОРТ"
+  },
+  {
+    "id": 43,
+    "source": "digiev_html",
+    "source_section": "glava43",
+    "section_type": "phrasebook",
+    "order_index": 43,
+    "title_ru": "ПУТЕШЕСТВИЕ. ТРАНСПОРТ",
+    "title_lak": "ССАПАР. ТРАНСПОРТ"
+  },
+  {
+    "id": 44,
+    "source": "digiev_html",
+    "source_section": "glava44",
+    "section_type": "phrasebook",
+    "order_index": 44,
+    "title_ru": "ЖЕЛЕЗНАЯ ДОРОГА",
+    "title_lak": "МУХХАЛ ХХУЛЛУ"
+  },
+  {
+    "id": 45,
+    "source": "digiev_html",
+    "source_section": "glava45",
+    "section_type": "phrasebook",
+    "order_index": 45,
+    "title_ru": "САМОЛЕТ",
+    "title_lak": "САМОЛЕТ"
+  },
+  {
+    "id": 46,
+    "source": "digiev_html",
+    "source_section": "glava46",
+    "section_type": "phrasebook",
+    "order_index": 46,
+    "title_ru": "АВТОБУС",
+    "title_lak": "АВТОБУС"
+  },
+  {
+    "id": 47,
+    "source": "digiev_html",
+    "source_section": "glava47",
+    "section_type": "phrasebook",
+    "order_index": 47,
+    "title_ru": "АВТОМОБИЛЬ",
+    "title_lak": "АВТОМОБИЛЬ"
+  },
+  {
+    "id": 48,
+    "source": "digiev_html",
+    "source_section": "glava48",
+    "section_type": "phrasebook",
+    "order_index": 48,
+    "title_ru": "ТУРИЗМ",
+    "title_lak": "ТУРИЗМ"
+  },
+  {
+    "id": 49,
+    "source": "digiev_html",
+    "source_section": "glava49",
+    "section_type": "phrasebook",
+    "order_index": 49,
+    "title_ru": "ТЕАТР. КИНО. КОНЦЕРТ",
+    "title_lak": "ТЕАТР. КИНО. КОНЦЕРТ"
+  },
+  {
+    "id": 50,
+    "source": "digiev_html",
+    "source_section": "glava50",
+    "section_type": "phrasebook",
+    "order_index": 50,
+    "title_ru": "ИСКУССТВО. МУЗЕИ. ВЫСТАВКИ",
+    "title_lak": "ИСКУССТВО. МУЗЕЙРДУ. ВЫСТАВКIАРТТУ"
+  },
+  {
+    "id": 51,
+    "source": "digiev_html",
+    "source_section": "glava51",
+    "section_type": "phrasebook",
+    "order_index": 51,
+    "title_ru": "В ГОРОДЕ. НА УЛИЦЕ",
+    "title_lak": "ШАГЬРУЛУВУ. КУЧАЛИЙ"
+  },
+  {
+    "id": 52,
+    "source": "digiev_html",
+    "source_section": "glava52",
+    "section_type": "phrasebook",
+    "order_index": 52,
+    "title_ru": "ПРОМЫШЛЕННОСТЬ",
+    "title_lak": "ПРОМЫШЛЕННОСТЬ"
+  },
+  {
+    "id": 53,
+    "source": "digiev_html",
+    "source_section": "glava53",
+    "section_type": "phrasebook",
+    "order_index": 53,
+    "title_ru": "В АУЛЕ",
+    "title_lak": "ШЯРАВАЛУ"
+  },
+  {
+    "id": 54,
+    "source": "digiev_html",
+    "source_section": "glava54",
+    "section_type": "phrasebook",
+    "order_index": 54,
+    "title_ru": "САД. ОГОРОД",
+    "title_lak": "БАГЪ. АХЪ"
+  },
+  {
+    "id": 55,
+    "source": "digiev_html",
+    "source_section": "glava55",
+    "section_type": "phrasebook",
+    "order_index": 55,
+    "title_ru": "ДОМА",
+    "title_lak": "ШАППА"
+  },
+  {
+    "id": 56,
+    "source": "digiev_html",
+    "source_section": "glava56",
+    "section_type": "phrasebook",
+    "order_index": 56,
+    "title_ru": "КУХНЯ",
+    "title_lak": "ЦУРИХЬУ"
+  },
+  {
+    "id": 57,
+    "source": "digiev_html",
+    "source_section": "glava57",
+    "section_type": "phrasebook",
+    "order_index": 57,
+    "title_ru": "НАДПИСИ. ВЫВЕСКИ",
+    "title_lak": "ЧИЧРУРДУ. ВЫВЕСКIАРТТУ"
+  },
+  {
+    "id": 58,
+    "source": "digiev_html",
+    "source_section": "glava58",
+    "section_type": "phrasebook",
+    "order_index": 58,
+    "title_ru": "ДЕНЬГИ",
+    "title_lak": "АРЦУ"
+  },
+  {
+    "id": 59,
+    "source": "digiev_html",
+    "source_section": "glava59",
+    "section_type": "phrasebook",
+    "order_index": 59,
+    "title_ru": "ПЛАТА. СЧЕТ",
+    "title_lak": "БАГЬА. ХIИСАВ"
+  },
+  {
+    "id": 60,
+    "source": "digiev_html",
+    "source_section": "glava60",
+    "section_type": "phrasebook",
+    "order_index": 60,
+    "title_ru": "ТОРГОВЛЯ. МАГАЗИН",
+    "title_lak": "МАША. ТТУЧАН"
+  },
+  {
+    "id": 61,
+    "source": "digiev_html",
+    "source_section": "glava61",
+    "section_type": "phrasebook",
+    "order_index": 61,
+    "title_ru": "ОДЕЖДА. ОБУВЬ",
+    "title_lak": "ЯННА. УСРУ"
+  },
+  {
+    "id": 62,
+    "source": "digiev_html",
+    "source_section": "glava62",
+    "section_type": "phrasebook",
+    "order_index": 62,
+    "title_ru": "ТКАНИ",
+    "title_lak": "ЩАРЩУ ЯННА"
+  },
+  {
+    "id": 63,
+    "source": "digiev_html",
+    "source_section": "glava63",
+    "section_type": "phrasebook",
+    "order_index": 63,
+    "title_ru": "КУЛЬТТОВАРЫ",
+    "title_lak": "КУЛЬТТОВАРДУ"
+  },
+  {
+    "id": 64,
+    "source": "digiev_html",
+    "source_section": "glava64",
+    "section_type": "phrasebook",
+    "order_index": 64,
+    "title_ru": "ПРОДОВОЛЬСТВЕННЫЙ МАГАЗИН",
+    "title_lak": "ДУКИ-ХIАЧIИЯЛУЛ ТТУЧАН"
+  },
+  {
+    "id": 65,
+    "source": "digiev_html",
+    "source_section": "glava65",
+    "section_type": "phrasebook",
+    "order_index": 65,
+    "title_ru": "НА РЫНКЕ",
+    "title_lak": "БАЗАЛЛУВУ"
+  },
+  {
+    "id": 66,
+    "source": "digiev_html",
+    "source_section": "glava66",
+    "section_type": "phrasebook",
+    "order_index": 66,
+    "title_ru": "ЛАКСКАЯ КУХНЯ",
+    "title_lak": "ЛАКРАЛ ДУКРАРДУ"
+  },
+  {
+    "id": 67,
+    "source": "digiev_html",
+    "source_section": "glava67",
+    "section_type": "phrasebook",
+    "order_index": 67,
+    "title_ru": "БЫТОВОЕ ОБСЛУЖИВАНИЕ",
+    "title_lak": "БАГЬУ-БИЗУЛУЛ КЪУЛЛУГЪ"
+  },
+  {
+    "id": 68,
+    "source": "digiev_html",
+    "source_section": "glava68",
+    "section_type": "phrasebook",
+    "order_index": 68,
+    "title_ru": "ЗДОРОВЬЕ",
+    "title_lak": "ЦIУЛЛУ-САГЪШИВУ"
+  },
+  {
+    "id": 69,
+    "source": "digiev_html",
+    "source_section": "glava69",
+    "section_type": "phrasebook",
+    "order_index": 69,
+    "title_ru": "У ВРАЧА",
+    "title_lak": "ХIАКИННАЧIА"
+  },
+  {
+    "id": 70,
+    "source": "digiev_html",
+    "source_section": "glava70",
+    "section_type": "phrasebook",
+    "order_index": 70,
+    "title_ru": "У ЗУБНОГО ВРАЧА",
+    "title_lak": "ККАРЧIАЛ ХIАКИННАЧIА"
+  },
+  {
+    "id": 71,
+    "source": "digiev_html",
+    "source_section": "glava71",
+    "section_type": "phrasebook",
+    "order_index": 71,
+    "title_ru": "У ГЛАЗНОГО ВРАЧА. ОПТИКА",
+    "title_lak": "ЯРУННИЛ ХIАКИННАЧIА. ОПТИКА"
+  },
+  {
+    "id": 72,
+    "source": "digiev_html",
+    "source_section": "glava72",
+    "section_type": "phrasebook",
+    "order_index": 72,
+    "title_ru": "В АПТЕКЕ",
+    "title_lak": "АПТЕКАЛУВУ"
+  },
+  {
+    "id": 73,
+    "source": "digiev_html",
+    "source_section": "glava73",
+    "section_type": "phrasebook",
+    "order_index": 73,
+    "title_ru": "ПОГОДА",
+    "title_lak": "ГЬАВА"
+  },
+  {
+    "id": 74,
+    "source": "digiev_html",
+    "source_section": "glava74",
+    "section_type": "phrasebook",
+    "order_index": 74,
+    "title_ru": "ТЕМПЕРАТУРА. КЛИМАТ",
+    "title_lak": "ТЕМПЕРАТУРА. ГЬАВА"
+  },
+  {
+    "id": 75,
+    "source": "digiev_html",
+    "source_section": "glava75",
+    "section_type": "phrasebook",
+    "order_index": 75,
+    "title_ru": "ПРИРОДА",
+    "title_lak": "ТIАБИАЬТ"
+  },
+  {
+    "id": 76,
+    "source": "digiev_html",
+    "source_section": "glava76",
+    "section_type": "phrasebook",
+    "order_index": 76,
+    "title_ru": "ВРЕМЕННЫЕ ПОНЯТИЯ",
+    "title_lak": "ЧIУМУЛ КIУЛШИН"
+  },
+  {
+    "id": 77,
+    "source": "digiev_html",
+    "source_section": "glava77",
+    "section_type": "phrasebook",
+    "order_index": 77,
+    "title_ru": "ДНИ НЕДЕЛИ",
+    "title_lak": "НЮЖМАР ДИЙССА КЬИНИРДУ"
+  },
+  {
+    "id": 78,
+    "source": "digiev_html",
+    "source_section": "glava78",
+    "section_type": "phrasebook",
+    "order_index": 78,
+    "title_ru": "МЕСЯЦЫ",
+    "title_lak": "БАРЗРУ"
+  },
+  {
+    "id": 79,
+    "source": "digiev_html",
+    "source_section": "glava79",
+    "section_type": "phrasebook",
+    "order_index": 79,
+    "title_ru": "ГОД",
+    "title_lak": "ШИН"
+  },
+  {
+    "id": 80,
+    "source": "digiev_html",
+    "source_section": "glava80",
+    "section_type": "phrasebook",
+    "order_index": 80,
+    "title_ru": "ВРЕМЕНА ГОДА",
+    "title_lak": "ШИНАЛ ЧIУННУ"
+  },
+  {
+    "id": 81,
+    "source": "digiev_html",
+    "source_section": "glava81",
+    "section_type": "phrasebook",
+    "order_index": 81,
+    "title_ru": "О ВРЕМЕНИ",
+    "title_lak": "ЧIУМУЯТУ"
+  },
+  {
+    "id": 82,
+    "source": "digiev_html",
+    "source_section": "glava82",
+    "section_type": "phrasebook",
+    "order_index": 82,
+    "title_ru": "МЕРА",
+    "title_lak": "ДУЦИН"
+  },
+  {
+    "id": 83,
+    "source": "digiev_html",
+    "source_section": "glava83",
+    "section_type": "phrasebook",
+    "order_index": 83,
+    "title_ru": "МАТЕМАТИЧЕСКИЕ ДЕЙСТВИЯ",
+    "title_lak": "ХIИСАВРТТУ ДАВУ"
+  },
+  {
+    "id": 84,
+    "source": "digiev_html",
+    "source_section": "glava84",
+    "section_type": "phrasebook",
+    "order_index": 84,
+    "title_ru": "ЧЕЛОВЕК. ОРГАНИЗМ ЧЕЛОВЕКА",
+    "title_lak": "ИНСАН. ИНСАННАЛ ЧУРХ"
+  },
+  {
+    "id": 85,
+    "source": "digiev_html",
+    "source_section": "glava85",
+    "section_type": "phrasebook",
+    "order_index": 85,
+    "title_ru": "ЖИВОТНЫЕ",
+    "title_lak": "ХIАЙВАНТ"
+  },
+  {
+    "id": 86,
+    "source": "digiev_html",
+    "source_section": "glava86",
+    "section_type": "phrasebook",
+    "order_index": 86,
+    "title_ru": "ДИКИЕ ЖИВОТНЫЕ",
+    "title_lak": "ВАХIШИССА ХIАЙВАНТ"
+  },
+  {
+    "id": 87,
+    "source": "digiev_html",
+    "source_section": "glava87",
+    "section_type": "phrasebook",
+    "order_index": 87,
+    "title_ru": "ДОМАШНИЕ ЖИВОТНЫЕ",
+    "title_lak": "ИЧIАЛЛИЛ ХIАЙВАНТ"
+  },
+  {
+    "id": 88,
+    "source": "digiev_html",
+    "source_section": "glava88",
+    "section_type": "phrasebook",
+    "order_index": 88,
+    "title_ru": "ПТИЦЫ",
+    "title_lak": "ЛЕЛУХХЯНТ"
+  },
+  {
+    "id": 89,
+    "source": "digiev_html",
+    "source_section": "glava89",
+    "section_type": "phrasebook",
+    "order_index": 89,
+    "title_ru": "НАСЕКОМЫЕ. РЫБЫ...",
+    "title_lak": "УЩУЩУЛГЪИ. ЧАВАХЪРУ..."
+  },
+  {
+    "id": 90,
+    "source": "digiev_html",
+    "source_section": "glava90",
+    "section_type": "phrasebook",
+    "order_index": 90,
+    "title_ru": "ЦВЕТЫ. ТРАВЫ",
+    "title_lak": "ТIУТIИВ. УРТТУ"
+  },
+  {
+    "id": 91,
+    "source": "digiev_html",
+    "source_section": "glava91",
+    "section_type": "dictionary",
+    "order_index": 91,
+    "title_ru": "ИМЕНА СУЩЕСТВИТЕЛЬНЫЕ",
+    "title_lak": "СУЩЕСТВИТЕЛЬНЫЙРДАЛ ЦIАРДУ"
+  },
+  {
+    "id": 92,
+    "source": "digiev_html",
+    "source_section": "glava92",
+    "section_type": "dictionary",
+    "order_index": 92,
+    "title_ru": "ГЛАГОЛЫ",
+    "title_lak": "ГЛАГОЛЛУ"
+  },
+  {
+    "id": 93,
+    "source": "digiev_html",
+    "source_section": "glava93",
+    "section_type": "dictionary",
+    "order_index": 93,
+    "title_ru": "ПРИЛАГАТЕЛЬНЫЕ",
+    "title_lak": "ПРИЛАГАТЕЛЬНЫЙРДУ"
+  },
+  {
+    "id": 94,
+    "source": "digiev_html",
+    "source_section": "glava94",
+    "section_type": "dictionary",
+    "order_index": 94,
+    "title_ru": "Словарь glava94",
+    "title_lak": "* * *"
+  },
+  {
+    "id": 95,
+    "source": "digiev_html",
+    "source_section": "glava95",
+    "section_type": "dictionary",
+    "order_index": 95,
+    "title_ru": "ЦВЕТА",
+    "title_lak": "РАНГРУ"
+  },
+  {
+    "id": 96,
+    "source": "digiev_html",
+    "source_section": "glava96",
+    "section_type": "dictionary",
+    "order_index": 96,
+    "title_ru": "НАРЕЧИЯ",
+    "title_lak": "НАРЕЧИЯРТТУ"
+  },
+  {
+    "id": 97,
+    "source": "digiev_html",
+    "source_section": "glava97",
+    "section_type": "dictionary",
+    "order_index": 97,
+    "title_ru": "МЕСТОИМЕНИЯ",
+    "title_lak": "ЦIАНИН КIАНАЙМИ"
+  },
+  {
+    "id": 98,
+    "source": "digiev_html",
+    "source_section": "glava98",
+    "section_type": "dictionary",
+    "order_index": 98,
+    "title_ru": "ЧИСЛИТЕЛЬНЫЕ",
+    "title_lak": "ЧИСЛИТЕЛЬНЫЙРДУ"
+  },
+  {
+    "id": 99,
+    "source": "digiev_html",
+    "source_section": "glava99",
+    "section_type": "dictionary",
+    "order_index": 99,
+    "title_ru": "Лакские имена (мужские)",
+    "title_lak": "Лакрал цIарду (арамтуннал)"
+  },
+  {
+    "id": 100,
+    "source": "digiev_html",
+    "source_section": "glava100",
+    "section_type": "dictionary",
+    "order_index": 100,
+    "title_ru": "Лакские имена (женские)",
+    "title_lak": "Лакрал цIарду (хъаннил)"
+  }
+]
