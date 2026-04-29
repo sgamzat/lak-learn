@@ -1,366 +1,403 @@
 /* ============================================
    LAKSKY LANGUAGE LEARNING APP
-   Vanilla JavaScript (ES6+)
+   Vanilla JavaScript (ES6+) + Supabase
    ============================================ */
 
-/**
- * ВСТРОЕННАЯ СЛОВАРНАЯ БАЗА ДАННЫХ
- * Структура каждого элемента:
- * - id: уникальный идентификатор (number)
- * - lak: слово на лакском языке (string)
- * - ru: перевод на русский язык (string)
- * - transcription: транскрипция для произношения (string)
- * - category: категория слова (string)
- * - example: пример использования в предложении (string)
- * 
- * Примечание: Лакский язык содержит специфические буквы и сочетания:
- * I, КI, ХI, ЧI, Гъ, Хъ, Къ, Гь и другие.
- * Кодировка UTF-8 обеспечивает корректное отображение.
- */
-const DEFAULT_DICTIONARY = [
-    {
-        id: 1,
-        lak: "Салам",
-        ru: "Здравствуйте",
-        transcription: "[салам]",
-        category: "Приветствия",
-        example: "Салам, кунна кул?"
+const sbClient = window.supabaseClient || null;
+
+// ============================================
+// USER AUTHENTICATION (SUPABASE)
+// ============================================
+
+const AuthSystem = {
+    currentUser: null,
+
+    async register(username, email, password) {
+        if (!sbClient) {
+            return { success: false, error: 'Supabase client не инициализирован. Проверьте подключение SDK и файл supabase-config.js' };
+        }
+
+        if (!username || username.trim().length < 3) {
+            return { success: false, error: 'Имя должно содержать минимум 3 символа' };
+        }
+        if (!email || !email.includes('@')) {
+            return { success: false, error: 'Введите корректный email' };
+        }
+        if (!password || password.length < 6) {
+            return { success: false, error: 'Пароль должен содержать минимум 6 символов' };
+        }
+
+        try {
+            const { data, error } = await sbClient.auth.signUp({
+                email: email.trim(),
+                password,
+                options: {
+                    data: {
+                        username: username.trim()
+                    }
+                }
+            });
+
+            if (error) {
+                return { success: false, error: error.message };
+            }
+
+            if (!data.user) {
+                return { success: false, error: 'Не удалось создать пользователя' };
+            }
+
+            // Если email confirmation включен, сессии может не быть сразу
+            if (!data.session) {
+                return {
+                    success: true,
+                    pendingConfirmation: true,
+                    message: 'Регистрация успешна. Подтвердите email, затем выполните вход.'
+                };
+            }
+
+            await this.ensureProfile(data.user.id, username.trim());
+
+            this.currentUser = {
+                id: data.user.id,
+                email: data.user.email,
+                username: profile.username || username.trim(),
+                isAdmin: Boolean(profile.is_admin)
+            };
+
+            return { success: true, user: this.currentUser };
+        } catch (e) {
+            return { success: false, error: `Сетевая ошибка регистрации: ${e?.message || 'неизвестно'}` };
+        }
     },
-    {
-        id: 2,
-        lak: "Баркалла",
-        ru: "Спасибо",
-        transcription: "[баркалла]",
-        category: "Приветствия",
-        example: "Баркалла, зура тӏимамура!"
+
+    async login(email, password) {
+        if (!sbClient) {
+            return { success: false, error: 'Supabase client не инициализирован. Проверьте подключение SDK и файл supabase-config.js' };
+        }
+
+        if (!email || !password) {
+            return { success: false, error: 'Введите email и пароль' };
+        }
+
+        try {
+            const { data, error } = await sbClient.auth.signInWithPassword({
+                email: email.trim(),
+                password
+            });
+
+            if (error) {
+                return { success: false, error: error.message };
+            }
+
+            const authUser = data.user;
+            const fallbackName = authUser?.user_metadata?.username || (authUser?.email || '').split('@')[0] || 'Пользователь';
+            const profile = await this.ensureProfile(authUser.id, fallbackName);
+
+            this.currentUser = {
+                id: authUser.id,
+                email: authUser.email,
+                username: profile.username || fallbackName,
+                isAdmin: Boolean(profile.is_admin)
+            };
+
+            return { success: true, user: this.currentUser };
+        } catch (e) {
+            return { success: false, error: `Сетевая ошибка входа: ${e?.message || 'неизвестно'}` };
+        }
     },
-    {
-        id: 3,
-        lak: "НахIуш",
-        ru: "Пока / До свидания",
-        transcription: "[нахӏуш]",
-        category: "Приветствия",
-        example: "НахIуш, дявуксса кӏанттай!"
+
+    async logout() {
+        const { error } = await sbClient.auth.signOut();
+        if (error) {
+            console.error('Ошибка выхода:', error);
+        }
+        this.currentUser = null;
     },
-    {
-        id: 4,
-        lak: "Ва",
-        ru: "Да",
-        transcription: "[ва]",
-        category: "Основные слова",
-        example: "Ва, ттула нитти."
+
+    isLoggedIn() {
+        return this.currentUser !== null;
     },
-    {
-        id: 5,
-        lak: "Я",
-        ru: "Нет",
-        transcription: "[я]",
-        category: "Основные слова",
-        example: "Я, ттущал бакъа."
+
+    async restoreSession() {
+        if (!sbClient) {
+            return false;
+        }
+
+        const { data, error } = await sbClient.auth.getSession();
+        if (error) {
+            console.error('Ошибка восстановления сессии:', error);
+            return false;
+        }
+
+        const session = data.session;
+        if (!session?.user) {
+            return false;
+        }
+
+        const authUser = session.user;
+        const fallbackName = authUser?.user_metadata?.username || (authUser?.email || '').split('@')[0] || 'Пользователь';
+        const profile = await this.ensureProfile(authUser.id, fallbackName);
+
+        this.currentUser = {
+            id: authUser.id,
+            email: authUser.email,
+            username: profile.username || fallbackName,
+            isAdmin: Boolean(profile.is_admin)
+        };
+
+        return true;
     },
-    {
-        id: 6,
-        lak: "Тту",
-        ru: "Я",
-        transcription: "[тту]",
-        category: "Местоимения",
-        example: "Тту лагма ялапар хъанахъиссар."
-    },
-    {
-        id: 7,
-        lak: "Ичӏал",
-        ru: "Ты",
-        transcription: "[ичӏал]",
-        category: "Местоимения",
-        example: "Ичӏал куна кул?"
-    },
-    {
-        id: 8,
-        lak: "Нитти",
-        ru: "Мама",
-        transcription: "[нитти]",
-        category: "Семья",
-        example: "Ттула нитти ххари буллуссар."
-    },
-    {
-        id: 9,
-        lak: "Бутта",
-        ru: "Папа",
-        transcription: "[бутта]",
-        category: "Семья",
-        example: "Ттула бутта зий ур заводрай."
-    },
-    {
-        id: 10,
-        lak: "Гьану",
-        ru: "Дом",
-        transcription: "[гьану]",
-        category: "Дом",
-        example: "Ттула гьану кӏулмур кӏанттур."
-    },
-    {
-        id: 11,
-        lak: "Ччатту",
-        ru: "Хлеб",
-        transcription: "[ччатту]",
-        category: "Еда",
-        example: "Ччатту ххуйну хъинну ччан бикӏайссар."
-    },
-    {
-        id: 12,
-        lak: "РохI",
-        ru: "Вода",
-        transcription: "[рохӏ]",
-        category: "Еда",
-        example: "РохI ччан бикӏайссар."
-    },
-    {
-        id: 13,
-        lak: "Кьюнкь",
-        ru: "Кошка",
-        transcription: "[кьюнкь]",
-        category: "Животные",
-        example: "Кьюнкь ххари дур ттущал."
-    },
-    {
-        id: 14,
-        lak: "Шавкь",
-        ru: "Собака",
-        transcription: "[шавкь]",
-        category: "Животные",
-        example: "Шавкь ляхълай ур."
-    },
-    {
-        id: 15,
-        lak: "Заман",
-        ru: "Время",
-        transcription: "[заман]",
-        category: "Основные слова",
-        example: "Заман хъунмасса дур."
-    },
-    {
-        id: 16,
-        lak: "Кӏану",
-        ru: "Место",
-        transcription: "[кӏану]",
-        category: "Основные слова",
-        example: "Кул кӏану дур?"
-    },
-    {
-        id: 17,
-        lak: "Ххуй",
-        ru: "Хороший",
-        transcription: "[ххуй]",
-        category: "Прилагательные",
-        example: "Ххуй инсан ур."
-    },
-    {
-        id: 18,
-        lak: "НахIу",
-        ru: "Плохой",
-        transcription: "[нахӏу]",
-        category: "Прилагательные",
-        example: "НахIу иш дур."
-    },
-    {
-        id: 19,
-        lak: "Кӏул",
-        ru: "Большой",
-        transcription: "[кӏул]",
-        category: "Прилагательные",
-        example: "Кӏул гьану дур."
-    },
-    {
-        id: 20,
-        lak: "Мур",
-        ru: "Маленький",
-        transcription: "[мур]",
-        category: "Прилагательные",
-        example: "Мур ливчӏунни."
-    },
-    {
-        id: 21,
-        lak: "Ца",
-        ru: "Один",
-        transcription: "[ца]",
-        category: "Числа",
-        example: "Ца инсан."
-    },
-    {
-        id: 22,
-        lak: "Кӏива",
-        ru: "Два",
-        transcription: "[кӏива]",
-        category: "Числа",
-        example: "Кӏива нитти-бутта."
-    },
-    {
-        id: 23,
-        lak: "Шамма",
-        ru: "Три",
-        transcription: "[шамма]",
-        category: "Числа",
-        example: "Шамма гьану."
-    },
-    {
-        id: 24,
-        lak: "Мокь",
-        ru: "Четыре",
-        transcription: "[мокь]",
-        category: "Числа",
-        example: "Мокь шавкь."
-    },
-    {
-        id: 25,
-        lak: "Шина",
-        ru: "Пять",
-        transcription: "[шина]",
-        category: "Числа",
-        example: "Шина цаппара."
-    },
-    {
-        id: 26,
-        lak: "Зий",
-        ru: "Работа",
-        transcription: "[зий]",
-        category: "Работа",
-        example: "Зий бан ччан бикӏайссар."
-    },
-    {
-        id: 27,
-        lak: "Ккасму",
-        ru: "Школа",
-        transcription: "[ккасму]",
-        category: "Образование",
-        example: "Ккасму лайкь дур."
-    },
-    {
-        id: 28,
-        lak: "Тӏабиаьт",
-        ru: "Природа",
-        transcription: "[тӏабиаьт]",
-        category: "Природа",
-        example: "Тӏабиаьт ххуй дур."
-    },
-    {
-        id: 29,
-        lak: "Маргь",
-        ru: "Солнце",
-        transcription: "[маргь]",
-        category: "Природа",
-        example: "Маргь ччан бикӏайссар."
-    },
-    {
-        id: 30,
-        lak: "Оьрму",
-        ru: "Жизнь",
-        transcription: "[оьрму]",
-        category: "Основные слова",
-        example: "Оьрму ххуй дур."
+
+    async ensureProfile(userId, username) {
+        const { data, error } = await sbClient
+            .from('profiles')
+            .select('id, username, is_admin')
+            .eq('id', userId)
+            .maybeSingle();
+
+        if (error) {
+            console.error('Ошибка чтения профиля:', error);
+        }
+
+        if (data) {
+            return data;
+        }
+
+        const payload = {
+            id: userId,
+            username: username || 'Пользователь',
+            updated_at: new Date().toISOString()
+        };
+
+        const { data: created, error: createError } = await sbClient
+            .from('profiles')
+            .upsert(payload, { onConflict: 'id' })
+            .select('id, username, is_admin')
+            .single();
+
+        if (createError) {
+            console.error('Ошибка создания профиля:', createError);
+            return { id: userId, username: payload.username, is_admin: false };
+        }
+
+        return created;
     }
-];
+};
+
+// ============================================
+// DATA LOADING
+// ============================================
+
+let DEFAULT_DICTIONARY = [];
+
+function normalizeWord(item, index = 0) {
+    return {
+        id: Number(item.id ?? index + 1),
+        lak: String(item.lak ?? '').trim(),
+        ru: String(item.ru ?? '').trim(),
+        transcription: String(item.transcription ?? '').trim(),
+        category: String(item.category ?? 'Без категории').trim(),
+        example: String(item.example ?? '').trim()
+    };
+}
+
+async function loadDictionaryFromFile() {
+    const response = await fetch('data/words.json');
+    if (!response.ok) {
+        throw new Error('Не удалось загрузить data/words.json');
+    }
+
+    const json = await response.json();
+    if (!Array.isArray(json)) {
+        throw new Error('Некорректный формат words.json');
+    }
+
+    return json.map((item, idx) => normalizeWord(item, idx));
+}
+
+async function loadDictionaryFromSupabase() {
+    if (!sbClient) {
+        throw new Error('Supabase client не инициализирован');
+    }
+
+    const { data, error } = await sbClient
+        .from('words')
+        .select('id, lak, ru, transcription, category, example')
+        .order('id', { ascending: true });
+
+    if (error) {
+        throw error;
+    }
+
+    if (!Array.isArray(data)) {
+        return [];
+    }
+
+    return data.map((item, idx) => normalizeWord(item, idx));
+}
+
+async function loadDictionary() {
+    try {
+        const words = await loadDictionaryFromSupabase();
+        if (words.length > 0) {
+            DEFAULT_DICTIONARY = words;
+            return words;
+        }
+
+        console.warn('Таблица words пуста, используем data/words.json');
+        DEFAULT_DICTIONARY = await loadDictionaryFromFile();
+        return DEFAULT_DICTIONARY;
+    } catch (error) {
+        console.error('Ошибка загрузки словаря из Supabase:', error);
+        try {
+            DEFAULT_DICTIONARY = await loadDictionaryFromFile();
+            return DEFAULT_DICTIONARY;
+        } catch (fileError) {
+            console.error('Ошибка fallback загрузки words.json:', fileError);
+            DEFAULT_DICTIONARY = [];
+            return [];
+        }
+    }
+}
 
 // ============================================
 // STATE MANAGEMENT
 // ============================================
 
-/**
- * Основное состояние приложения
- * Все данные хранятся в localStorage для автономной работы
- */
 const AppState = {
-    dictionary: [],           // Словарь слов
-    learnedWords: [],         // ID выученных слов
-    quizScore: { correct: 0, wrong: 0 }, // Счёт в тесте
-    currentCardIndex: 0,      // Текущая карточка
-    theme: 'light',           // Тема оформления
-    currentTab: 'cards'       // Активная вкладка
+    dictionary: [],
+    learnedWords: [],
+    quizScore: { correct: 0, wrong: 0 },
+    currentCardIndex: 0,
+    theme: 'light',
+    currentTab: 'cards'
 };
 
+function isCurrentUserAdmin() {
+    return Boolean(AuthSystem.currentUser?.isAdmin);
+}
+
+function getDefaultProgress() {
+    return {
+        dictionary: [],
+        learned_words: [],
+        quiz_correct: 0,
+        quiz_wrong: 0,
+        theme: 'light',
+        current_card_index: 0
+    };
+}
+
 // ============================================
-// LOCAL STORAGE HELPERS
+// STORAGE HELPERS (SUPABASE)
 // ============================================
 
-/**
- * Сохранение состояния в localStorage
- */
-function saveState() {
+async function saveState() {
+    if (!AuthSystem.isLoggedIn()) return;
+
     try {
-        localStorage.setItem('lakskyApp_dictionary', JSON.stringify(AppState.dictionary));
-        localStorage.setItem('lakskyApp_learnedWords', JSON.stringify(AppState.learnedWords));
-        localStorage.setItem('lakskyApp_quizScore', JSON.stringify(AppState.quizScore));
-        localStorage.setItem('lakskyApp_theme', AppState.theme);
+        const payload = {
+            user_id: AuthSystem.currentUser.id,
+            // Словарь общий (из таблицы words), поэтому тут не сохраняем dictionary
+            learned_words: AppState.learnedWords,
+            quiz_correct: AppState.quizScore.correct,
+            quiz_wrong: AppState.quizScore.wrong,
+            theme: AppState.theme,
+            current_card_index: AppState.currentCardIndex,
+            updated_at: new Date().toISOString()
+        };
+
+        const { error } = await sbClient
+            .from('user_progress')
+            .upsert(payload, { onConflict: 'user_id' });
+
+        if (error) {
+            throw error;
+        }
     } catch (e) {
-        console.error('Ошибка сохранения в localStorage:', e);
+        console.error('Ошибка сохранения прогресса в Supabase:', e);
     }
 }
 
-/**
- * Загрузка состояния из localStorage
- * @returns {boolean} true если данные загружены, false если используются данные по умолчанию
- */
-function loadState() {
+async function loadState() {
+    if (!AuthSystem.isLoggedIn()) return false;
+
     try {
-        const dictData = localStorage.getItem('lakskyApp_dictionary');
-        const learnedData = localStorage.getItem('lakskyApp_learnedWords');
-        const scoreData = localStorage.getItem('lakskyApp_quizScore');
-        const themeData = localStorage.getItem('lakskyApp_theme');
+        const userId = AuthSystem.currentUser.id;
+        const { data, error } = await sbClient
+            .from('user_progress')
+            .select('user_id, learned_words, quiz_correct, quiz_wrong, theme, current_card_index')
+            .eq('user_id', userId)
+            .maybeSingle();
 
-        if (dictData) {
-            AppState.dictionary = JSON.parse(dictData);
-        } else {
-            AppState.dictionary = [...DEFAULT_DICTIONARY];
+        if (error) {
+            throw error;
         }
 
-        if (learnedData) {
-            AppState.learnedWords = JSON.parse(learnedData);
-        }
+        const progress = data || getDefaultProgress();
 
-        if (scoreData) {
-            AppState.quizScore = JSON.parse(scoreData);
-        }
-
-        if (themeData) {
-            AppState.theme = themeData;
-        }
-
-        return !!dictData;
-    } catch (e) {
-        console.error('Ошибка загрузки из localStorage:', e);
+        // Словарь всегда общий
         AppState.dictionary = [...DEFAULT_DICTIONARY];
+
+        AppState.learnedWords = Array.isArray(progress.learned_words)
+            ? progress.learned_words.map(Number).filter(Number.isFinite)
+            : [];
+
+        AppState.quizScore = {
+            correct: Number(progress.quiz_correct || 0),
+            wrong: Number(progress.quiz_wrong || 0)
+        };
+
+        AppState.theme = progress.theme === 'dark' ? 'dark' : 'light';
+
+        const maxIndex = Math.max(0, AppState.dictionary.length - 1);
+        const safeIndex = Number.isInteger(progress.current_card_index) ? progress.current_card_index : 0;
+        AppState.currentCardIndex = Math.min(Math.max(safeIndex, 0), maxIndex);
+
+        if (!data) {
+            await saveState();
+        }
+
+        return true;
+    } catch (e) {
+        console.error('Ошибка загрузки прогресса из Supabase:', e);
+
+        AppState.dictionary = [...DEFAULT_DICTIONARY];
+        AppState.learnedWords = [];
+        AppState.quizScore = { correct: 0, wrong: 0 };
+        AppState.theme = 'light';
+        AppState.currentCardIndex = 0;
+
         return false;
     }
 }
 
-/**
- * Сброс прогресса обучения
- */
-function resetProgress() {
+async function resetProgress() {
     AppState.learnedWords = [];
     AppState.quizScore = { correct: 0, wrong: 0 };
-    saveState();
+    AppState.currentCardIndex = 0;
+    await saveState();
     updateProgressUI();
     updateQuizScoreUI();
+    updateStats();
+    renderCard();
 }
 
-/**
- * Сброс словаря к значениям по умолчанию
- */
-function resetDictionary() {
+async function resetDictionary() {
+    await loadDictionary();
     AppState.dictionary = [...DEFAULT_DICTIONARY];
-    saveState();
-    renderDictionary();
-    updateStats();
+    AppState.currentCardIndex = 0;
     updateCategoryFilter();
+    renderDictionary();
+    updateProgressUI();
+    updateStats();
+    renderCard();
 }
 
 // ============================================
 // THEME MANAGEMENT
 // ============================================
 
-/**
- * Применение темы оформления
- */
 function applyTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme);
     const icon = document.querySelector('.theme-icon');
@@ -369,37 +406,32 @@ function applyTheme(theme) {
     }
 }
 
-/**
- * Переключение темы
- */
-function toggleTheme() {
+async function toggleTheme() {
     AppState.theme = AppState.theme === 'light' ? 'dark' : 'light';
     applyTheme(AppState.theme);
-    saveState();
+    await saveState();
 }
 
 // ============================================
 // TAB NAVIGATION
 // ============================================
 
-/**
- * Переключение между вкладками
- * @param {string} tabId - ID вкладки
- */
 function switchTab(tabId) {
-    // Обновляем кнопки вкладок
+    if (tabId === 'admin' && !isCurrentUserAdmin()) {
+        showAuthError('Доступ к админ-панели только для администратора');
+        return;
+    }
+
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.tab === tabId);
     });
 
-    // Обновляем содержимое вкладок
     document.querySelectorAll('.tab-content').forEach(content => {
         content.classList.toggle('active', content.id === tabId);
     });
 
     AppState.currentTab = tabId;
 
-    // Инициализация конкретной вкладки
     switch (tabId) {
         case 'cards':
             renderCard();
@@ -413,35 +445,176 @@ function switchTab(tabId) {
         case 'settings':
             updateStats();
             break;
+        case 'admin':
+            renderAdminWordsList();
+            loadAdminUsers();
+            break;
     }
+}
+
+// ============================================
+// ADMIN PANEL
+// ============================================
+
+function updateAdminUI() {
+    const adminTabBtn = document.getElementById('admin-tab-btn');
+    if (!adminTabBtn) return;
+
+    adminTabBtn.classList.toggle('hidden', !isCurrentUserAdmin());
+
+    if (!isCurrentUserAdmin() && AppState.currentTab === 'admin') {
+        switchTab('cards');
+    }
+}
+
+function resetAdminWordForm() {
+    const form = document.getElementById('admin-word-form');
+    if (!form) return;
+
+    form.reset();
+    document.getElementById('admin-word-id').value = '';
+    document.getElementById('admin-word-submit').textContent = '➕ Добавить слово';
+}
+
+function fillAdminWordForm(wordId) {
+    const word = AppState.dictionary.find(w => Number(w.id) === Number(wordId));
+    if (!word) return;
+
+    document.getElementById('admin-word-id').value = String(word.id);
+    document.getElementById('admin-lak').value = word.lak;
+    document.getElementById('admin-ru').value = word.ru;
+    document.getElementById('admin-transcription').value = word.transcription;
+    document.getElementById('admin-category').value = word.category;
+    document.getElementById('admin-example').value = word.example;
+    document.getElementById('admin-word-submit').textContent = '💾 Сохранить изменения';
+}
+
+async function saveAdminWord(event) {
+    event.preventDefault();
+
+    if (!isCurrentUserAdmin()) {
+        alert('Недостаточно прав для изменения словаря');
+        return;
+    }
+
+    const idRaw = document.getElementById('admin-word-id').value;
+    const payload = {
+        lak: document.getElementById('admin-lak').value.trim(),
+        ru: document.getElementById('admin-ru').value.trim(),
+        transcription: document.getElementById('admin-transcription').value.trim(),
+        category: document.getElementById('admin-category').value.trim(),
+        example: document.getElementById('admin-example').value.trim()
+    };
+
+    if (!payload.lak || !payload.ru || !payload.transcription || !payload.category || !payload.example) {
+        alert('Заполните все поля слова');
+        return;
+    }
+
+    let query = sbClient.from('words');
+    if (idRaw) {
+        query = query.update(payload).eq('id', Number(idRaw));
+    } else {
+        query = query.insert(payload);
+    }
+
+    const { error } = await query;
+
+    if (error) {
+        console.error('Ошибка сохранения слова:', error);
+        alert(`Не удалось сохранить слово: ${error.message}`);
+        return;
+    }
+
+    await loadDictionary();
+    AppState.dictionary = [...DEFAULT_DICTIONARY];
+    updateCategoryFilter();
+    renderDictionary();
+    renderCard();
+    updateStats();
+    renderAdminWordsList();
+    resetAdminWordForm();
+
+    alert(idRaw ? 'Слово обновлено' : 'Слово добавлено');
+}
+
+function renderAdminWordsList() {
+    const list = document.getElementById('admin-words-list');
+    if (!list || !isCurrentUserAdmin()) return;
+
+    const rows = [...AppState.dictionary]
+        .sort((a, b) => Number(a.id) - Number(b.id))
+        .map(word => `
+            <div class="admin-item">
+                <div class="admin-item-main">
+                    <strong>${escapeHtml(word.lak)}</strong> — ${escapeHtml(word.ru)}
+                    <div class="admin-item-meta">${escapeHtml(word.transcription)} · ${escapeHtml(word.category)}</div>
+                </div>
+                <div class="admin-item-actions">
+                    <button class="btn btn-secondary admin-edit-btn" data-word-id="${word.id}">✏️ Редактировать</button>
+                </div>
+            </div>
+        `)
+        .join('');
+
+    list.innerHTML = rows || '<p class="info-text">Словарь пуст</p>';
+
+    list.querySelectorAll('.admin-edit-btn').forEach(btn => {
+        btn.addEventListener('click', () => fillAdminWordForm(btn.dataset.wordId));
+    });
+}
+
+async function loadAdminUsers() {
+    const list = document.getElementById('admin-users-list');
+    if (!list || !isCurrentUserAdmin()) return;
+
+    list.innerHTML = '<p class="info-text">Загрузка пользователей...</p>';
+
+    const { data, error } = await sbClient.rpc('admin_list_users');
+    if (error) {
+        console.error('Ошибка загрузки пользователей:', error);
+        list.innerHTML = `<p class="info-text">Ошибка загрузки пользователей: ${escapeHtml(error.message)}</p>`;
+        return;
+    }
+
+    if (!Array.isArray(data) || data.length === 0) {
+        list.innerHTML = '<p class="info-text">Пользователи не найдены</p>';
+        return;
+    }
+
+    const rows = data
+        .map(user => `
+            <div class="admin-item">
+                <div class="admin-item-main">
+                    <strong>${escapeHtml(user.username || 'Пользователь')}</strong>
+                    <div class="admin-item-meta">${escapeHtml(user.email || 'без email')} · ${escapeHtml(String(user.created_at || ''))}</div>
+                </div>
+            </div>
+        `)
+        .join('');
+
+    list.innerHTML = rows;
 }
 
 // ============================================
 // PROGRESS TRACKING
 // ============================================
 
-/**
- * Отметить слово как выученное
- */
-function markAsLearned() {
+async function markAsLearned() {
     const currentWord = AppState.dictionary[AppState.currentCardIndex];
     if (currentWord && !AppState.learnedWords.includes(currentWord.id)) {
         AppState.learnedWords.push(currentWord.id);
-        saveState();
+        await saveState();
         updateProgressUI();
-        
-        // Визуальная обратная связь
+
         const btn = document.getElementById('mark-learned');
         btn.classList.add('pulse');
         setTimeout(() => btn.classList.remove('pulse'), 300);
     }
-    
+
     moveToNextCard();
 }
 
-/**
- * Обновление UI прогресса
- */
 function updateProgressUI() {
     const total = AppState.dictionary.length;
     const learned = AppState.learnedWords.length;
@@ -451,12 +624,9 @@ function updateProgressUI() {
     document.getElementById('progress-fill').style.width = `${percentage}%`;
 }
 
-/**
- * Обновление статистики в настройках
- */
 function updateStats() {
     const categories = new Set(AppState.dictionary.map(w => w.category));
-    
+
     document.getElementById('stat-total').textContent = AppState.dictionary.length;
     document.getElementById('stat-learned').textContent = AppState.learnedWords.length;
     document.getElementById('stat-categories').textContent = categories.size;
@@ -466,51 +636,43 @@ function updateStats() {
 // FLASHCARD MODE
 // ============================================
 
-/**
- * Рендер текущей карточки
- */
 function renderCard() {
     if (AppState.dictionary.length === 0) {
         showEmptyState('card-word', 'Словарь пуст');
         return;
     }
 
-    const word = AppState.dictionary[AppState.currentCardIndex];
+    const safeIndex = Math.min(Math.max(AppState.currentCardIndex, 0), AppState.dictionary.length - 1);
+    AppState.currentCardIndex = safeIndex;
+
+    const word = AppState.dictionary[safeIndex];
     const card = document.getElementById('flashcard');
-    
-    // Сброс переворота карточки
+
     card.classList.remove('flipped');
 
-    // Заполнение данными с небольшой задержкой для плавности
     setTimeout(() => {
         document.getElementById('card-word').textContent = word.lak;
         document.getElementById('card-translation').textContent = word.ru;
         document.getElementById('card-transcription').textContent = word.transcription;
         document.getElementById('card-example').textContent = word.example;
-        
-        // Обновление состояния кнопки "Выучено"
+
         const learnBtn = document.getElementById('mark-learned');
         learnBtn.disabled = AppState.learnedWords.includes(word.id);
-    }, 150);
+    }, 120);
 
     updateNavigationButtons();
 }
 
-/**
- * Переход к следующей карточке
- */
 function moveToNextCard() {
     if (AppState.currentCardIndex < AppState.dictionary.length - 1) {
         AppState.currentCardIndex++;
     } else {
-        AppState.currentCardIndex = 0; // Зацикливание
+        AppState.currentCardIndex = 0;
     }
     renderCard();
+    saveState();
 }
 
-/**
- * Переход к предыдущей карточке
- */
 function moveToPrevCard() {
     if (AppState.currentCardIndex > 0) {
         AppState.currentCardIndex--;
@@ -518,19 +680,14 @@ function moveToPrevCard() {
         AppState.currentCardIndex = AppState.dictionary.length - 1;
     }
     renderCard();
+    saveState();
 }
 
-/**
- * Обновление кнопок навигации
- */
 function updateNavigationButtons() {
     document.getElementById('prev-card').disabled = AppState.dictionary.length <= 1;
     document.getElementById('next-card').disabled = AppState.dictionary.length <= 1;
 }
 
-/**
- * Переворот карточки
- */
 function flipCard() {
     const card = document.getElementById('flashcard');
     card.classList.toggle('flipped');
@@ -543,9 +700,6 @@ function flipCard() {
 let currentQuizQuestion = null;
 let quizAnswered = false;
 
-/**
- * Инициализация теста
- */
 function initQuiz() {
     if (AppState.dictionary.length < 4) {
         showEmptyState('quiz-word', 'Нужно минимум 4 слова для теста');
@@ -554,34 +708,24 @@ function initQuiz() {
     generateQuizQuestion();
 }
 
-/**
- * Генерация нового вопроса для теста
- */
 function generateQuizQuestion() {
     quizAnswered = false;
     document.getElementById('next-question').style.display = 'none';
     document.getElementById('quiz-feedback').className = 'quiz-feedback';
     document.getElementById('quiz-feedback').textContent = '';
 
-    // Выбор случайного слова для вопроса
     const randomIndex = Math.floor(Math.random() * AppState.dictionary.length);
     currentQuizQuestion = AppState.dictionary[randomIndex];
 
-    // Генерация вариантов ответов (1 правильный + 3 неправильных)
     const options = [currentQuizQuestion];
     const distractors = AppState.dictionary.filter(w => w.id !== currentQuizQuestion.id);
-    
-    // Перемешиваем и берём 3 неправильных ответа
+
     shuffleArray(distractors);
     options.push(...distractors.slice(0, 3));
-    
-    // Перемешиваем все варианты
     shuffleArray(options);
 
-    // Отображение вопроса
     document.getElementById('quiz-word').textContent = currentQuizQuestion.lak;
 
-    // Генерация кнопок ответов
     const optionsContainer = document.getElementById('quiz-options');
     optionsContainer.innerHTML = '';
 
@@ -589,26 +733,20 @@ function generateQuizQuestion() {
         const btn = document.createElement('button');
         btn.className = 'quiz-option';
         btn.textContent = option.ru;
-        btn.dataset.id = option.id;
+        btn.dataset.id = String(option.id);
         btn.addEventListener('click', () => handleQuizAnswer(option.id, btn));
         optionsContainer.appendChild(btn);
     });
 }
 
-/**
- * Обработка ответа в тесте
- * @param {number} selectedId - ID выбранного ответа
- * @param {HTMLElement} btnElement - Элемент кнопки
- */
 function handleQuizAnswer(selectedId, btnElement) {
-    if (quizAnswered) return; // Защита от повторного нажатия
+    if (quizAnswered) return;
     quizAnswered = true;
 
-    const isCorrect = selectedId === currentQuizQuestion.id;
+    const isCorrect = Number(selectedId) === Number(currentQuizQuestion.id);
     const feedback = document.getElementById('quiz-feedback');
     const allOptions = document.querySelectorAll('.quiz-option');
 
-    // Блокировка всех кнопок
     allOptions.forEach(opt => opt.classList.add('disabled'));
 
     if (isCorrect) {
@@ -617,15 +755,13 @@ function handleQuizAnswer(selectedId, btnElement) {
         feedback.className = 'quiz-feedback correct';
         AppState.quizScore.correct++;
     } else {
-        btnElement.classList.add('wrong');
-        btnElement.classList.add('shake');
+        btnElement.classList.add('wrong', 'shake');
         feedback.textContent = `✗ Неправильно. Правильный ответ: ${currentQuizQuestion.ru}`;
         feedback.className = 'quiz-feedback wrong';
         AppState.quizScore.wrong++;
 
-        // Подсветка правильного ответа
         allOptions.forEach(opt => {
-            if (parseInt(opt.dataset.id) === currentQuizQuestion.id) {
+            if (Number(opt.dataset.id) === Number(currentQuizQuestion.id)) {
                 opt.classList.add('correct');
             }
         });
@@ -636,9 +772,6 @@ function handleQuizAnswer(selectedId, btnElement) {
     document.getElementById('next-question').style.display = 'inline-flex';
 }
 
-/**
- * Обновление счёта в тесте
- */
 function updateQuizScoreUI() {
     document.getElementById('score-correct').textContent = AppState.quizScore.correct;
     document.getElementById('score-wrong').textContent = AppState.quizScore.wrong;
@@ -648,39 +781,35 @@ function updateQuizScoreUI() {
 // DICTIONARY MODE
 // ============================================
 
-/**
- * Рендер списка словаря с фильтрацией
- */
 function renderDictionary() {
     const searchTerm = document.getElementById('search-input').value.toLowerCase();
     const categoryFilter = document.getElementById('category-filter').value;
     const listContainer = document.getElementById('dictionary-list');
     const emptyState = document.getElementById('empty-state');
 
-    // Фильтрация слов
-    let filteredWords = AppState.dictionary.filter(word => {
-        const matchesSearch = word.lak.toLowerCase().includes(searchTerm) ||
-                             word.ru.toLowerCase().includes(searchTerm);
-        const matchesCategory = !categoryFilter || word.category === categoryFilter;
-        return matchesSearch && matchesCategory;
-    });
+    const filteredWords = AppState.dictionary
+        .filter(word => {
+            const matchesSearch = word.lak.toLowerCase().includes(searchTerm) || word.ru.toLowerCase().includes(searchTerm);
+            const matchesCategory = !categoryFilter || word.category === categoryFilter;
+            return matchesSearch && matchesCategory;
+        })
+        .sort((a, b) => {
+            const aLearned = AppState.learnedWords.includes(a.id);
+            const bLearned = AppState.learnedWords.includes(b.id);
+            return Number(aLearned) - Number(bLearned);
+        });
 
-    // Сортировка: сначала невыученные, потом выученные
-    filteredWords.sort((a, b) => {
-        const aLearned = AppState.learnedWords.includes(a.id);
-        const bLearned = AppState.learnedWords.includes(b.id);
-        return aLearned - bLearned;
-    });
-
-    // Отображение результатов
     if (filteredWords.length === 0) {
         listContainer.style.display = 'none';
         emptyState.style.display = 'block';
-    } else {
-        listContainer.style.display = 'flex';
-        emptyState.style.display = 'none';
-        
-        listContainer.innerHTML = filteredWords.map(word => {
+        return;
+    }
+
+    listContainer.style.display = 'flex';
+    emptyState.style.display = 'none';
+
+    listContainer.innerHTML = filteredWords
+        .map(word => {
             const isLearned = AppState.learnedWords.includes(word.id);
             return `
                 <div class="dict-item ${isLearned ? 'learned' : ''}">
@@ -693,34 +822,28 @@ function renderDictionary() {
                     <div class="dict-example">${escapeHtml(word.example)}</div>
                 </div>
             `;
-        }).join('');
-    }
+        })
+        .join('');
 }
 
-/**
- * Обновление фильтра категорий
- */
 function updateCategoryFilter() {
     const categories = [...new Set(AppState.dictionary.map(w => w.category))].sort();
     const select = document.getElementById('category-filter');
-    
-    select.innerHTML = '<option value="">Все категории</option>' +
+
+    select.innerHTML =
+        '<option value="">Все категории</option>' +
         categories.map(cat => `<option value="${escapeHtml(cat)}">${escapeHtml(cat)}</option>`).join('');
 }
 
 // ============================================
-// IMPORT/EXPORT FUNCTIONALITY
+// IMPORT/EXPORT
 // ============================================
 
-/**
- * Экспорт словаря в JSON файл
- * Позволяет создавать резервные копии и обмениваться словарями
- */
 function exportDictionary() {
     const dataStr = JSON.stringify(AppState.dictionary, null, 2);
     const blob = new Blob([dataStr], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
-    
+
     const a = document.createElement('a');
     a.href = url;
     a.download = `laksky-dictionary-${new Date().toISOString().split('T')[0]}.json`;
@@ -730,80 +853,14 @@ function exportDictionary() {
     URL.revokeObjectURL(url);
 }
 
-/**
- * Импорт словаря из JSON файла
- * Валидирует структуру данных перед загрузкой
- * @param {File} file - JSON файл для импорта
- */
-function importDictionary(file) {
-    const reader = new FileReader();
-    
-    reader.onload = function(e) {
-        try {
-            const importedData = JSON.parse(e.target.result);
-            
-            // Валидация структуры данных
-            if (!Array.isArray(importedData)) {
-                throw new Error('Данные должны быть массивом');
-            }
-
-            // Проверка каждого элемента
-            importedData.forEach((item, index) => {
-                const requiredFields = ['id', 'lak', 'ru', 'transcription', 'category', 'example'];
-                for (const field of requiredFields) {
-                    if (!(field in item)) {
-                        throw new Error(`Элемент ${index}: отсутствует поле "${field}"`);
-                    }
-                }
-                
-                // Проверка типов данных
-                if (typeof item.id !== 'number') {
-                    throw new Error(`Элемент ${index}: поле "id" должно быть числом`);
-                }
-                ['lak', 'ru', 'transcription', 'category', 'example'].forEach(field => {
-                    if (typeof item[field] !== 'string') {
-                        throw new Error(`Элемент ${index}: поле "${field}" должно быть строкой`);
-                    }
-                });
-            });
-
-            // Замена текущего словаря
-            AppState.dictionary = importedData;
-            AppState.learnedWords = []; // Сброс прогресса при импорте нового словаря
-            AppState.currentCardIndex = 0;
-            
-            saveState();
-            
-            // Обновление UI
-            renderDictionary();
-            updateCategoryFilter();
-            updateProgressUI();
-            updateStats();
-            renderCard();
-            
-            alert(`✓ Успешно импортировано ${importedData.length} слов(а)`);
-            
-        } catch (error) {
-            console.error('Ошибка импорта:', error);
-            alert(`✗ Ошибка импорта: ${error.message}\n\nПроверьте формат JSON файла.`);
-        }
-    };
-    
-    reader.onerror = function() {
-        alert('✗ Ошибка чтения файла');
-    };
-    
-    reader.readAsText(file);
+function importDictionary() {
+    alert('Словарь общий и хранится в Supabase (таблица words). Импорт выполняется через админ-панель Supabase.');
 }
 
 // ============================================
 // UTILITY FUNCTIONS
 // ============================================
 
-/**
- * Перемешивание массива (алгоритм Фишера-Йетса)
- * @param {Array} array - Массив для перемешивания
- */
 function shuffleArray(array) {
     for (let i = array.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -811,22 +868,12 @@ function shuffleArray(array) {
     }
 }
 
-/**
- * Экранирование HTML для защиты от XSS
- * @param {string} text - Текст для экранирования
- * @returns {string} Экранированный текст
- */
 function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
 }
 
-/**
- * Показ сообщения о пустом состоянии
- * @param {string} elementId - ID элемента
- * @param {string} message - Сообщение
- */
 function showEmptyState(elementId, message) {
     const el = document.getElementById(elementId);
     if (el) {
@@ -834,114 +881,294 @@ function showEmptyState(elementId, message) {
     }
 }
 
+function showAuthError(message, type = 'error') {
+    const errorEl = document.getElementById('auth-error');
+    if (!errorEl) return;
+
+    errorEl.textContent = message;
+    errorEl.style.display = 'block';
+    errorEl.style.color = type === 'success' ? '#27ae60' : '';
+    errorEl.style.borderColor = type === 'success' ? '#27ae60' : '';
+    errorEl.style.background = type === 'success' ? 'rgba(39, 174, 96, 0.1)' : '';
+
+    setTimeout(() => {
+        errorEl.style.display = 'none';
+        errorEl.style.color = '';
+        errorEl.style.borderColor = '';
+        errorEl.style.background = '';
+    }, 5000);
+}
+
+function setAuthLoading(formId, isLoading) {
+    const form = document.getElementById(formId);
+    if (!form) return;
+
+    const submitBtn = form.querySelector('button[type="submit"]');
+    if (!submitBtn) return;
+
+    if (isLoading) {
+        submitBtn.dataset.originalText = submitBtn.textContent;
+        submitBtn.textContent = 'Подождите...';
+        submitBtn.disabled = true;
+    } else {
+        submitBtn.textContent = submitBtn.dataset.originalText || submitBtn.textContent;
+        submitBtn.disabled = false;
+    }
+}
+
+function humanizeAuthError(message) {
+    const msg = String(message || '').toLowerCase();
+
+    if (msg.includes('email not confirmed') || msg.includes('email_not_confirmed')) {
+        return 'Email не подтвержден. Перейдите по ссылке из письма и повторите вход.';
+    }
+
+    if (msg.includes('invalid login credentials')) {
+        return 'Неверный email или пароль.';
+    }
+
+    if (msg.includes('email address') && msg.includes('invalid')) {
+        return 'Некорректный email. Введите реальный почтовый адрес (например Gmail/Yandex).';
+    }
+
+    if (msg.includes('password should be at least')) {
+        return 'Пароль слишком короткий. Минимум 6 символов.';
+    }
+
+    return message || 'Ошибка авторизации';
+}
+
 // ============================================
-// EVENT LISTENERS & INITIALIZATION
+// APP INITIALIZATION
 // ============================================
 
-/**
- * Инициализация приложения
- */
-function initApp() {
-    // Загрузка сохранённого состояния
-    loadState();
-    
-    // Применение темы
-    applyTheme(AppState.theme);
-    
-    // Навигация по вкладкам
+let appEventHandlersBound = false;
+
+function bindAppHandlers() {
+    if (appEventHandlersBound) return;
+
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', () => switchTab(btn.dataset.tab));
     });
-    
-    // Переключатель темы
-    document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
-    
-    // Карточки: навигация
+
+    document.getElementById('theme-toggle').addEventListener('click', () => {
+        toggleTheme();
+    });
+
     document.getElementById('prev-card').addEventListener('click', moveToPrevCard);
     document.getElementById('next-card').addEventListener('click', moveToNextCard);
-    document.getElementById('mark-learned').addEventListener('click', markAsLearned);
+    document.getElementById('mark-learned').addEventListener('click', () => {
+        markAsLearned();
+    });
     document.getElementById('flashcard').addEventListener('click', flipCard);
-    
-    // Тест: следующий вопрос
+
     document.getElementById('next-question').addEventListener('click', generateQuizQuestion);
-    
-    // Словарь: поиск и фильтрация
+
     document.getElementById('search-input').addEventListener('input', renderDictionary);
     document.getElementById('category-filter').addEventListener('change', renderDictionary);
-    
-    // Настройки: экспорт/импорт
+
     document.getElementById('export-json').addEventListener('click', exportDictionary);
-    document.getElementById('import-json').addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (file) {
-            importDictionary(file);
-            e.target.value = ''; // Сброс для возможности повторного импорта того же файла
-        }
-    });
-    
-    // Настройки: сброс
-    document.getElementById('reset-progress').addEventListener('click', () => {
+    document.getElementById('import-json').addEventListener('change', () => importDictionary());
+
+    document.getElementById('reset-progress').addEventListener('click', async () => {
         if (confirm('Сбросить весь прогресс обучения?')) {
-            resetProgress();
+            await resetProgress();
             alert('Прогресс сброшен');
         }
     });
-    
-    document.getElementById('reset-dictionary').addEventListener('click', () => {
-        if (confirm('Сбросить словарь к значениям по умолчанию? Все изменения будут потеряны!')) {
-            resetDictionary();
-            alert('Словарь сброшен');
+
+    document.getElementById('reset-dictionary').addEventListener('click', async () => {
+        if (confirm('Перезагрузить словарь из Supabase?')) {
+            await resetDictionary();
+            alert('Словарь перезагружен');
         }
     });
-    
-    // Первоначальный рендер
+
+    document.getElementById('admin-word-form')?.addEventListener('submit', saveAdminWord);
+    document.getElementById('admin-word-cancel')?.addEventListener('click', resetAdminWordForm);
+    document.getElementById('admin-refresh-users')?.addEventListener('click', () => {
+        loadAdminUsers();
+    });
+
+    appEventHandlersBound = true;
+}
+
+async function initApp() {
+    await loadState();
+
+    applyTheme(AppState.theme);
+    bindAppHandlers();
+
+    // Общий словарь — запрет пользовательского импорта
+    const importInput = document.getElementById('import-json');
+    if (importInput) {
+        importInput.disabled = true;
+    }
+
     updateProgressUI();
     updateQuizScoreUI();
     updateCategoryFilter();
     renderCard();
+    renderDictionary();
     updateStats();
-    
-    console.log('Приложение запущено. Слов loaded:', AppState.dictionary.length);
+    updateAdminUI();
+    renderAdminWordsList();
+
+    if (isCurrentUserAdmin()) {
+        await loadAdminUsers();
+    }
 }
 
-// Запуск приложения после загрузки DOM
-document.addEventListener('DOMContentLoaded', initApp);
+// ============================================
+// AUTH UI HANDLERS
+// ============================================
 
-/*
- * ============================================
- * ДОПОЛНИТЕЛЬНЫЕ ВОЗМОЖНОСТИ (КОММЕНТАРИИ)
- * ============================================
- * 
- * ДЛЯ ДОБАВЛЕНИЯ ОЗВУЧКИ В БУДУЩЕМ:
- * -------------------------------
- * Если появятся аудиофайлы для каждого слова, можно добавить:
- * 
- * 1. В структуру словаря добавить поле: audioFile: "path/to/audio.mp3"
- * 2. Создать функцию playAudio(wordId):
- *    const word = AppState.dictionary.find(w => w.id === wordId);
- *    if (word && word.audioFile) {
- *        const audio = new Audio(word.audioFile);
- *        audio.play();
- *    }
- * 3. Добавить кнопку воспроизведения на карточку и в словарь
- * 
- * ДЛЯ ДОБАВЛЕНИЯ НОВЫХ СЛОВ ЧЕРЕЗ JSON:
- * -------------------------------------
- * 1. Экспортируйте текущий словарь через кнопку "Экспорт JSON"
- * 2. Откройте файл в текстовом редакторе
- * 3. Добавьте новые элементы по аналогии с существующими:
- *    {
- *        "id": 31,
- *        "lak": "Новое слово",
- *        "ru": "Перевод",
- *        "transcription": "[транскрипция]",
- *        "category": "Категория",
- *        "example": "Пример использования"
- *    }
- * 4. Сохраните файл и импортируйте обратно через "Импорт JSON"
- * 
- * РЕЗЕРВНОЕ КОПИРОВАНИЕ:
- * ----------------------
- * Регулярно используйте "Экспорт JSON" для создания бэкапов.
- * Файл можно хранить на компьютере, в облаке или пересылать другим пользователям.
- */
+function updateAuthUI() {
+    const authSection = document.getElementById('auth-section');
+    const mainApp = document.getElementById('main-app');
+    const userInfo = document.getElementById('user-info');
+    const authForms = document.getElementById('auth-forms');
+    const currentUsername = document.getElementById('current-username');
+    const headerUsername = document.getElementById('header-username');
+
+    if (AuthSystem.isLoggedIn()) {
+        authSection.style.display = 'none';
+        mainApp.style.display = 'block';
+        userInfo.style.display = 'block';
+        authForms.style.display = 'none';
+
+        if (currentUsername) currentUsername.textContent = AuthSystem.currentUser.username;
+        if (headerUsername) {
+            headerUsername.textContent = isCurrentUserAdmin()
+                ? `${AuthSystem.currentUser.username} (admin)`
+                : AuthSystem.currentUser.username;
+        }
+    } else {
+        authSection.style.display = 'flex';
+        mainApp.style.display = 'none';
+        userInfo.style.display = 'none';
+        authForms.style.display = 'block';
+    }
+
+    updateAdminUI();
+}
+
+function initAuthHandlers() {
+    document.getElementById('show-register')?.addEventListener('click', e => {
+        e.preventDefault();
+        document.getElementById('login-form').style.display = 'none';
+        document.getElementById('register-form').style.display = 'block';
+    });
+
+    document.getElementById('show-login')?.addEventListener('click', e => {
+        e.preventDefault();
+        document.getElementById('register-form').style.display = 'none';
+        document.getElementById('login-form').style.display = 'block';
+    });
+
+    document.getElementById('login-form')?.addEventListener('submit', async e => {
+        e.preventDefault();
+        setAuthLoading('login-form', true);
+
+        try {
+            const email = document.getElementById('login-email').value.trim();
+            const password = document.getElementById('login-password').value;
+
+            const result = await AuthSystem.login(email, password);
+            if (!result.success) {
+                showAuthError(humanizeAuthError(result.error));
+                return;
+            }
+
+            await loadDictionary();
+            updateAuthUI();
+            await initApp();
+            switchTab('cards');
+        } catch (err) {
+            console.error('Unhandled login error:', err);
+            showAuthError(`Ошибка входа: ${err?.message || 'неизвестно'}`);
+        } finally {
+            setAuthLoading('login-form', false);
+        }
+    });
+
+    document.getElementById('register-form')?.addEventListener('submit', async e => {
+        e.preventDefault();
+        setAuthLoading('register-form', true);
+
+        try {
+            const username = document.getElementById('register-username').value.trim();
+            const email = document.getElementById('register-email').value.trim();
+            const password = document.getElementById('register-password').value;
+
+            const result = await AuthSystem.register(username, email, password);
+            if (!result.success) {
+                showAuthError(humanizeAuthError(result.error));
+                return;
+            }
+
+            if (result.pendingConfirmation) {
+                showAuthError(result.message, 'success');
+                document.getElementById('register-form').style.display = 'none';
+                document.getElementById('login-form').style.display = 'block';
+                return;
+            }
+
+            await loadDictionary();
+            updateAuthUI();
+            await initApp();
+            switchTab('cards');
+        } catch (err) {
+            console.error('Unhandled register error:', err);
+            showAuthError(`Ошибка регистрации: ${err?.message || 'неизвестно'}`);
+        } finally {
+            setAuthLoading('register-form', false);
+        }
+    });
+
+    document.getElementById('logout-btn')?.addEventListener('click', async () => {
+        await saveState();
+        await AuthSystem.logout();
+        updateAuthUI();
+    });
+
+    document.getElementById('header-logout-btn')?.addEventListener('click', async () => {
+        await saveState();
+        await AuthSystem.logout();
+        updateAuthUI();
+    });
+}
+
+// ============================================
+// BOOTSTRAP
+// ============================================
+
+document.addEventListener('DOMContentLoaded', async () => {
+    if (!sbClient) {
+        showAuthError('Supabase SDK не загружен. Откройте приложение через локальный сервер и проверьте доступ к CDN.', 'error');
+        return;
+    }
+
+    await loadDictionary();
+    await AuthSystem.restoreSession();
+
+    initAuthHandlers();
+    updateAuthUI();
+
+    if (AuthSystem.isLoggedIn()) {
+        await initApp();
+    }
+});
+
+window.addEventListener('error', (event) => {
+    console.error('Global JS error:', event.error || event.message);
+    showAuthError(`Ошибка JS: ${event.message || 'см. консоль'}`);
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+    console.error('Unhandled promise rejection:', event.reason);
+    const reasonText = typeof event.reason === 'string'
+        ? event.reason
+        : (event.reason?.message || 'неизвестная ошибка');
+    showAuthError(`Ошибка async: ${reasonText}`);
+});

@@ -8,13 +8,56 @@
 </head>
 <body>
     <div class="app-container">
-        <!-- Header -->
-        <header class="header">
-            <h1>📚 Лакский язык</h1>
-            <button id="theme-toggle" class="btn-icon" aria-label="Переключить тему">
-                <span class="theme-icon">🌙</span>
-            </button>
-        </header>
+        <!-- Auth Section -->
+        <section id="auth-section" class="auth-section">
+            <div class="auth-container">
+                <h1>📚 Лакский язык</h1>
+                <p class="auth-subtitle">Приложение для изучения лакского языка</p>
+                
+                <div id="auth-forms" class="auth-forms">
+                    <!-- Login Form -->
+                    <form id="login-form" class="auth-form">
+                        <h2>Вход</h2>
+                        <input type="email" id="login-email" placeholder="Email" required>
+                        <input type="password" id="login-password" placeholder="Пароль" required minlength="6">
+                        <button type="submit" class="btn btn-primary">Войти</button>
+                        <p class="auth-switch">Нет аккаунта? <a href="#" id="show-register">Зарегистрироваться</a></p>
+                    </form>
+                    
+                    <!-- Register Form -->
+                    <form id="register-form" class="auth-form" style="display: none;">
+                        <h2>Регистрация</h2>
+                        <input type="text" id="register-username" placeholder="Придумайте имя пользователя" required minlength="3">
+                        <input type="email" id="register-email" placeholder="Email" required>
+                        <input type="password" id="register-password" placeholder="Пароль (минимум 6 символов)" required minlength="6">
+                        <button type="submit" class="btn btn-primary">Зарегистрироваться</button>
+                        <p class="auth-switch">Уже есть аккаунт? <a href="#" id="show-login">Войти</a></p>
+                    </form>
+                </div>
+                
+                <!-- User Info (shown when logged in) -->
+                <div id="user-info" class="user-info" style="display: none;">
+                    <p>Добро пожаловать, <span id="current-username"></span>!</p>
+                    <button id="logout-btn" class="btn btn-secondary">Выйти</button>
+                </div>
+                
+                <div id="auth-error" class="auth-error"></div>
+            </div>
+        </section>
+
+        <!-- Main App (hidden by default) -->
+        <div id="main-app" style="display: none;">
+            <!-- Header -->
+            <header class="header">
+                <h1>📚 Лакский язык</h1>
+                <div class="header-user">
+                    <span id="header-username"></span>
+                    <button id="header-logout-btn" class="btn-icon" aria-label="Выйти">🚪</button>
+                </div>
+                <button id="theme-toggle" class="btn-icon" aria-label="Переключить тему">
+                    <span class="theme-icon">🌙</span>
+                </button>
+            </header>
 
         <!-- Navigation Tabs -->
         <nav class="tabs">
@@ -22,6 +65,7 @@
             <button class="tab-btn" data-tab="quiz">Тест</button>
             <button class="tab-btn" data-tab="dictionary">Словарь</button>
             <button class="tab-btn" data-tab="settings">Настройки</button>
+            <button id="admin-tab-btn" class="tab-btn hidden" data-tab="admin">Админ</button>
         </nav>
 
         <!-- Main Content -->
@@ -142,10 +186,45 @@
                         Используйте экспорт/импорт для создания резервных копий и обмена словарями.
                     </p>
                 </div>
+                </div>
+            </section>
+
+            <!-- Admin Mode -->
+            <section id="admin" class="tab-content">
+                <div class="settings-section">
+                    <h2>Админ-панель словаря</h2>
+                    <p class="info-text">Добавление и редактирование слов доступно только администратору.</p>
+
+                    <form id="admin-word-form" class="admin-form">
+                        <input type="hidden" id="admin-word-id">
+                        <input type="text" id="admin-lak" placeholder="Слово на лакском" required>
+                        <input type="text" id="admin-ru" placeholder="Перевод на русский" required>
+                        <input type="text" id="admin-transcription" placeholder="Транскрипция" required>
+                        <input type="text" id="admin-category" placeholder="Категория" required>
+                        <textarea id="admin-example" placeholder="Пример" rows="3" required></textarea>
+                        <div class="settings-group">
+                            <button id="admin-word-submit" type="submit" class="btn btn-primary">➕ Добавить слово</button>
+                            <button id="admin-word-cancel" type="button" class="btn btn-secondary">Отмена</button>
+                        </div>
+                    </form>
+
+                    <div id="admin-words-list" class="admin-list"></div>
+                </div>
+
+                <div class="settings-section">
+                    <h2>Пользователи</h2>
+                    <div class="settings-group">
+                        <button id="admin-refresh-users" class="btn btn-secondary">🔄 Обновить список</button>
+                    </div>
+                    <div id="admin-users-list" class="admin-list"></div>
+                </div>
             </section>
         </main>
+        </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
     <script src="app.js"></script>
 </body>
 </html>
