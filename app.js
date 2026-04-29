@@ -60,7 +60,8 @@ const AuthSystem = {
             this.currentUser = {
                 id: data.user.id,
                 email: data.user.email,
-                username: username.trim()
+                username: profile.username || username.trim(),
+                isAdmin: Boolean(profile.is_admin)
             };
 
             return { success: true, user: this.currentUser };
@@ -95,7 +96,8 @@ const AuthSystem = {
             this.currentUser = {
                 id: authUser.id,
                 email: authUser.email,
-                username: profile.username || fallbackName
+                username: profile.username || fallbackName,
+                isAdmin: Boolean(profile.is_admin)
             };
 
             return { success: true, user: this.currentUser };
@@ -139,7 +141,8 @@ const AuthSystem = {
         this.currentUser = {
             id: authUser.id,
             email: authUser.email,
-            username: profile.username || fallbackName
+            username: profile.username || fallbackName,
+            isAdmin: Boolean(profile.is_admin)
         };
 
         return true;
@@ -148,7 +151,7 @@ const AuthSystem = {
     async ensureProfile(userId, username) {
         const { data, error } = await sbClient
             .from('profiles')
-            .select('id, username')
+            .select('id, username, is_admin')
             .eq('id', userId)
             .maybeSingle();
 
@@ -169,12 +172,12 @@ const AuthSystem = {
         const { data: created, error: createError } = await sbClient
             .from('profiles')
             .upsert(payload, { onConflict: 'id' })
-            .select('id, username')
+            .select('id, username, is_admin')
             .single();
 
         if (createError) {
             console.error('Ошибка создания профиля:', createError);
-            return { id: userId, username: payload.username };
+            return { id: userId, username: payload.username, is_admin: false };
         }
 
         return created;
@@ -269,6 +272,10 @@ const AppState = {
     theme: 'light',
     currentTab: 'cards'
 };
+
+function isCurrentUserAdmin() {
+    return Boolean(AuthSystem.currentUser?.isAdmin);
+}
 
 function getDefaultProgress() {
     return {
@@ -410,6 +417,11 @@ async function toggleTheme() {
 // ============================================
 
 function switchTab(tabId) {
+    if (tabId === 'admin' && !isCurrentUserAdmin()) {
+        showAuthError('Доступ к админ-панели только для администратора');
+        return;
+    }
+
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.tab === tabId);
     });
@@ -433,7 +445,155 @@ function switchTab(tabId) {
         case 'settings':
             updateStats();
             break;
+        case 'admin':
+            renderAdminWordsList();
+            loadAdminUsers();
+            break;
     }
+}
+
+// ============================================
+// ADMIN PANEL
+// ============================================
+
+function updateAdminUI() {
+    const adminTabBtn = document.getElementById('admin-tab-btn');
+    if (!adminTabBtn) return;
+
+    adminTabBtn.classList.toggle('hidden', !isCurrentUserAdmin());
+
+    if (!isCurrentUserAdmin() && AppState.currentTab === 'admin') {
+        switchTab('cards');
+    }
+}
+
+function resetAdminWordForm() {
+    const form = document.getElementById('admin-word-form');
+    if (!form) return;
+
+    form.reset();
+    document.getElementById('admin-word-id').value = '';
+    document.getElementById('admin-word-submit').textContent = '➕ Добавить слово';
+}
+
+function fillAdminWordForm(wordId) {
+    const word = AppState.dictionary.find(w => Number(w.id) === Number(wordId));
+    if (!word) return;
+
+    document.getElementById('admin-word-id').value = String(word.id);
+    document.getElementById('admin-lak').value = word.lak;
+    document.getElementById('admin-ru').value = word.ru;
+    document.getElementById('admin-transcription').value = word.transcription;
+    document.getElementById('admin-category').value = word.category;
+    document.getElementById('admin-example').value = word.example;
+    document.getElementById('admin-word-submit').textContent = '💾 Сохранить изменения';
+}
+
+async function saveAdminWord(event) {
+    event.preventDefault();
+
+    if (!isCurrentUserAdmin()) {
+        alert('Недостаточно прав для изменения словаря');
+        return;
+    }
+
+    const idRaw = document.getElementById('admin-word-id').value;
+    const payload = {
+        lak: document.getElementById('admin-lak').value.trim(),
+        ru: document.getElementById('admin-ru').value.trim(),
+        transcription: document.getElementById('admin-transcription').value.trim(),
+        category: document.getElementById('admin-category').value.trim(),
+        example: document.getElementById('admin-example').value.trim()
+    };
+
+    if (!payload.lak || !payload.ru || !payload.transcription || !payload.category || !payload.example) {
+        alert('Заполните все поля слова');
+        return;
+    }
+
+    let query = sbClient.from('words');
+    if (idRaw) {
+        query = query.update(payload).eq('id', Number(idRaw));
+    } else {
+        query = query.insert(payload);
+    }
+
+    const { error } = await query;
+
+    if (error) {
+        console.error('Ошибка сохранения слова:', error);
+        alert(`Не удалось сохранить слово: ${error.message}`);
+        return;
+    }
+
+    await loadDictionary();
+    AppState.dictionary = [...DEFAULT_DICTIONARY];
+    updateCategoryFilter();
+    renderDictionary();
+    renderCard();
+    updateStats();
+    renderAdminWordsList();
+    resetAdminWordForm();
+
+    alert(idRaw ? 'Слово обновлено' : 'Слово добавлено');
+}
+
+function renderAdminWordsList() {
+    const list = document.getElementById('admin-words-list');
+    if (!list || !isCurrentUserAdmin()) return;
+
+    const rows = [...AppState.dictionary]
+        .sort((a, b) => Number(a.id) - Number(b.id))
+        .map(word => `
+            <div class="admin-item">
+                <div class="admin-item-main">
+                    <strong>${escapeHtml(word.lak)}</strong> — ${escapeHtml(word.ru)}
+                    <div class="admin-item-meta">${escapeHtml(word.transcription)} · ${escapeHtml(word.category)}</div>
+                </div>
+                <div class="admin-item-actions">
+                    <button class="btn btn-secondary admin-edit-btn" data-word-id="${word.id}">✏️ Редактировать</button>
+                </div>
+            </div>
+        `)
+        .join('');
+
+    list.innerHTML = rows || '<p class="info-text">Словарь пуст</p>';
+
+    list.querySelectorAll('.admin-edit-btn').forEach(btn => {
+        btn.addEventListener('click', () => fillAdminWordForm(btn.dataset.wordId));
+    });
+}
+
+async function loadAdminUsers() {
+    const list = document.getElementById('admin-users-list');
+    if (!list || !isCurrentUserAdmin()) return;
+
+    list.innerHTML = '<p class="info-text">Загрузка пользователей...</p>';
+
+    const { data, error } = await sbClient.rpc('admin_list_users');
+    if (error) {
+        console.error('Ошибка загрузки пользователей:', error);
+        list.innerHTML = `<p class="info-text">Ошибка загрузки пользователей: ${escapeHtml(error.message)}</p>`;
+        return;
+    }
+
+    if (!Array.isArray(data) || data.length === 0) {
+        list.innerHTML = '<p class="info-text">Пользователи не найдены</p>';
+        return;
+    }
+
+    const rows = data
+        .map(user => `
+            <div class="admin-item">
+                <div class="admin-item-main">
+                    <strong>${escapeHtml(user.username || 'Пользователь')}</strong>
+                    <div class="admin-item-meta">${escapeHtml(user.email || 'без email')} · ${escapeHtml(String(user.created_at || ''))}</div>
+                </div>
+            </div>
+        `)
+        .join('');
+
+    list.innerHTML = rows;
 }
 
 // ============================================
@@ -824,6 +984,12 @@ function bindAppHandlers() {
         }
     });
 
+    document.getElementById('admin-word-form')?.addEventListener('submit', saveAdminWord);
+    document.getElementById('admin-word-cancel')?.addEventListener('click', resetAdminWordForm);
+    document.getElementById('admin-refresh-users')?.addEventListener('click', () => {
+        loadAdminUsers();
+    });
+
     appEventHandlersBound = true;
 }
 
@@ -845,6 +1011,12 @@ async function initApp() {
     renderCard();
     renderDictionary();
     updateStats();
+    updateAdminUI();
+    renderAdminWordsList();
+
+    if (isCurrentUserAdmin()) {
+        await loadAdminUsers();
+    }
 }
 
 // ============================================
@@ -866,13 +1038,19 @@ function updateAuthUI() {
         authForms.style.display = 'none';
 
         if (currentUsername) currentUsername.textContent = AuthSystem.currentUser.username;
-        if (headerUsername) headerUsername.textContent = AuthSystem.currentUser.username;
+        if (headerUsername) {
+            headerUsername.textContent = isCurrentUserAdmin()
+                ? `${AuthSystem.currentUser.username} (admin)`
+                : AuthSystem.currentUser.username;
+        }
     } else {
         authSection.style.display = 'flex';
         mainApp.style.display = 'none';
         userInfo.style.display = 'none';
         authForms.style.display = 'block';
     }
+
+    updateAdminUI();
 }
 
 function initAuthHandlers() {

@@ -65,6 +65,7 @@
             <button class="tab-btn" data-tab="quiz">Тест</button>
             <button class="tab-btn" data-tab="dictionary">Словарь</button>
             <button class="tab-btn" data-tab="settings">Настройки</button>
+            <button id="admin-tab-btn" class="tab-btn hidden" data-tab="admin">Админ</button>
         </nav>
 
         <!-- Main Content -->
@@ -185,6 +186,37 @@
                         Используйте экспорт/импорт для создания резервных копий и обмена словарями.
                     </p>
                 </div>
+                </div>
+            </section>
+
+            <!-- Admin Mode -->
+            <section id="admin" class="tab-content">
+                <div class="settings-section">
+                    <h2>Админ-панель словаря</h2>
+                    <p class="info-text">Добавление и редактирование слов доступно только администратору.</p>
+
+                    <form id="admin-word-form" class="admin-form">
+                        <input type="hidden" id="admin-word-id">
+                        <input type="text" id="admin-lak" placeholder="Слово на лакском" required>
+                        <input type="text" id="admin-ru" placeholder="Перевод на русский" required>
+                        <input type="text" id="admin-transcription" placeholder="Транскрипция" required>
+                        <input type="text" id="admin-category" placeholder="Категория" required>
+                        <textarea id="admin-example" placeholder="Пример" rows="3" required></textarea>
+                        <div class="settings-group">
+                            <button id="admin-word-submit" type="submit" class="btn btn-primary">➕ Добавить слово</button>
+                            <button id="admin-word-cancel" type="button" class="btn btn-secondary">Отмена</button>
+                        </div>
+                    </form>
+
+                    <div id="admin-words-list" class="admin-list"></div>
+                </div>
+
+                <div class="settings-section">
+                    <h2>Пользователи</h2>
+                    <div class="settings-group">
+                        <button id="admin-refresh-users" class="btn btn-secondary">🔄 Обновить список</button>
+                    </div>
+                    <div id="admin-users-list" class="admin-list"></div>
                 </div>
             </section>
         </main>
