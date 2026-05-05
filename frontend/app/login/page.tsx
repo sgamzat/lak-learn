@@ -40,6 +40,7 @@ export default function LoginPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="email"
+            autoComplete="email"
             required
           />
           <input
@@ -48,6 +49,7 @@ export default function LoginPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="password"
+            autoComplete="current-password"
             required
           />
           <button className="w-full rounded bg-emerald-700 px-4 py-2" disabled={loading}>
@@ -62,4 +64,3 @@ export default function LoginPage() {
     </main>
   );
 }
-

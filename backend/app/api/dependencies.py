@@ -1,6 +1,6 @@
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.redis_client import redis_client
@@ -50,3 +50,22 @@ async def require_admin(current_user: User = Depends(get_current_user)) -> User:
     if current_user.role != "admin":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
     return current_user
+
+
+async def require_admin_or_bootstrap(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db_session),
+) -> User:
+    if current_user.role == "admin":
+        return current_user
+
+    admins_count_result = await db.execute(select(func.count(User.id)).where(User.role == "admin"))
+    admins_count = admins_count_result.scalar_one()
+
+    if admins_count == 0:
+        current_user.role = "admin"
+        await db.commit()
+        await db.refresh(current_user)
+        return current_user
+
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")

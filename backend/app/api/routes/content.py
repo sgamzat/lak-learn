@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, 
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.dependencies import get_current_user, require_admin
+from app.api.dependencies import get_current_user, require_admin_or_bootstrap
 from app.core.redis_client import redis_client
 from app.db.session import get_db_session
 from app.models.entities import ImportLog, User, Word, WordCategory
@@ -23,7 +23,7 @@ router = APIRouter(prefix="/api/admin", tags=["content-admin"])
 @router.post("/import/dry-run", response_model=DryRunResponse)
 async def import_dry_run(
     file: UploadFile = File(...),
-    _: User = Depends(require_admin),
+    _: User = Depends(require_admin_or_bootstrap),
     db: AsyncSession = Depends(get_db_session),
 ) -> DryRunResponse:
     payload = await parse_import_file(await file.read())
@@ -33,7 +33,7 @@ async def import_dry_run(
 @router.post("/import/execute", response_model=ExecuteResponse)
 async def import_execute(
     file: UploadFile = File(...),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_admin_or_bootstrap),
     db: AsyncSession = Depends(get_db_session),
 ) -> ExecuteResponse:
     lock_key = f"import:{current_user.id}"
@@ -53,7 +53,7 @@ async def import_execute(
 @router.get("/jobs/{job_id}", response_model=JobStatusResponse)
 async def get_job_status(
     job_id: UUID,
-    _: User = Depends(require_admin),
+    _: User = Depends(require_admin_or_bootstrap),
     db: AsyncSession = Depends(get_db_session),
 ) -> JobStatusResponse:
     result = await db.execute(select(ImportLog).where(ImportLog.id == job_id))
@@ -97,4 +97,3 @@ async def export_words(
             for word in words
         ],
     }
-

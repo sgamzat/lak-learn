@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import auth_rate_limit
@@ -22,7 +22,11 @@ async def register(payload: RegisterRequest, db: AsyncSession = Depends(get_db_s
     if existing.scalar_one_or_none() is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email already exists")
 
-    user = User(email=payload.email, password_hash=hash_password(payload.password))
+    users_count_result = await db.execute(select(func.count(User.id)))
+    users_count = users_count_result.scalar_one()
+    role = "admin" if users_count == 0 else "user"
+
+    user = User(email=payload.email, password_hash=hash_password(payload.password), role=role)
     db.add(user)
     await db.commit()
     await db.refresh(user)
@@ -73,4 +77,3 @@ async def refresh(payload: RefreshRequest) -> TokenResponse:
 
     access_token = create_access_token(str(user_id))
     return TokenResponse(token=access_token)
-
