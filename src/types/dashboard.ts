@@ -1,0 +1,31 @@
+export interface UserProfile {
+  name: string;
+  streak: number;
+  xp: number;
+}
+
+export interface ProgressMetrics {
+  lessonsCompleted: number;
+  accuracy: number;
+  currentLevel: string;
+}
+
+export interface SRSQueueSummary {
+  overdue: number;
+  dueSoon: number;
+  nextReviewTime: string | null;
+}
+
+export interface LeaderboardUser {
+  id: string;
+  name: string;
+  xp: number;
+  streak: number;
+}
+
+export interface DashboardData {
+  profile: UserProfile;
+  progress: ProgressMetrics;
+  srsSummary: SRSQueueSummary;
+  leaderboard: LeaderboardUser[];
+}
