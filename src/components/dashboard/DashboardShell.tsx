@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { BookOpen, ChartNoAxesCombined, Flame, Star, Trophy } from "lucide-react";
-import { getDashboardData } from "@/lib/api/client";
+import { useRouter } from "next/navigation";
+import { ChartNoAxesCombined, ChevronDown, Flame, LogOut, Settings, Star, Trophy } from "lucide-react";
+import { getDashboardData, logout } from "@/lib/api/client";
 import { SRSQueueWidget } from "@/components/dashboard/SRSQueueWidget";
 import type { DashboardData } from "@/types/dashboard";
 
-const quickLinks = [
+const baseQuickLinks = [
   { href: "/dashboard", label: "Словарь" },
   { href: "/dashboard", label: "Грамматика" },
   { href: "/review", label: "Повторение" },
@@ -15,8 +16,11 @@ const quickLinks = [
 ];
 
 export function DashboardShell() {
+  const router = useRouter();
   const [data, setData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -41,6 +45,22 @@ export function DashboardShell() {
   }, []);
 
   const progressWidth = useMemo(() => `${data?.progress.accuracy ?? 0}%`, [data?.progress.accuracy]);
+
+  async function handleLogout() {
+    if (isLoggingOut) {
+      return;
+    }
+
+    setIsLoggingOut(true);
+    const ok = await logout();
+    setIsLoggingOut(false);
+    setIsProfileMenuOpen(false);
+
+    if (ok) {
+      router.push("/login");
+      router.refresh();
+    }
+  }
 
   if (isLoading) {
     return (
@@ -70,14 +90,83 @@ export function DashboardShell() {
   return (
     <div className="mx-auto max-w-7xl px-4 py-6">
       <header className="flex h-16 items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">Салам, {data.profile.name}</h1>
-        <div className="flex items-center gap-3 text-sm">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <h1 className="text-2xl font-bold">Дашборд</h1>
+
+            <nav className="flex flex-wrap items-center gap-2" aria-label="Быстрые ссылки">
+              {baseQuickLinks.map((link) => (
+                <Link
+                  key={link.label}
+                  href={link.href}
+                  className="inline-flex min-h-10 items-center justify-center whitespace-nowrap rounded-full border border-gray-200 px-3 text-sm transition hover:bg-gray-50"
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </nav>
+          </div>
+
+          <p className="mt-1 text-sm text-gray-600">Пользователь: {data.profile.name}</p>
+        </div>
+
+        <div className="relative flex items-center gap-3 text-sm">
           <span className="inline-flex min-h-11 items-center gap-1 rounded-full bg-orange-100 px-3 font-medium text-orange-700">
             <Flame className="h-4 w-4" /> {data.profile.streak} дней
           </span>
           <span className="inline-flex min-h-11 items-center gap-1 rounded-full bg-yellow-100 px-3 font-medium text-yellow-700">
             <Star className="h-4 w-4" /> {data.profile.xp} XP
           </span>
+
+          <button
+            type="button"
+            onClick={() => setIsProfileMenuOpen((prev) => !prev)}
+            className="inline-flex min-h-11 items-center gap-1 rounded-full border border-gray-200 bg-white px-3 font-medium text-gray-700 transition hover:bg-gray-50"
+            aria-haspopup="menu"
+            aria-expanded={isProfileMenuOpen}
+          >
+            Профиль <ChevronDown className="h-4 w-4" />
+          </button>
+
+          {isProfileMenuOpen ? (
+            <div
+              className="absolute right-0 top-14 z-10 w-64 rounded-xl border border-gray-200 bg-white p-2 shadow-lg"
+              role="menu"
+              aria-label="Настройки профиля"
+            >
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-gray-700 transition hover:bg-gray-50"
+                role="menuitem"
+              >
+                <Settings className="h-4 w-4" />
+                Сменить пароль (скоро)
+              </button>
+
+              {data.profile.role === "admin" ? (
+                <Link
+                  href="/admin"
+                  className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-700 transition hover:bg-gray-50"
+                  role="menuitem"
+                  onClick={() => setIsProfileMenuOpen(false)}
+                >
+                  <Settings className="h-4 w-4" />
+                  База знаний (админ)
+                </Link>
+              ) : null}
+
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                role="menuitem"
+                onClick={handleLogout}
+                disabled={isLoggingOut}
+              >
+                <LogOut className="h-4 w-4" />
+                {isLoggingOut ? "Выход..." : "Выйти"}
+              </button>
+            </div>
+          ) : null}
         </div>
       </header>
 
@@ -111,24 +200,6 @@ export function DashboardShell() {
             />
           </div>
           <p className="mt-2 text-sm text-gray-700">Точность: {data.progress.accuracy}%</p>
-        </section>
-
-        <section className="rounded-2xl border border-gray-200 bg-white p-6 transition hover:-translate-y-0.5 hover:shadow-lg">
-          <div className="flex items-center gap-2">
-            <BookOpen className="h-5 w-5" />
-            <h2 className="text-lg font-semibold">Быстрые ссылки</h2>
-          </div>
-          <div className="mt-4 grid grid-flow-col gap-2 overflow-x-auto pb-1 md:grid-flow-row md:grid-cols-2 md:overflow-visible">
-            {quickLinks.map((link) => (
-              <Link
-                key={link.label}
-                href={link.href}
-                className="inline-flex min-h-11 items-center justify-center whitespace-nowrap rounded-xl border border-gray-200 px-3 text-sm transition hover:bg-gray-50"
-              >
-                {link.label}
-              </Link>
-            ))}
-          </div>
         </section>
 
         <section className="rounded-2xl border border-gray-200 bg-white p-6 transition hover:-translate-y-0.5 hover:shadow-lg md:col-span-2 lg:col-span-3">

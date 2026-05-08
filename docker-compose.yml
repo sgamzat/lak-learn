@@ -1,20 +1,95 @@
 services:
-  lak-learn-frontend:
+  postgres:
+    image: postgres:16-alpine
+    container_name: lak-learn-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-lak_learn}
+      POSTGRES_USER: ${POSTGRES_USER:-lak_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lak_password}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-lak_user} -d ${POSTGRES_DB:-lak_learn}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - app_net
+
+  migrate:
+    image: postgres:16-alpine
+    container_name: lak-learn-migrate
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:-lak_password}
+      POSTGRES_DB: ${POSTGRES_DB:-lak_learn}
+      POSTGRES_USER: ${POSTGRES_USER:-lak_user}
+    volumes:
+      - ./db/migrations:/migrations:ro
+    command: >
+      sh -c '
+        set -e;
+        for file in /migrations/*.sql; do
+          echo "Applying $$file";
+          psql -h postgres -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}" -v ON_ERROR_STOP=1 -f "$$file";
+        done
+      '
+    restart: "no"
+    networks:
+      - app_net
+
+  app:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: lak-learn-frontend
-    ports:
-      - "3000:3000"
+    container_name: lak-learn-app
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
     environment:
       NODE_ENV: production
       NEXT_TELEMETRY_DISABLED: "1"
       PORT: "3000"
+      HOSTNAME: "0.0.0.0"
+      DATABASE_URL: postgresql://${POSTGRES_USER:-lak_user}:${POSTGRES_PASSWORD:-lak_password}@postgres:5432/${POSTGRES_DB:-lak_learn}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-change_me_access}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-change_me_refresh}
+      ACCESS_TOKEN_TTL: ${ACCESS_TOKEN_TTL:-15m}
+      REFRESH_TOKEN_TTL: ${REFRESH_TOKEN_TTL:-30d}
       NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-}
+    expose:
+      - "3000"
     healthcheck:
-      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3000 || exit 1"]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
       timeout: 10s
       retries: 5
       start_period: 40s
     restart: unless-stopped
+    networks:
+      - app_net
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: lak-learn-nginx
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    restart: unless-stopped
+    networks:
+      - app_net
+
+volumes:
+  pg_data:
+
+networks:
+  app_net:
+    driver: bridge

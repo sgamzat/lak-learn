@@ -1,32 +1,8 @@
 import type { DashboardData } from "@/types/dashboard";
 import type { FlashcardData } from "@/types/srs";
+import type { AuthResponse } from "@/types/auth";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ?? "";
-
-const defaultDashboard: DashboardData = {
-  profile: {
-    name: "Гамзат",
-    streak: 7,
-    xp: 340
-  },
-  progress: {
-    lessonsCompleted: 24,
-    accuracy: 78,
-    currentLevel: "A1"
-  },
-  srsSummary: {
-    overdue: 12,
-    dueSoon: 5,
-    nextReviewTime: "Сегодня, 19:00"
-  },
-  leaderboard: [
-    { id: "u1", name: "Мадина", xp: 920, streak: 21 },
-    { id: "u2", name: "Али", xp: 860, streak: 14 },
-    { id: "u3", name: "Гамзат", xp: 340, streak: 7 },
-    { id: "u4", name: "Зарема", xp: 310, streak: 6 },
-    { id: "u5", name: "Расул", xp: 280, streak: 5 }
-  ]
-};
 
 const fallbackSRSQueue: FlashcardData[] = [
   {
@@ -98,12 +74,25 @@ async function requestJson<T>(path: string): Promise<T> {
   return (await response.json()) as T;
 }
 
-export async function getDashboardData(): Promise<DashboardData> {
-  try {
-    return await requestJson<DashboardData>("/api/dashboard");
-  } catch {
-    return defaultDashboard;
+async function requestJsonWithMethod<T>(path: string, method: "GET" | "POST"): Promise<T> {
+  const url = `${API_BASE_URL}${path}`;
+  const response = await fetch(url, {
+    method,
+    headers: {
+      Accept: "application/json"
+    },
+    cache: "no-store"
+  });
+
+  if (!response.ok) {
+    throw new Error(`Request failed: ${response.status}`);
   }
+
+  return (await response.json()) as T;
+}
+
+export async function getDashboardData(): Promise<DashboardData> {
+  return requestJson<DashboardData>("/api/dashboard");
 }
 
 export async function getSRSQueue(): Promise<FlashcardData[]> {
@@ -111,5 +100,23 @@ export async function getSRSQueue(): Promise<FlashcardData[]> {
     return await requestJson<FlashcardData[]>("/api/srs/queue");
   } catch {
     return fallbackSRSQueue;
+  }
+}
+
+export async function getCurrentUser(): Promise<AuthResponse["user"] | null> {
+  try {
+    const response = await requestJsonWithMethod<AuthResponse>("/api/auth/me", "GET");
+    return response.user;
+  } catch {
+    return null;
+  }
+}
+
+export async function logout(): Promise<boolean> {
+  try {
+    await requestJsonWithMethod<{ ok: boolean }>("/api/auth/logout", "POST");
+    return true;
+  } catch {
+    return false;
   }
 }

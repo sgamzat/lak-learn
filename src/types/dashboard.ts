@@ -1,7 +1,10 @@
+import type { UserRole } from "@/types/auth";
+
 export interface UserProfile {
   name: string;
   streak: number;
   xp: number;
+  role: UserRole;
 }
 
 export interface ProgressMetrics {

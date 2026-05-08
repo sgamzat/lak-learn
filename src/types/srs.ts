@@ -25,5 +25,5 @@ export interface SRSReviewState {
   results: SRSResult[];
   isFinished: boolean;
   isLoading: boolean;
+  isInputLocked: boolean;
 }
-

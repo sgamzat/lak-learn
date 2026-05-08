@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useReducer } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
 import { getSRSQueue } from "@/lib/api/client";
@@ -14,6 +15,8 @@ type Action =
   | { type: "load_start" }
   | { type: "load_success"; payload: FlashcardData[] }
   | { type: "reveal" }
+  | { type: "lock_input" }
+  | { type: "unlock_input" }
   | { type: "rate"; payload: SRSRating };
 
 const initialState: SRSReviewState = {
@@ -22,7 +25,8 @@ const initialState: SRSReviewState = {
   isRevealed: false,
   results: [],
   isFinished: false,
-  isLoading: true
+  isLoading: true,
+  isInputLocked: false
 };
 
 function getXPByRating(rating: SRSRating): number {
@@ -43,11 +47,18 @@ function reducer(state: SRSReviewState, action: Action): SRSReviewState {
         isFinished: action.payload.length === 0,
         isRevealed: false,
         currentIndex: 0,
-        results: []
+        results: [],
+        isInputLocked: false
       };
+    case "lock_input":
+      return { ...state, isInputLocked: true };
+    case "unlock_input":
+      return { ...state, isInputLocked: false };
     case "reveal":
+      if (state.isInputLocked) return state;
       return { ...state, isRevealed: !state.isRevealed };
     case "rate": {
+      if (state.isInputLocked) return state;
       const current = state.queue[state.currentIndex];
       if (!current) return state;
 
@@ -69,7 +80,8 @@ function reducer(state: SRSReviewState, action: Action): SRSReviewState {
         currentIndex: 0,
         isRevealed: false,
         results: updatedResults,
-        isFinished: finished
+        isFinished: finished,
+        isInputLocked: false
       };
     }
     default:
@@ -80,6 +92,8 @@ function reducer(state: SRSReviewState, action: Action): SRSReviewState {
 export function SRSReviewScreen() {
   const [state, dispatch] = useReducer(reducer, initialState);
   const reduceMotion = useReducedMotion();
+  const router = useRouter();
+  const rateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     dispatch({ type: "load_start" });
@@ -96,35 +110,71 @@ export function SRSReviewScreen() {
     [state.results]
   );
 
+  const handleRate = useCallback(
+    (rating: SRSRating) => {
+      if (state.isFinished || !state.isRevealed || state.isInputLocked) {
+        return;
+      }
+
+      dispatch({ type: "lock_input" });
+
+      if (rateTimeoutRef.current) {
+        clearTimeout(rateTimeoutRef.current);
+      }
+
+      rateTimeoutRef.current = setTimeout(() => {
+        dispatch({ type: "rate", payload: rating });
+        rateTimeoutRef.current = null;
+      }, reduceMotion ? 60 : 180);
+    },
+    [reduceMotion, state.isFinished, state.isInputLocked, state.isRevealed]
+  );
+
+  useEffect(() => {
+    return () => {
+      if (rateTimeoutRef.current) {
+        clearTimeout(rateTimeoutRef.current);
+      }
+    };
+  }, []);
+
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
+      if (event.repeat) return;
+
+      if (event.key === "Escape") {
+        event.preventDefault();
+        router.push("/dashboard");
+        return;
+      }
+
       if (event.key === " " || event.key === "Enter") {
         event.preventDefault();
-        if (!state.isFinished) {
+        if (!state.isFinished && !state.isInputLocked) {
           dispatch({ type: "reveal" });
         }
       }
 
       if (event.key === "1") {
         if (!state.isFinished && state.isRevealed) {
-          dispatch({ type: "rate", payload: "forgot" });
+          handleRate("forgot");
         }
       }
       if (event.key === "2") {
         if (!state.isFinished && state.isRevealed) {
-          dispatch({ type: "rate", payload: "unsure" });
+          handleRate("unsure");
         }
       }
       if (event.key === "3") {
         if (!state.isFinished && state.isRevealed) {
-          dispatch({ type: "rate", payload: "know" });
+          handleRate("know");
         }
       }
     };
 
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [state.isFinished, state.isRevealed]);
+  }, [handleRate, router, state.isFinished, state.isInputLocked, state.isRevealed]);
 
   if (state.isLoading) {
     return (
@@ -177,13 +227,14 @@ export function SRSReviewScreen() {
         </AnimatePresence>
       </div>
 
-      <div className="px-4 pb-6 pt-2">
+      <div className="sticky bottom-0 bg-gray-50/95 px-4 pb-[calc(env(safe-area-inset-bottom)+0.875rem)] pt-2 backdrop-blur supports-[backdrop-filter]:bg-gray-50/75">
         <p className="mb-2 text-center text-sm text-gray-600">Осталось слов: {state.queue.length}</p>
         <p className="mb-3 text-center text-sm font-medium text-gray-800">XP за сессию: {sessionXP}</p>
         <div className="flex justify-center">
           <SRSRatingButtons
-            onRate={(rating) => dispatch({ type: "rate", payload: rating })}
+            onRate={handleRate}
             disabled={!state.isRevealed}
+            isInputLocked={state.isInputLocked}
           />
         </div>
       </div>
