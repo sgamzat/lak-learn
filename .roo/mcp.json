@@ -1,0 +1,67 @@
+{
+	"mcpServers": {
+		"github": {
+			"command": "docker",
+			"args": [
+				"run",
+				"-i",
+				"--rm",
+				"-e",
+				"GITHUB_PERSONAL_ACCESS_TOKEN",
+				"-e",
+				"GITHUB_TOOLSETS",
+				"-e",
+				"GITHUB_READ_ONLY",
+				"ghcr.io/github/github-mcp-server"
+			],
+			"env": {
+				"GITHUB_PERSONAL_ACCESS_TOKEN": "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",
+				"GITHUB_TOOLSETS": "",
+				"GITHUB_READ_ONLY": ""
+			},
+			"alwaysAllow": [
+				"get_me"
+			]
+		},
+		"postgres": {
+			"command": "npx",
+			"args": [
+				"-y",
+				"@modelcontextprotocol/server-postgres",
+				"postgresql://lak_user:lak_password@127.0.0.1:5432/lak_learn"
+			],
+			"env": {}
+		},
+		"playwright": {
+			"command": "npx",
+			"args": [
+				"@djyde/mcp-browser@latest"
+			],
+			"disabled": true,
+			"alwaysAllow": []
+		},
+		"browser": {
+			"command": "npx",
+			"args": [
+				"-y",
+				"@anthropic/mcp-server-puppeteer",
+				"http://localhost:3000"
+			],
+			"env": {
+				"HEADLESS": "true"
+			},
+			"disabled": true,
+			"alwaysAllow": []
+		},
+		"fetch": {
+			"command": "npx",
+			"args": [
+				"-y",
+				"@modelcontextprotocol/server-fetch"
+			],
+			"env": {},
+			"disabled": true,
+			"alwaysAllow": []
+		}
+	}
+}
