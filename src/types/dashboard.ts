@@ -10,7 +10,6 @@ export interface UserProfile {
 export interface ProgressMetrics {
   lessonsCompleted: number;
   accuracy: number;
-  currentLevel: string;
 }
 
 export interface SRSQueueSummary {
@@ -26,9 +25,14 @@ export interface LeaderboardUser {
   streak: number;
 }
 
+export interface LeaderboardRankRow extends LeaderboardUser {
+  rank: number;
+}
+
 export interface DashboardData {
   profile: UserProfile;
   progress: ProgressMetrics;
   srsSummary: SRSQueueSummary;
-  leaderboard: LeaderboardUser[];
+  leaderboardTop: LeaderboardRankRow[];
+  myLeaderboardRow: LeaderboardRankRow | null;
 }

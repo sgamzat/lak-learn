@@ -23,6 +23,7 @@ export function AdminUsersPanel() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
   const [status, setStatus] = useState<StatusState>({ type: "idle" });
 
   const reloadUsers = useCallback(async () => {
@@ -102,6 +103,42 @@ export function AdminUsersPanel() {
     }
   }
 
+  async function deleteUser(userId: string, displayName: string) {
+    const confirmed = window.confirm(`Удалить пользователя «${displayName}»? Действие необратимо.`);
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingUserId(userId);
+    setStatus({ type: "idle" });
+
+    try {
+      const response = await fetch(`/api/admin/users/${userId}`, {
+        method: "DELETE",
+        headers: {
+          Accept: "application/json"
+        }
+      });
+
+      const payload = (await response.json().catch(() => ({}))) as {
+        error?: string;
+        user?: { id: string; email: string };
+      };
+
+      if (!response.ok) {
+        setStatus({ type: "error", message: payload.error ?? "Не удалось удалить пользователя" });
+        return;
+      }
+
+      setUsers((current) => current.filter((item) => item.id !== userId));
+      setStatus({ type: "success", message: "Пользователь удалён" });
+    } catch {
+      setStatus({ type: "error", message: "Сетевая ошибка при удалении пользователя" });
+    } finally {
+      setDeletingUserId(null);
+    }
+  }
+
   const sortedUsers = useMemo(
     () => [...users].sort((a, b) => b.xp - a.xp || b.streak - a.streak || a.email.localeCompare(b.email)),
     [users]
@@ -130,6 +167,8 @@ export function AdminUsersPanel() {
         <div className="max-h-[520px] space-y-3 overflow-auto pr-1">
           {sortedUsers.map((user) => {
             const isUpdating = updatingUserId === user.id;
+            const isDeleting = deletingUserId === user.id;
+            const isBusy = isUpdating || isDeleting;
 
             return (
               <article key={user.id} className="rounded-xl border border-gray-200 p-4">
@@ -160,7 +199,7 @@ export function AdminUsersPanel() {
                   {user.role === "admin" ? (
                     <button
                       type="button"
-                      disabled={isUpdating}
+                      disabled={isBusy}
                       onClick={() => void updateUser(user.id, { role: "user" })}
                       className="inline-flex min-h-11 items-center rounded-xl border border-amber-300 px-3 text-sm text-amber-700 transition hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-60"
                     >
@@ -169,7 +208,7 @@ export function AdminUsersPanel() {
                   ) : (
                     <button
                       type="button"
-                      disabled={isUpdating}
+                      disabled={isBusy}
                       onClick={() => void updateUser(user.id, { role: "admin" })}
                       className="inline-flex min-h-11 items-center rounded-xl border border-blue-300 px-3 text-sm text-blue-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
                     >
@@ -180,7 +219,7 @@ export function AdminUsersPanel() {
                   {user.isBlocked ? (
                     <button
                       type="button"
-                      disabled={isUpdating}
+                      disabled={isBusy}
                       onClick={() => void updateUser(user.id, { isBlocked: false })}
                       className="inline-flex min-h-11 items-center rounded-xl border border-emerald-300 px-3 text-sm text-emerald-700 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
                     >
@@ -189,13 +228,22 @@ export function AdminUsersPanel() {
                   ) : (
                     <button
                       type="button"
-                      disabled={isUpdating}
+                      disabled={isBusy}
                       onClick={() => void updateUser(user.id, { isBlocked: true })}
                       className="inline-flex min-h-11 items-center rounded-xl border border-red-300 px-3 text-sm text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       Заблокировать
                     </button>
                   )}
+
+                  <button
+                    type="button"
+                    disabled={isBusy}
+                    onClick={() => void deleteUser(user.id, user.displayName)}
+                    className="inline-flex min-h-11 items-center rounded-xl border border-red-500 px-3 text-sm text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isDeleting ? "Удаляю..." : "Удалить пользователя"}
+                  </button>
                 </div>
               </article>
             );
@@ -205,4 +253,3 @@ export function AdminUsersPanel() {
     </section>
   );
 }
-

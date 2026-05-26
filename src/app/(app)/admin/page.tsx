@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { AdminCollectionsPanel } from "@/components/admin/AdminCollectionsPanel";
 import { AdminWordForm } from "@/components/admin/AdminWordForm";
 import { AdminUsersPanel } from "@/components/admin/AdminUsersPanel";
 import { getPageAuthContext } from "@/lib/server/page-auth";
@@ -29,6 +30,7 @@ export default async function AdminPage() {
       </section>
 
       <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <AdminCollectionsPanel />
         <AdminWordForm />
         <AdminUsersPanel />
       </section>

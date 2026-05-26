@@ -1,11 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useReducer, useRef } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
-import { getSRSQueue } from "@/lib/api/client";
+import { getSRSQueue, submitSRSReview } from "@/lib/api/client";
 import { Flashcard } from "@/components/srs/Flashcard";
 import { SRSRatingButtons } from "@/components/srs/SRSRatingButtons";
 import { SRSSummaryScreen } from "@/components/srs/SRSSummaryScreen";
@@ -91,15 +91,22 @@ function reducer(state: SRSReviewState, action: Action): SRSReviewState {
 
 export function SRSReviewScreen() {
   const [state, dispatch] = useReducer(reducer, initialState);
+  const [reviewError, setReviewError] = useState<string | null>(null);
   const reduceMotion = useReducedMotion();
   const router = useRouter();
   const rateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     dispatch({ type: "load_start" });
-    getSRSQueue().then((queue) => {
-      dispatch({ type: "load_success", payload: queue });
-    });
+    getSRSQueue()
+      .then((queue) => {
+        setReviewError(null);
+        dispatch({ type: "load_success", payload: queue });
+      })
+      .catch(() => {
+        setReviewError("Не удалось загрузить очередь повторения");
+        dispatch({ type: "load_success", payload: [] });
+      });
   }, []);
 
   const currentCard = state.queue[state.currentIndex] ?? null;
@@ -123,11 +130,29 @@ export function SRSReviewScreen() {
       }
 
       rateTimeoutRef.current = setTimeout(() => {
-        dispatch({ type: "rate", payload: rating });
-        rateTimeoutRef.current = null;
+        const activeCard = state.queue[state.currentIndex];
+
+        if (!activeCard) {
+          dispatch({ type: "unlock_input" });
+          rateTimeoutRef.current = null;
+          return;
+        }
+
+        submitSRSReview(activeCard.id, rating)
+          .then(() => {
+            setReviewError(null);
+            dispatch({ type: "rate", payload: rating });
+          })
+          .catch(() => {
+            setReviewError("Не удалось сохранить результат. Повторите попытку.");
+            dispatch({ type: "unlock_input" });
+          })
+          .finally(() => {
+            rateTimeoutRef.current = null;
+          });
       }, reduceMotion ? 60 : 180);
     },
-    [reduceMotion, state.isFinished, state.isInputLocked, state.isRevealed]
+    [reduceMotion, state.currentIndex, state.isFinished, state.isInputLocked, state.isRevealed, state.queue]
   );
 
   useEffect(() => {
@@ -230,6 +255,7 @@ export function SRSReviewScreen() {
       <div className="sticky bottom-0 bg-gray-50/95 px-4 pb-[calc(env(safe-area-inset-bottom)+0.875rem)] pt-2 backdrop-blur supports-[backdrop-filter]:bg-gray-50/75">
         <p className="mb-2 text-center text-sm text-gray-600">Осталось слов: {state.queue.length}</p>
         <p className="mb-3 text-center text-sm font-medium text-gray-800">XP за сессию: {sessionXP}</p>
+        {reviewError ? <p className="mb-2 text-center text-xs text-red-600">{reviewError}</p> : null}
         <div className="flex justify-center">
           <SRSRatingButtons
             onRate={handleRate}

@@ -22,6 +22,46 @@
 			"alwaysAllow": [
 				"get_me"
 			]
+		},
+		"postgres": {
+			"command": "npx",
+			"args": [
+				"-y",
+				"@modelcontextprotocol/server-postgres",
+				"postgresql://lak_user:lak_password@127.0.0.1:5432/lak_learn"
+			],
+			"env": {}
+		},
+		"playwright": {
+			"command": "npx",
+			"args": [
+				"@djyde/mcp-browser@latest"
+			],
+			"disabled": true,
+			"alwaysAllow": []
+		},
+		"browser": {
+			"command": "npx",
+			"args": [
+				"-y",
+				"@anthropic/mcp-server-puppeteer",
+				"http://localhost:3000"
+			],
+			"env": {
+				"HEADLESS": "true"
+			},
+			"disabled": true,
+			"alwaysAllow": []
+		},
+		"fetch": {
+			"command": "npx",
+			"args": [
+				"-y",
+				"@modelcontextprotocol/server-fetch"
+			],
+			"env": {},
+			"disabled": true,
+			"alwaysAllow": []
 		}
 	}
 }

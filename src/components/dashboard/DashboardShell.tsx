@@ -9,7 +9,8 @@ import { SRSQueueWidget } from "@/components/dashboard/SRSQueueWidget";
 import type { DashboardData } from "@/types/dashboard";
 
 const baseQuickLinks = [
-  { href: "/dashboard", label: "Словарь" },
+  { href: "/dictionary", label: "Словарь" },
+  { href: "/letters", label: "БУКВЫ" },
   { href: "/dashboard", label: "Грамматика" },
   { href: "/review", label: "Повторение" },
   { href: "/dashboard", label: "Статистика" }
@@ -25,22 +26,39 @@ export function DashboardShell() {
   useEffect(() => {
     let mounted = true;
 
-    getDashboardData()
-      .then((response) => {
+    const loadDashboard = async () => {
+      try {
+        const response = await getDashboardData();
         if (mounted) {
           setData(response);
           setIsLoading(false);
         }
-      })
-      .catch(() => {
+      } catch {
         if (mounted) {
           setData(null);
           setIsLoading(false);
         }
-      });
+      }
+    };
+
+    void loadDashboard();
+
+    const intervalId = window.setInterval(() => {
+      void loadDashboard();
+    }, 60_000);
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        void loadDashboard();
+      }
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
 
     return () => {
       mounted = false;
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, []);
 
@@ -92,7 +110,9 @@ export function DashboardShell() {
       <header className="flex h-16 items-center justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-            <h1 className="text-2xl font-bold">Дашборд</h1>
+            <h1 className="text-2xl font-black tracking-tight sm:text-3xl">
+              <span className="inline-block font-serif leading-none text-black">Laklearn</span>
+            </h1>
 
             <nav className="flex flex-wrap items-center gap-2" aria-label="Быстрые ссылки">
               {baseQuickLinks.map((link) => (
@@ -107,7 +127,6 @@ export function DashboardShell() {
             </nav>
           </div>
 
-          <p className="mt-1 text-sm text-gray-600">Пользователь: {data.profile.name}</p>
         </div>
 
         <div className="relative flex items-center gap-3 text-sm">
@@ -190,9 +209,6 @@ export function DashboardShell() {
           <p className="mt-4 text-sm text-gray-600">
             Уроков завершено: <span className="font-semibold text-gray-900">{data.progress.lessonsCompleted}</span>
           </p>
-          <p className="mt-1 text-sm text-gray-600">
-            Текущий уровень: <span className="font-semibold text-gray-900">{data.progress.currentLevel}</span>
-          </p>
           <div className="mt-4 h-3 overflow-hidden rounded-full bg-gray-200" aria-label="Прогресс точности">
             <div
               className="h-full bg-green-500 transition-all duration-1000 ease-out"
@@ -219,7 +235,7 @@ export function DashboardShell() {
                 </tr>
               </thead>
               <tbody>
-                {data.leaderboard.map((user, index) => {
+                {data.leaderboardTop.map((user) => {
                   const isCurrentUser = user.name === data.profile.name;
 
                   return (
@@ -227,13 +243,29 @@ export function DashboardShell() {
                       key={user.id}
                       className={isCurrentUser ? "rounded-xl bg-blue-50 text-blue-900" : "text-gray-700"}
                     >
-                      <td className="py-2 pr-2 font-semibold">{index + 1}</td>
+                      <td className="py-2 pr-2 font-semibold">{user.rank}</td>
                       <td className="py-2 pr-2">{user.name}</td>
                       <td className="py-2 pr-2 font-medium">{user.xp}</td>
                       <td className="py-2">🔥 {user.streak}</td>
                     </tr>
                   );
                 })}
+
+                {data.myLeaderboardRow && data.myLeaderboardRow.rank > 10 ? (
+                  <>
+                    <tr>
+                      <td colSpan={4} className="py-2">
+                        <div className="h-px w-full bg-gray-200" />
+                      </td>
+                    </tr>
+                    <tr className="rounded-xl bg-blue-50 text-blue-900">
+                      <td className="py-2 pr-2 font-semibold">{data.myLeaderboardRow.rank}</td>
+                      <td className="py-2 pr-2 font-semibold">Вы ({data.myLeaderboardRow.name})</td>
+                      <td className="py-2 pr-2 font-medium">{data.myLeaderboardRow.xp}</td>
+                      <td className="py-2">🔥 {data.myLeaderboardRow.streak}</td>
+                    </tr>
+                  </>
+                ) : null}
               </tbody>
             </table>
           </div>
