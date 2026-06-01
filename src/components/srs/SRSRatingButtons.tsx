@@ -6,36 +6,88 @@ interface SRSRatingButtonsProps {
   isInputLocked?: boolean;
 }
 
-const buttons: Array<{ key: SRSRating; label: string; className: string }> = [
-  { key: "forgot", label: "Забыл", className: "bg-red-500 hover:bg-red-600" },
-  { key: "unsure", label: "Не уверен", className: "bg-yellow-500 hover:bg-yellow-600" },
-  { key: "know", label: "Знаю", className: "bg-green-500 hover:bg-green-600" }
-];
+const BUTTONS = [
+  {
+    key: "forgot" as SRSRating,
+    label: "Забыл",
+    hint: "1",
+    icon: "✕",
+    style: "border-red-200 bg-red-50 text-red-700 hover:bg-red-100 active:bg-red-200",
+    iconStyle: "text-red-400",
+  },
+  {
+    key: "unsure" as SRSRating,
+    label: "Не уверен",
+    hint: "2",
+    icon: "~",
+    style: "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 active:bg-amber-200",
+    iconStyle: "text-amber-400",
+  },
+  {
+    key: "know" as SRSRating,
+    label: "Знаю",
+    hint: "3",
+    icon: "✓",
+    style: "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 active:bg-emerald-200",
+    iconStyle: "text-emerald-500",
+  },
+] as const;
 
-export function SRSRatingButtons({ onRate, disabled = false, isInputLocked = false }: SRSRatingButtonsProps) {
+export function SRSRatingButtons({
+  onRate,
+  disabled = false,
+  isInputLocked = false,
+}: SRSRatingButtonsProps) {
   const isBlocked = disabled || isInputLocked;
 
   return (
-    <div className="w-full max-w-md">
-      <div className="flex w-full justify-between gap-2">
-        {buttons.map((button) => (
+    <div className="w-full max-w-[460px] space-y-3">
+
+      {/* Кнопки оценки */}
+      <div className="flex gap-3">
+        {BUTTONS.map((btn) => (
           <button
-            key={button.key}
+            key={btn.key}
             type="button"
-            onClick={() => onRate(button.key)}
+            onClick={() => onRate(btn.key)}
             disabled={isBlocked}
-            className={`${button.className} min-h-11 h-16 flex-1 rounded-xl px-4 text-sm font-semibold text-white transition hover:scale-[1.03] active:scale-[0.97] focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:scale-100 disabled:active:scale-100 md:h-14`}
+            className={[
+              "group flex flex-1 flex-col items-center gap-1.5 rounded-2xl border-2 px-3 py-4 transition-all duration-150",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
+              "disabled:pointer-events-none disabled:opacity-40",
+              "active:scale-[0.97]",
+              isBlocked ? "" : btn.style,
+              !isBlocked ? "cursor-pointer" : "cursor-not-allowed",
+            ].join(" ")}
           >
-            {button.label}
+            {/* Иконка */}
+            <span className={[
+              "text-xl font-bold leading-none transition-transform duration-150 group-active:scale-90",
+              btn.iconStyle,
+            ].join(" ")}>
+              {btn.icon}
+            </span>
+
+            {/* Название */}
+            <span className="text-sm font-semibold leading-none">
+              {btn.label}
+            </span>
+
+            {/* Клавиша */}
+            <span className="rounded-md bg-white/60 px-1.5 py-0.5 font-mono text-[10px] font-medium opacity-60">
+              {btn.hint}
+            </span>
           </button>
         ))}
       </div>
-      <p className="mt-2 text-center text-xs text-gray-500">
+
+      {/* Подсказка состояния */}
+      <p className="text-center text-xs text-gray-400">
         {isInputLocked
-          ? "Переход к следующей карточке..."
+          ? "Сохраняем..."
           : disabled
-            ? "Сначала откройте перевод (Space/Enter), затем 1 | 2 | 3"
-            : "← 1 | 2 | 3 →"}
+          ? "Space / Enter — открыть перевод"
+          : "Оцените насколько хорошо вы знаете слово"}
       </p>
     </div>
   );

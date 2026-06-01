@@ -13,6 +13,7 @@ type QueueRow = {
   example_sentence: string | null;
   due_at: string | null;
   interval_state: IntervalState;
+  repetition: number;
 };
 
 export async function GET(request: Request) {
@@ -79,7 +80,7 @@ export async function GET(request: Request) {
         ORDER BY rh.word_id, rh.reviewed_at DESC, rh.id DESC
       ),
       card_state AS (
-        SELECT usc.word_id, usc.due_at
+        SELECT usc.word_id, usc.due_at, usc.repetition
         FROM user_srs_cards usc
         WHERE usc.user_id = $1
       )
@@ -91,6 +92,7 @@ export async function GET(request: Request) {
         w.translation,
         ex.sentence_src AS example_sentence,
         COALESCE(cs.due_at, lr.next_review_at)::text AS due_at,
+        COALESCE(cs.repetition, 0) AS repetition,
         CASE
           WHEN COALESCE(cs.due_at, lr.next_review_at) IS NULL OR COALESCE(cs.due_at, lr.next_review_at) <= NOW() THEN 'overdue'
           WHEN COALESCE(cs.due_at, lr.next_review_at) <= NOW() + INTERVAL '24 hours' THEN 'dueSoon'
@@ -128,7 +130,8 @@ export async function GET(request: Request) {
     translation: row.translation,
     exampleSentence: row.example_sentence ?? "",
     intervalState: row.interval_state,
-    nextReviewDate: row.due_at ?? new Date().toISOString()
+    nextReviewDate: row.due_at ?? new Date().toISOString(),
+    repetition: row.repetition ?? 0,
   }));
 
   const response = NextResponse.json(payload, { status: 200 });

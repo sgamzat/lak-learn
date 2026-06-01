@@ -10,6 +10,7 @@ export interface FlashcardData {
   exampleSentence: string;
   intervalState: IntervalState;
   nextReviewDate: string;
+  repetition: number;
 }
 
 export interface SRSResult {
