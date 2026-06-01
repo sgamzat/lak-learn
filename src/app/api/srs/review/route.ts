@@ -13,6 +13,14 @@ type ExistsWordRow = {
   id: number;
 };
 
+type ExistingCardRow = {
+  easiness_factor: string;
+  repetition: number;
+  interval_days: number;
+  lapses: number;
+  total_reviews: number;
+};
+
 function normalizeWordId(value: string | number | undefined): number | null {
   if (typeof value === "number") {
     return Number.isInteger(value) && value > 0 ? value : null;
@@ -26,18 +34,65 @@ function normalizeWordId(value: string | number | undefined): number | null {
   return null;
 }
 
-function getNextReviewDate(rating: SRSRating): Date {
-  const now = Date.now();
+function ratingToQuality(rating: SRSRating): 1 | 3 | 5 {
+  if (rating === "forgot") return 1;
+  if (rating === "unsure") return 3;
+  return 5;
+}
 
-  if (rating === "forgot") {
-    return new Date(now + 30 * 60 * 1000);
+function clampEasinessFactor(value: number): number {
+  return Math.max(1.3, Number(value.toFixed(2)));
+}
+
+type NextCardState = {
+  easinessFactor: number;
+  repetition: number;
+  intervalDays: number;
+  dueAt: Date;
+  lapses: number;
+  totalReviews: number;
+};
+
+function getNextCardState(params: { rating: SRSRating; existingCard: ExistingCardRow | null }): NextCardState {
+  const quality = ratingToQuality(params.rating);
+  const currentEf = params.existingCard ? Number.parseFloat(params.existingCard.easiness_factor) : 2.5;
+  const currentRepetition = params.existingCard?.repetition ?? 0;
+  const currentIntervalDays = params.existingCard?.interval_days ?? 0;
+  const currentLapses = params.existingCard?.lapses ?? 0;
+  const currentTotalReviews = params.existingCard?.total_reviews ?? 0;
+
+  const efDelta = 0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02);
+  const nextEf = clampEasinessFactor(currentEf + efDelta);
+
+  let repetition = currentRepetition;
+  let intervalDays = currentIntervalDays;
+  let lapses = currentLapses;
+
+  if (quality < 3) {
+    repetition = 0;
+    intervalDays = 1;
+    lapses += 1;
+  } else if (repetition === 0) {
+    repetition = 1;
+    intervalDays = 1;
+  } else if (repetition === 1) {
+    repetition = 2;
+    intervalDays = 6;
+  } else {
+    repetition += 1;
+    intervalDays = Math.max(1, Math.round(currentIntervalDays * nextEf));
   }
 
-  if (rating === "unsure") {
-    return new Date(now + 24 * 60 * 60 * 1000);
-  }
+  const dueAt = new Date(Date.now() + intervalDays * 24 * 60 * 60 * 1000);
 
-  return new Date(now + 3 * 24 * 60 * 60 * 1000);
+  return {
+    easinessFactor: nextEf,
+    repetition,
+    intervalDays,
+    dueAt,
+    lapses,
+    totalReviews: currentTotalReviews + 1
+  };
 }
 
 function getXPByRating(rating: SRSRating): number {
@@ -83,15 +138,67 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Слово не найдено" }, { status: 404 });
   }
 
-  const nextReviewAt = getNextReviewDate(rating);
+  const existingCardResult = await query<ExistingCardRow>(
+    `
+      SELECT easiness_factor::text, repetition, interval_days, lapses, total_reviews
+      FROM user_srs_cards
+      WHERE user_id = $1
+        AND word_id = $2
+      LIMIT 1
+    `,
+    [auth.user.id, wordId]
+  );
+
+  const nextCardState = getNextCardState({
+    rating,
+    existingCard: existingCardResult.rows[0] ?? null
+  });
 
   await withTransaction(async (client) => {
+    await client.query(
+      `
+        INSERT INTO user_srs_cards (
+          user_id,
+          word_id,
+          easiness_factor,
+          repetition,
+          interval_days,
+          due_at,
+          last_reviewed_at,
+          lapses,
+          total_reviews,
+          updated_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7, $8, NOW())
+        ON CONFLICT (user_id, word_id)
+        DO UPDATE SET
+          easiness_factor = EXCLUDED.easiness_factor,
+          repetition = EXCLUDED.repetition,
+          interval_days = EXCLUDED.interval_days,
+          due_at = EXCLUDED.due_at,
+          last_reviewed_at = NOW(),
+          lapses = EXCLUDED.lapses,
+          total_reviews = EXCLUDED.total_reviews,
+          updated_at = NOW()
+      `,
+      [
+        auth.user.id,
+        wordId,
+        nextCardState.easinessFactor,
+        nextCardState.repetition,
+        nextCardState.intervalDays,
+        nextCardState.dueAt,
+        nextCardState.lapses,
+        nextCardState.totalReviews
+      ]
+    );
+
     await client.query(
       `
         INSERT INTO review_history (user_id, word_id, rating, reviewed_at, next_review_at)
         VALUES ($1, $2, $3, NOW(), $4)
       `,
-      [auth.user.id, wordId, rating, nextReviewAt]
+      [auth.user.id, wordId, rating, nextCardState.dueAt]
     );
 
     await client.query(
@@ -105,7 +212,16 @@ export async function POST(request: Request) {
     );
   });
 
-  const response = NextResponse.json({ ok: true, nextReviewAt: nextReviewAt.toISOString() }, { status: 200 });
+  const response = NextResponse.json(
+    {
+      ok: true,
+      nextReviewAt: nextCardState.dueAt.toISOString(),
+      intervalDays: nextCardState.intervalDays,
+      easinessFactor: nextCardState.easinessFactor,
+      repetition: nextCardState.repetition
+    },
+    { status: 200 }
+  );
 
   if (auth.refreshedAccessToken) {
     setAccessCookie(response, auth.refreshedAccessToken);
@@ -113,4 +229,3 @@ export async function POST(request: Request) {
 
   return response;
 }
-

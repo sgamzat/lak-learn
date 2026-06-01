@@ -1,0 +1,4 @@
+ALTER TABLE words
+  ALTER COLUMN lemma TYPE TEXT,
+  ALTER COLUMN translation TYPE TEXT;
+

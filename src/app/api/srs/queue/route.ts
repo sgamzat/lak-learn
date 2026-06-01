@@ -11,7 +11,7 @@ type QueueRow = {
   part_of_speech: string | null;
   translation: string;
   example_sentence: string | null;
-  next_review_at: string | null;
+  due_at: string | null;
   interval_state: IntervalState;
 };
 
@@ -77,6 +77,11 @@ export async function GET(request: Request) {
         FROM review_history rh
         WHERE rh.user_id = $1
         ORDER BY rh.word_id, rh.reviewed_at DESC, rh.id DESC
+      ),
+      card_state AS (
+        SELECT usc.word_id, usc.due_at
+        FROM user_srs_cards usc
+        WHERE usc.user_id = $1
       )
       SELECT
         w.id::text AS id,
@@ -85,15 +90,16 @@ export async function GET(request: Request) {
         w.part_of_speech,
         w.translation,
         ex.sentence_src AS example_sentence,
-        lr.next_review_at::text,
+        COALESCE(cs.due_at, lr.next_review_at)::text AS due_at,
         CASE
-          WHEN lr.next_review_at IS NULL OR lr.next_review_at <= NOW() THEN 'overdue'
-          WHEN lr.next_review_at <= NOW() + INTERVAL '24 hours' THEN 'dueSoon'
+          WHEN COALESCE(cs.due_at, lr.next_review_at) IS NULL OR COALESCE(cs.due_at, lr.next_review_at) <= NOW() THEN 'overdue'
+          WHEN COALESCE(cs.due_at, lr.next_review_at) <= NOW() + INTERVAL '24 hours' THEN 'dueSoon'
           ELSE 'scheduled'
         END AS interval_state
       FROM selected_words sw
       JOIN words w ON w.id = sw.word_id
       LEFT JOIN latest_review lr ON lr.word_id = w.id
+      LEFT JOIN card_state cs ON cs.word_id = w.id
       LEFT JOIN LATERAL (
         SELECT sentence_src
         FROM word_examples we
@@ -103,18 +109,18 @@ export async function GET(request: Request) {
       ) ex ON TRUE
       ORDER BY
         CASE
-          WHEN lr.next_review_at IS NULL OR lr.next_review_at <= NOW() THEN 0
-          WHEN lr.next_review_at <= NOW() + INTERVAL '24 hours' THEN 1
+          WHEN COALESCE(cs.due_at, lr.next_review_at) IS NULL OR COALESCE(cs.due_at, lr.next_review_at) <= NOW() THEN 0
+          WHEN COALESCE(cs.due_at, lr.next_review_at) <= NOW() + INTERVAL '24 hours' THEN 1
           ELSE 2
         END ASC,
-        COALESCE(lr.next_review_at, NOW()) ASC,
+        COALESCE(cs.due_at, lr.next_review_at, NOW()) ASC,
         w.id ASC
       LIMIT 200
     `,
     [auth.user.id]
   );
 
-  const payload: FlashcardData[] = rowsResult.rows.map((row) => ({
+  const payload: FlashcardData[] = rowsResult.rows.map((row: QueueRow) => ({
     id: row.id,
     word: row.word,
     transcription: row.transcription ?? "",
@@ -122,7 +128,7 @@ export async function GET(request: Request) {
     translation: row.translation,
     exampleSentence: row.example_sentence ?? "",
     intervalState: row.interval_state,
-    nextReviewDate: row.next_review_at ?? new Date().toISOString()
+    nextReviewDate: row.due_at ?? new Date().toISOString()
   }));
 
   const response = NextResponse.json(payload, { status: 200 });
@@ -133,4 +139,3 @@ export async function GET(request: Request) {
 
   return response;
 }
-
