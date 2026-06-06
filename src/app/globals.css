@@ -4,11 +4,62 @@
 
 :root {
   color-scheme: light;
+
+  /* Шрифты из next/font — доступны как CSS-переменные */
+  --font-spectral: var(--font-spectral);
+  --font-golos: var(--font-golos);
+  --font-mono: var(--font-mono);
 }
 
 body {
   @apply bg-gray-50 text-gray-900 antialiased;
 }
+
+/* ── Глобальные классы дашборда (перенесены из useEffect в DashboardShell) ── */
+
+.lk-lift {
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.lk-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.28);
+}
+
+.lk-navlink {
+  transition: color 0.15s;
+}
+
+.lk-navlink:hover {
+  color: #F4EFE6 !important;
+}
+
+.lk-btn-gold {
+  transition: filter 0.15s;
+}
+
+.lk-btn-gold:hover {
+  filter: brightness(1.12);
+}
+
+/* Адаптив: мобильная навигация */
+@media (max-width: 768px) {
+  .lk-desktop-nav {
+    display: none !important;
+  }
+
+  .lk-mobile-burger {
+    display: inline-flex !important;
+  }
+}
+
+@media (min-width: 769px) {
+  .lk-mobile-burger {
+    display: none !important;
+  }
+}
+
+/* ── Доступность: отключение анимаций ───────────────────────────────────── */
 
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -20,4 +71,3 @@ body {
     scroll-behavior: auto !important;
   }
 }
-

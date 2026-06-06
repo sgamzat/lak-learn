@@ -166,7 +166,7 @@ export async function createSessionForUser(user: AuthUser, request: RequestMeta)
   return { accessToken, refreshToken };
 }
 
-export async function registerWithEmail(email: string, password: string): Promise<AuthUser | null> {
+export async function registerWithEmail(email: string, password: string, displayName: string | null = null): Promise<AuthUser | null> {
   const normalizedEmail = email.toLowerCase();
   const passwordHash = await hashPassword(password);
 
@@ -174,11 +174,11 @@ export async function registerWithEmail(email: string, password: string): Promis
     const inserted = await withTransaction(async (client) => {
       const userResult = await client.query<{ id: string; email: string; is_blocked: boolean }>(
         `
-          INSERT INTO users (email, password_hash, role_id)
-          VALUES ($1, $2, (SELECT id FROM roles WHERE code = 'user'))
+          INSERT INTO users (email, password_hash, role_id, display_name)
+          VALUES ($1, $2, (SELECT id FROM roles WHERE code = 'user'), $3)
           RETURNING id, email, is_blocked
         `,
-        [normalizedEmail, passwordHash]
+        [normalizedEmail, passwordHash, displayName]
       );
 
       const user = userResult.rows[0];

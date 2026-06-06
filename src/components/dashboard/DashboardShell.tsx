@@ -3,11 +3,11 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { LogOut, Settings, BookOpen, Flame, Star, Trophy, ChevronDown, Target, Layers, Grid, Sparkles, BookMarked, CheckCircle, Lock, ArrowRight, Bookmark } from "lucide-react";
+import { LogOut, Settings, BookOpen, Flame, Trophy, ChevronDown, Target, ArrowRight, Bookmark, Menu, X } from "lucide-react";
 import { getDashboardData, logout } from "@/lib/api/client";
 import type { DashboardData } from "@/types/dashboard";
 
-// ── Design tokens (from Laklearn design system) ──────────────────────────────
+// Design tokens
 const T = {
   ink:       "#0E1B2E",
   navy:      "#13243B",
@@ -31,12 +31,11 @@ const T = {
   sans:      "'Golos Text', system-ui, sans-serif",
   mono:      "'IBM Plex Mono', ui-monospace, monospace",
   cream:     "#ECE6D6",
-  eagleInk:  "#15151A",
   flagGreen: "#34772F",
   flagRed:   "#9C2B27",
 };
 
-// ── Static data ───────────────────────────────────────────────────────────────
+// Static data
 const WORD_OF_DAY = { lak: "Барчаллагь", ru: "Спасибо", transcription: "bar-cha-llagh" };
 
 const PRACTICE_MODES = [
@@ -46,59 +45,25 @@ const PRACTICE_MODES = [
   { icon: "book",     name: "Письмо",    sub: "напиши перевод",       color: T.red,   href: "/review" },
 ];
 
-const THEMES = [
-  { name: "Приветствия",    word: "Ассаламу аьлайкум", done: 12, total: 12, color: T.gold  },
-  { name: "Семья",          word: "Кулпат",            done: 8,  total: 14, color: T.blue  },
-  { name: "Гостеприимство", word: "Хъамал",            done: 3,  total: 11, color: T.red   },
-  { name: "Праздники",      word: "Байран",            done: 0,  total: 9,  color: T.green },
-  { name: "Природа гор",    word: "Аьрщи",             done: 0,  total: 16, color: T.blue  },
-  { name: "Числа",          word: "Ца, кIива, шанна",  done: 5,  total: 10, color: T.gold  },
-];
+const COLLECTION_COLORS = [T.gold, T.blue, T.red, T.green, T.gold, T.blue, T.red, T.green, T.gold, T.blue, T.red, T.green];
 
-const LEVEL_PATH = [
-  { label: "Алфавит",       done: true  },
-  { label: "Семья",         done: true  },
-  { label: "Приветствия",   done: true  },
-  { label: "Гостеприимство",cur: true   },
-  { label: "Числа",                     },
-  { label: "Праздники",                 },
-  { label: "Природа",       lock: true  },
-];
+// Logo & SVG components
 
-const COLLECTION = [
-  { id: "kumuh",  name: "Гъумучи",     sub: "Историческая столица", got: true,  color: T.blue  },
-  { id: "balhar", name: "Балхар",      sub: "Гончарное ремесло",    got: true,  color: T.red   },
-  { id: "pabaku", name: "Пабаку",      sub: "Священная гора",       got: false, color: T.green },
-  { id: "zlato",  name: "Златокузнецы",sub: "Кази-Кумух",           got: false, color: T.gold  },
-  { id: "dance",  name: "Къавтӏаву",   sub: "Лакский танец",        got: false, color: T.blue  },
-  { id: "flag",   name: "Байрахъ",     sub: "Символика Лакии",      got: false, color: T.red   },
-];
-
-// ── Pabaku mountain logo components ──────────────────────────────────────────
-
-// Маленькая Пабаку для использования внутри контента (путь, футер и т.д.)
 function PabakoMini({ size = 28 }: { size?: number }) {
-  const s = size / 28;
   return (
     <svg width={size} height={size} viewBox="0 0 28 28" style={{ display: "block", flexShrink: 0 }}>
-      {/* дальние горы */}
       <polygon points="2,22 8,13 14,22" fill={T.navy3} />
       <polygon points="14,22 20,15 26,22" fill={T.navy3} />
-      {/* главная пирамида Пабаку — острая как шило */}
       <polygon points="2,22 14,4 26,22" fill={T.gold} />
-      {/* левая грань темнее — объём */}
       <polygon points="2,22 14,4 14,22" fill="#A07820" />
-      {/* снежная шапка */}
       <polygon points="14,4 11,11 14,9 17,11" fill="#ECE4CC" />
     </svg>
   );
 }
 
-// Горизонтальный логотип вариант C: иконка горы + wordmark + подпись
 function LogoEagle() {
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 10 }}>
-      {/* иконка горы в тёмном прямоугольнике */}
       <span style={{
         display: "inline-flex", alignItems: "center", justifyContent: "center",
         width: 42, height: 42, borderRadius: 10,
@@ -106,7 +71,6 @@ function LogoEagle() {
       }}>
         <PabakoMini size={30} />
       </span>
-      {/* wordmark + подпись */}
       <span style={{ display: "flex", flexDirection: "column", gap: 1 }}>
         <span style={{ fontFamily: T.serif, fontSize: 20, fontWeight: 800, letterSpacing: -0.3, color: T.text, lineHeight: 1 }}>
           Lak<span style={{ color: T.gold }}>learn</span>
@@ -193,13 +157,18 @@ function getInitials(name: string): string {
   return name.split(" ").map((w) => w[0] ?? "").join("").toUpperCase().slice(0, 2);
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
+// Main component
 export function DashboardShell() {
   const router = useRouter();
   const [data, setData] = useState<DashboardData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [onboardingStep, setOnboardingStep] = useState<0|1|2|3>(0);
+  const [onboardingName, setOnboardingName] = useState("");
+  const [onboardingGoal, setOnboardingGoal] = useState<5|10|15>(10);
+  const [onboardingSaving, setOnboardingSaving] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -236,7 +205,7 @@ export function DashboardShell() {
   const dailyGoal = 10;
   const dailyDone = useMemo(() => Math.min(data?.progress.lessonsCompleted ?? 0, dailyGoal), [data]);
   const dailyPercent = Math.round((dailyDone / dailyGoal) * 100);
-  const dayProgress = Math.round((dailyDone / dailyGoal) * 70); // ring value
+  const dayProgress = Math.round((dailyDone / dailyGoal) * 70);
 
   const card: React.CSSProperties = {
     background: T.navy2,
@@ -244,26 +213,28 @@ export function DashboardShell() {
     borderRadius: 18,
   };
 
-  // ── Fonts injection (Google Fonts)
+  // Greeting subtitle — динамический, без хардкода
+  // Открыть онбординг для новых пользователей (только один раз)
   useEffect(() => {
-    if (document.getElementById("laklearn-fonts")) return;
-    const link = document.createElement("link");
-    link.id = "laklearn-fonts";
-    link.rel = "stylesheet";
-    link.href = "https://fonts.googleapis.com/css2?family=Spectral:wght@600;700;800&family=Golos+Text:wght@400;500;600;700&family=IBM+Plex+Mono&display=swap";
-    document.head.appendChild(link);
+    if (!data) return;
+    const isNew = data.progress.lessonsCompleted === 0 && data.profile.xp === 0;
+    const alreadySeen = typeof window !== "undefined" && localStorage.getItem("laklearn_onboarding_done") === "1";
+    if (isNew && !alreadySeen) {
+      // Предзаполнить имя если уже есть display_name
+      const name = data.profile.name;
+      const emailLike = name.includes("@") || /^[a-z0-9._-]+$/i.test(name);
+      if (!emailLike) setOnboardingName(name);
+      setOnboardingStep(1);
+    }
+  }, [data]);
 
-    const style = document.createElement("style");
-    style.textContent = `
-      .lk-lift { transition: transform 0.18s ease, box-shadow 0.18s ease; }
-      .lk-lift:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(0,0,0,0.28); }
-      .lk-navlink { transition: color 0.15s; }
-      .lk-navlink:hover { color: ${T.text} !important; }
-      .lk-btn-gold { transition: filter 0.15s; }
-      .lk-btn-gold:hover { filter: brightness(1.12); }
-    `;
-    document.head.appendChild(style);
-  }, []);
+  const greetingSubtitle = useMemo(() => {
+    if (!data) return "";
+    if (data.progress.lessonsCompleted === 0) return "Добро пожаловать! Начните с алфавита — это займёт 5 минут.";
+    if (totalSRS === 0) return "Сегодня всё повторено. Отличная работа!";
+    if (data.srsSummary.overdue > 0) return `${data.srsSummary.overdue} карточек просрочено — освежи, пока помнишь.`;
+    return `${totalSRS} карточек ждут повторения — один полёт, пять минут.`;
+  }, [data, totalSRS]);
 
   if (isLoading) {
     return (
@@ -289,59 +260,227 @@ export function DashboardShell() {
     );
   }
 
+  // Навигация — только рабочие разделы
   const NAV_LINKS = [
-    { href: "/dictionary", label: "Словарь",    ready: true  },
-    { href: "/letters",    label: "Буквы",       ready: true  },
-    { href: "/review",     label: "Повторение",  ready: true  },
-    { href: "/dashboard",  label: "Грамматика",  ready: false },
-    { href: "/dashboard",  label: "Статистика",  ready: false },
+    { href: "/dictionary", label: "Словарь"    },
+    { href: "/letters",    label: "Буквы"      },
+    { href: "/review",     label: "Повторение" },
   ];
+
+  async function finishOnboarding() {
+    setOnboardingSaving(true);
+    try {
+      const name = onboardingName.trim();
+      if (name) {
+        await fetch("/api/profile", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ displayName: name }),
+        });
+      }
+      if (typeof window !== "undefined") {
+        localStorage.setItem("laklearn_onboarding_done", "1");
+      }
+    } catch {
+      // не критично — просто закроем
+    } finally {
+      setOnboardingSaving(false);
+      setOnboardingStep(0);
+    }
+  }
 
   return (
     <div style={{ width: "100%", minHeight: "100vh", background: T.ink, fontFamily: T.sans, color: T.text }}>
 
-      {/* ── STICKY HEADER ──────────────────────────────────────────────── */}
+      {/* ONBOARDING MODAL */}
+      {onboardingStep > 0 && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 100,
+          background: "rgba(8,14,24,0.85)", backdropFilter: "blur(8px)",
+          display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+        }}>
+          <div style={{
+            background: T.navy2, border: `1px solid ${T.line}`,
+            borderRadius: 24, padding: "36px 32px", maxWidth: 440, width: "100%",
+            boxShadow: "0 24px 64px rgba(0,0,0,0.5)",
+          }}>
+
+            {/* Логотип и прогресс */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 28 }}>
+              <PabakoMini size={36} />
+              <div style={{ display: "flex", gap: 6 }}>
+                {[1,2,3].map((s) => (
+                  <div key={s} style={{
+                    height: 4, borderRadius: 4,
+                    width: s === onboardingStep ? 28 : 16,
+                    background: s <= onboardingStep ? T.gold : T.lineCool,
+                    transition: "all 0.3s",
+                  }} />
+                ))}
+              </div>
+            </div>
+
+            {/* ШАГ 1 — Имя */}
+            {onboardingStep === 1 && (
+              <div>
+                <div style={{ fontFamily: T.serif, fontSize: 26, fontWeight: 700, marginBottom: 8 }}>
+                  Ассаламу аьлайкум!
+                </div>
+                <div style={{ color: T.textMut, fontSize: 15, marginBottom: 28, lineHeight: 1.5 }}>
+                  Добро пожаловать в Laklearn. Как вас зовут? Это необязательно.
+                </div>
+                <input
+                  type="text"
+                  maxLength={64}
+                  placeholder="Ваше имя"
+                  value={onboardingName}
+                  onChange={(e) => setOnboardingName(e.target.value)}
+                  style={{
+                    width: "100%", padding: "14px 16px", borderRadius: 12,
+                    border: `1px solid ${T.line}`, background: T.navy,
+                    color: T.text, fontFamily: T.sans, fontSize: 15,
+                    outline: "none", boxSizing: "border-box",
+                  }}
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={() => setOnboardingStep(2)}
+                  style={{
+                    marginTop: 16, width: "100%", padding: "14px",
+                    borderRadius: 12, border: "none",
+                    background: T.gold, color: T.ink,
+                    fontFamily: T.sans, fontSize: 15, fontWeight: 700, cursor: "pointer",
+                  }}
+                >
+                  Продолжить →
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setOnboardingStep(2)}
+                  style={{
+                    marginTop: 8, width: "100%", padding: "10px",
+                    borderRadius: 12, border: "none", background: "transparent",
+                    color: T.textFaint, fontFamily: T.sans, fontSize: 13, cursor: "pointer",
+                  }}
+                >
+                  Пропустить
+                </button>
+              </div>
+            )}
+
+            {/* ШАГ 2 — Цель */}
+            {onboardingStep === 2 && (
+              <div>
+                <div style={{ fontFamily: T.serif, fontSize: 26, fontWeight: 700, marginBottom: 8 }}>
+                  Выберите цель
+                </div>
+                <div style={{ color: T.textMut, fontSize: 15, marginBottom: 24, lineHeight: 1.5 }}>
+                  Сколько минут в день вы готовы уделять лакскому языку?
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {([5, 10, 15] as const).map((mins) => (
+                    <button
+                      key={mins}
+                      type="button"
+                      onClick={() => setOnboardingGoal(mins)}
+                      style={{
+                        padding: "14px 18px", borderRadius: 12, cursor: "pointer",
+                        border: `2px solid ${onboardingGoal === mins ? T.gold : T.lineCool}`,
+                        background: onboardingGoal === mins ? T.goldDim : "transparent",
+                        color: onboardingGoal === mins ? T.gold : T.textMut,
+                        fontFamily: T.sans, fontSize: 15, fontWeight: onboardingGoal === mins ? 700 : 500,
+                        textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between",
+                        transition: "all 0.15s",
+                      }}
+                    >
+                      <span>{mins} минут в день</span>
+                      <span style={{ fontSize: 13, opacity: 0.7 }}>
+                        {mins === 5 ? "Лёгкий старт" : mins === 10 ? "Оптимально" : "Активное изучение"}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setOnboardingStep(3)}
+                  style={{
+                    marginTop: 20, width: "100%", padding: "14px",
+                    borderRadius: 12, border: "none",
+                    background: T.gold, color: T.ink,
+                    fontFamily: T.sans, fontSize: 15, fontWeight: 700, cursor: "pointer",
+                  }}
+                >
+                  Продолжить →
+                </button>
+              </div>
+            )}
+
+            {/* ШАГ 3 — Старт */}
+            {onboardingStep === 3 && (
+              <div style={{ textAlign: "center" }}>
+                <div style={{ fontSize: 48, marginBottom: 16 }}>🏔️</div>
+                <div style={{ fontFamily: T.serif, fontSize: 26, fontWeight: 700, marginBottom: 8 }}>
+                  {onboardingName.trim() ? `Рады познакомиться, ${onboardingName.trim().split(" ")[0]}!` : "Всё готово!"}
+                </div>
+                <div style={{ color: T.textMut, fontSize: 15, marginBottom: 28, lineHeight: 1.6 }}>
+                  Начнём с лакского алфавита — это основа всего. Займёт не больше {onboardingGoal} минут.
+                </div>
+                <Link
+                  href="/letters"
+                  onClick={() => void finishOnboarding()}
+                  style={{
+                    display: "block", padding: "14px",
+                    borderRadius: 12, background: T.gold,
+                    color: T.ink, fontFamily: T.sans, fontSize: 15,
+                    fontWeight: 700, textDecoration: "none", textAlign: "center",
+                  }}
+                >
+                  {onboardingSaving ? "Сохранение…" : "Начать с алфавита →"}
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => void finishOnboarding()}
+                  disabled={onboardingSaving}
+                  style={{
+                    marginTop: 10, width: "100%", padding: "10px",
+                    borderRadius: 12, border: "none", background: "transparent",
+                    color: T.textFaint, fontFamily: T.sans, fontSize: 13, cursor: "pointer",
+                  }}
+                >
+                  Начать с главной
+                </button>
+              </div>
+            )}
+
+          </div>
+        </div>
+      )}
+
+      {/* STICKY HEADER */}
       <header style={{
         position: "sticky", top: 0, zIndex: 20,
         background: "rgba(14,27,46,0.88)", backdropFilter: "blur(12px)",
         borderBottom: `1px solid ${T.line}`,
       }}>
-        <div style={{ maxWidth: 1200, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 36px" }}>
+        <div style={{ maxWidth: 1200, margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 20px" }}>
           <LogoEagle />
 
-          <nav style={{ display: "flex", gap: 4, alignItems: "center" }}>
-            {/* Active: Главная */}
+          {/* Десктоп навигация — скрыта на мобиле */}
+          <nav style={{ display: "flex", gap: 4, alignItems: "center" }} className="lk-desktop-nav">
             <span style={{ padding: "8px 16px", borderRadius: 99, fontSize: 14.5, fontWeight: 600, color: T.ink, background: T.gold, cursor: "default" }}>
               Главная
             </span>
-            {NAV_LINKS.map((link) =>
-              link.ready ? (
-                <Link key={link.label} href={link.href} className="lk-navlink" style={{ padding: "8px 16px", borderRadius: 99, fontSize: 14.5, fontWeight: 500, color: T.textMut, textDecoration: "none" }}>
-                  {link.label}
-                </Link>
-              ) : (
-                <span key={link.label} style={{ padding: "8px 14px", fontSize: 14.5, color: T.textFaint, display: "inline-flex", alignItems: "center", gap: 6 }}>
-                  {link.label}
-                  <Pill color={T.textMut} bg="rgba(157,176,199,0.1)">
-                    <span style={{ fontSize: 10 }}>скоро</span>
-                  </Pill>
-                </span>
-              )
-            )}
+            {NAV_LINKS.map((link) => (
+              <Link key={link.label} href={link.href} className="lk-navlink" style={{ padding: "8px 16px", borderRadius: 99, fontSize: 14.5, fontWeight: 500, color: T.textMut, textDecoration: "none" }}>
+                {link.label}
+              </Link>
+            ))}
           </nav>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <Pill color={T.gold}>
-              <Flame size={13} color={T.gold} style={{ display: "block" }} />
-              {data.profile.streak} дней
-            </Pill>
-            <Pill color={T.goldHi} bg="rgba(231,198,107,0.1)">
-              <Star size={13} color={T.goldHi} style={{ display: "block" }} />
-              {data.profile.xp} XP
-            </Pill>
-
-            {/* Profile menu */}
-            <div ref={menuRef} style={{ position: "relative" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            {/* Профиль-меню — только на десктопе */}
+            <div ref={menuRef} style={{ position: "relative" }} className="lk-desktop-nav">
               <button
                 type="button"
                 onClick={() => setIsProfileMenuOpen((p) => !p)}
@@ -387,8 +526,74 @@ export function DashboardShell() {
                 </div>
               )}
             </div>
+
+            {/* Бургер — только на мобиле */}
+            <button
+              type="button"
+              className="lk-mobile-burger"
+              onClick={() => setIsMobileMenuOpen((p) => !p)}
+              style={{
+                display: "none", alignItems: "center", justifyContent: "center",
+                width: 38, height: 38, borderRadius: 10,
+                border: `1px solid ${T.line}`, background: T.navy2,
+                color: T.text, cursor: "pointer",
+              }}
+            >
+              {isMobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
+            </button>
           </div>
         </div>
+
+        {/* Мобильное меню-дравер */}
+        {isMobileMenuOpen && (
+          <div style={{
+            borderTop: `1px solid ${T.line}`,
+            background: T.navy2,
+            padding: "12px 20px 20px",
+          }}>
+            {/* Имя пользователя */}
+            <div style={{ padding: "10px 0 12px", fontSize: 13, color: T.textMut, borderBottom: `1px solid ${T.line}`, marginBottom: 8 }}>
+              {data.profile.name}
+            </div>
+
+            {/* Ссылки */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              <span style={{ display: "block", padding: "12px 14px", borderRadius: 10, fontSize: 15, fontWeight: 600, color: T.ink, background: T.gold }}>
+                Главная
+              </span>
+              {NAV_LINKS.map((link) => (
+                <Link
+                  key={link.label}
+                  href={link.href}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  style={{ display: "block", padding: "12px 14px", borderRadius: 10, fontSize: 15, fontWeight: 500, color: T.textMut, textDecoration: "none" }}
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </div>
+
+            {/* Разделитель */}
+            <div style={{ height: 1, background: T.line, margin: "12px 0" }} />
+
+            {/* Профиль и выход */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              {data.profile.role === "admin" && (
+                <Link href="/admin" onClick={() => setIsMobileMenuOpen(false)} style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", borderRadius: 10, color: T.text, fontSize: 15, textDecoration: "none" }}>
+                  <BookOpen size={16} /> Админ-панель
+                </Link>
+              )}
+              <button
+                type="button"
+                onClick={() => { setIsMobileMenuOpen(false); void handleLogout(); }}
+                disabled={isLoggingOut}
+                style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "12px 14px", borderRadius: 10, border: "none", background: "transparent", color: T.red, fontSize: 15, fontFamily: T.sans, cursor: "pointer", textAlign: "left" }}
+              >
+                <LogOut size={16} /> {isLoggingOut ? "Выход…" : "Выйти"}
+              </button>
+            </div>
+          </div>
+        )}
       </header>
 
       {/* ── PAGE CONTENT ───────────────────────────────────────────────── */}
@@ -400,8 +605,9 @@ export function DashboardShell() {
             <div style={{ fontFamily: T.serif, fontSize: 34, fontWeight: 700, letterSpacing: -0.4 }}>
               Ассаламу аьлайкум, {data.profile.name.split(" ")[0]}
             </div>
+            {/* Динамический подзаголовок вместо хардкода */}
             <div style={{ color: T.textMut, fontSize: 15, marginTop: 5 }}>
-              Барзу уже разложил карточки на сегодня. Один полёт — пять минут.
+              {greetingSubtitle}
             </div>
           </div>
           <Pill color={T.gold}>
@@ -412,13 +618,17 @@ export function DashboardShell() {
 
         {/* ── ROW 1: HERO + SRS QUEUE ───────────────────────────────────── */}
         <div style={{ display: "grid", gridTemplateColumns: "1.9fr 1fr", gap: 18, marginBottom: 18 }}>
-          {/* Hero CTA */}
-          <Link href="/review" className="lk-lift" style={{
-            ...card, position: "relative", overflow: "hidden", padding: "30px 34px",
-            minHeight: 234, display: "flex", flexDirection: "column", justifyContent: "space-between",
-            background: `linear-gradient(135deg, ${T.navy2} 0%, ${T.navy} 100%)`, textDecoration: "none",
-          }}>
-            {/* Mountains bg */}
+
+          {/* Hero CTA — адаптирован к состоянию пользователя */}
+          <Link
+            href={data.progress.lessonsCompleted === 0 ? "/letters" : "/review"}
+            className="lk-lift"
+            style={{
+              ...card, position: "relative", overflow: "hidden", padding: "30px 34px",
+              minHeight: 234, display: "flex", flexDirection: "column", justifyContent: "space-between",
+              background: `linear-gradient(135deg, ${T.navy2} 0%, ${T.navy} 100%)`, textDecoration: "none",
+            }}
+          >
             <div style={{ position: "absolute", inset: 0, top: "auto", bottom: 0, opacity: 0.5 }}>
               <Mountains height={140} />
             </div>
@@ -433,51 +643,50 @@ export function DashboardShell() {
             <div style={{ position: "relative" }}>
               <SectionLabel color={T.gold}>Сегодняшняя сессия</SectionLabel>
               <div style={{ fontFamily: T.serif, fontSize: 30, fontWeight: 700, marginTop: 12, letterSpacing: -0.3 }}>
-                Продолжить повторение
+                {data.progress.lessonsCompleted === 0
+                  ? "Начать первый урок"
+                  : totalSRS === 0
+                  ? "Всё повторено на сегодня"
+                  : "Продолжить повторение"}
               </div>
               <div style={{ color: T.textMut, fontSize: 14.5, marginTop: 6, maxWidth: 420 }}>
-                {data.srsSummary.overdue > 0 ? `${data.srsSummary.overdue} карточек просрочено — освежи, пока помнишь.` : "Не дай словам забыться — 5 минут в день."}
+                {greetingSubtitle}
               </div>
             </div>
-            <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 14, marginTop: 22 }}>
+            <div style={{ position: "relative" }}>
               <span className="lk-btn-gold" style={{
-                display: "inline-flex", alignItems: "center", gap: 9, background: T.gold, color: T.ink,
-                padding: "13px 24px", borderRadius: 12, fontFamily: T.sans, fontWeight: 700, fontSize: 15,
+                display: "inline-flex", alignItems: "center", gap: 8, marginTop: 20,
+                padding: "12px 22px", borderRadius: 12, background: T.gold,
+                color: T.ink, fontFamily: T.sans, fontSize: 14.5, fontWeight: 700,
               }}>
-                ▶ Начать <span style={{ fontFamily: T.mono, fontSize: 11, opacity: 0.55 }}>Space</span>
+                {data.progress.lessonsCompleted === 0 ? "К алфавиту →" : totalSRS === 0 ? "Открыть словарь →" : "Начать →"}
               </span>
-              {data.srsSummary.overdue > 0 && (
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: T.red, fontSize: 13, fontWeight: 600 }}>
-                  <span style={{ width: 8, height: 8, borderRadius: 4, background: T.red, display: "inline-block" }} />
-                  {data.srsSummary.overdue} просрочено
-                </span>
-              )}
             </div>
           </Link>
 
-          {/* SRS Queue card */}
-          <div style={{ ...card, padding: 24 }}>
-            <SectionLabel>Очередь повторения</SectionLabel>
-            <div style={{ display: "flex", gap: 12, marginTop: 16 }}>
-              <div style={{ flex: 1, background: T.redDim, borderRadius: 12, padding: "16px 12px", textAlign: "center" }}>
-                <div style={{ fontFamily: T.serif, fontSize: 30, fontWeight: 700, color: T.red, lineHeight: 1 }}>
-                  {data.srsSummary.overdue}
+          {/* SRS Queue */}
+          <div style={{ ...card, padding: 24, display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+            <div>
+              <SectionLabel color={T.gold}>Очередь повторения</SectionLabel>
+              <div style={{ marginTop: 18, display: "flex", flexDirection: "column", gap: 12 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 14, color: T.textMut }}>Просрочено</span>
+                  <span style={{ fontFamily: T.serif, fontSize: 22, fontWeight: 700, color: data.srsSummary.overdue > 0 ? T.red : T.textFaint }}>
+                    {data.srsSummary.overdue}
+                  </span>
                 </div>
-                <div style={{ fontSize: 12, color: T.red, marginTop: 6, fontWeight: 600 }}>Просрочено</div>
-              </div>
-              <div style={{ flex: 1, background: "rgba(62,134,201,0.12)", borderRadius: 12, padding: "16px 12px", textAlign: "center" }}>
-                <div style={{ fontFamily: T.serif, fontSize: 30, fontWeight: 700, color: T.blue, lineHeight: 1 }}>
-                  {data.srsSummary.dueSoon}
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: 14, color: T.textMut }}>Скоро</span>
+                  <span style={{ fontFamily: T.serif, fontSize: 22, fontWeight: 700, color: data.srsSummary.dueSoon > 0 ? T.gold : T.textFaint }}>
+                    {data.srsSummary.dueSoon}
+                  </span>
                 </div>
-                <div style={{ fontSize: 12, color: T.blue, marginTop: 6, fontWeight: 600 }}>Скоро</div>
               </div>
             </div>
-            <div style={{ borderTop: `1px solid ${T.line}`, marginTop: 18, paddingTop: 14, display: "flex", alignItems: "center", gap: 8, color: T.textMut, fontSize: 13, whiteSpace: "nowrap" }}>
-              <Target size={15} style={{ color: T.textMut, display: "block" }} />
+            <div style={{ fontSize: 12.5, color: T.textFaint, marginTop: 16 }}>
               {data.srsSummary.nextReviewTime
                 ? <>Следующее в <span style={{ color: T.text, fontWeight: 600, marginLeft: 4 }}>{new Date(data.srsSummary.nextReviewTime).toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}</span></>
-                : "Нет запланированных повторений"
-              }
+                : "Нет запланированных повторений"}
             </div>
           </div>
         </div>
@@ -505,6 +714,7 @@ export function DashboardShell() {
 
         {/* ── ROW 2: GOAL + WORD OF DAY + STREAK ───────────────────────── */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1.25fr 1fr", gap: 18, marginBottom: 18 }}>
+
           {/* Goal ring */}
           <div style={{ ...card, padding: 24, display: "flex", alignItems: "center", gap: 16 }}>
             <div style={{ position: "relative", flexShrink: 0 }}>
@@ -551,116 +761,50 @@ export function DashboardShell() {
                   <div style={{
                     width: 26, height: 26, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center",
                     background: i < Math.min(data.profile.streak, 7) ? T.gold : "transparent",
-                    border: i < Math.min(data.profile.streak, 7) ? "none" : `1.5px dashed ${T.line}`,
+                    border: i < Math.min(data.profile.streak, 7) ? "none" : `1.5px dashed ${T.lineCool}`,
                   }}>
-                    {i < Math.min(data.profile.streak, 7) && <Flame size={14} style={{ color: T.ink, display: "block" }} />}
+                    <Flame size={13} style={{ color: i < Math.min(data.profile.streak, 7) ? T.ink : T.textFaint, display: "block" }} />
                   </div>
-                  <span style={{ fontSize: 11, color: T.textFaint }}>{d}</span>
+                  <span style={{ fontSize: 10, color: T.textFaint }}>{d}</span>
                 </div>
               ))}
             </div>
+            <div style={{ marginTop: 18 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                <span style={{ fontSize: 13, color: T.textMut }}>XP набрано</span>
+                <span style={{ fontFamily: T.serif, fontSize: 15, fontWeight: 700, color: T.goldHi }}>{data.profile.xp} XP</span>
+              </div>
+              <Bar value={Math.min((data.profile.xp / 500) * 100, 100)} color={T.gold} />
+            </div>
           </div>
         </div>
 
-        {/* ── PHRASEBOOK BY THEME ───────────────────────────────────────── */}
-        <div style={{ ...card, padding: 26, marginBottom: 18 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <SectionLabel color={T.gold}>Разговорник по темам</SectionLabel>
-              <Pill color={T.textMut} bg="rgba(157,176,199,0.1)"><span style={{ fontSize: 11 }}>6 тем</span></Pill>
+        {/* Коллекции — реальный прогресс из БД */}
+        {data.collections && data.collections.length > 0 && (
+          <div style={{ ...card, padding: 24, marginBottom: 18 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+              <SectionLabel color={T.gold}>Темы · прогресс</SectionLabel>
+              <Link href="/dictionary" style={{ display: "inline-flex", alignItems: "center", gap: 5, color: T.gold, fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
+                Все темы <ArrowRight size={14} style={{ color: T.gold, display: "block" }} />
+              </Link>
             </div>
-            <Link href="/dictionary" className="lk-navlink" style={{ display: "inline-flex", alignItems: "center", gap: 5, color: T.gold, fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
-              Все темы <ArrowRight size={14} style={{ color: T.gold, display: "block" }} />
-            </Link>
-          </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
-            {THEMES.map((t) => {
-              const pct = Math.round((t.done / t.total) * 100);
-              const done = pct === 100;
-              return (
-                <div key={t.name} className="lk-lift" style={{ borderRadius: 14, border: `1px solid ${T.line}`, background: T.navy, padding: 16, cursor: "pointer" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <span style={{ width: 40, height: 40, borderRadius: 11, flexShrink: 0, background: `${t.color}22`, border: `1px solid ${t.color}55`, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: T.serif, fontWeight: 800, fontSize: 17, color: t.color }}>
-                      {t.name[0]}
-                    </span>
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ fontFamily: T.serif, fontSize: 15.5, fontWeight: 700 }}>{t.name}</div>
-                      <div style={{ fontSize: 11.5, color: T.textFaint, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{t.word}</div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
+              {data.collections.slice(0, 6).map((col, i) => {
+                const pct = col.totalWords > 0 ? Math.round((col.learnedWords / col.totalWords) * 100) : 0;
+                const color = pct === 100 ? T.green : pct > 0 ? T.gold : COLLECTION_COLORS[i % COLLECTION_COLORS.length];
+                return (
+                  <div key={col.id} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 130 }}>{col.title}</span>
+                      <span style={{ fontSize: 11.5, color: T.textMut, whiteSpace: "nowrap", marginLeft: 6 }}>{col.learnedWords}/{col.totalWords}</span>
                     </div>
-                    {done && <CheckCircle size={16} style={{ color: T.green, flexShrink: 0 }} />}
+                    <Bar value={pct} color={color} />
                   </div>
-                  <div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 10 }}>
-                    <div style={{ flex: 1 }}><Bar value={pct} color={done ? T.green : t.color} /></div>
-                    <span style={{ fontSize: 11.5, color: T.textMut, whiteSpace: "nowrap" }}>{t.done}/{t.total}</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* ── LEVEL PATH ────────────────────────────────────────────────── */}
-        <div style={{ ...card, padding: 26, marginBottom: 18, position: "relative", overflow: "hidden" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 22 }}>
-            <SectionLabel color={T.gold}>Твой путь · Уровень A1</SectionLabel>
-            <span style={{ fontSize: 12.5, color: T.textFaint }}>полная карта Лакии — в «Грамматике»</span>
-          </div>
-          <div style={{ display: "flex", alignItems: "center" }}>
-            {LEVEL_PATH.map((s, i, arr) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", flex: i < arr.length - 1 ? "1" : "0 0 auto" }}>
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 9, width: i < arr.length - 1 ? "100%" : "auto", minWidth: 80 }}>
-                  <div style={{
-                    width: 44, height: 44, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-                    background: s.done ? T.gold : (s.cur ? T.navy : "transparent"),
-                    border: s.cur ? `2.5px solid ${T.gold}` : (s.done ? "none" : `1.5px dashed ${T.lineCool}`),
-                  }}>
-                    {s.done ? <CheckCircle size={20} style={{ color: T.ink }} />
-                      : s.lock ? <Lock size={16} style={{ color: T.textFaint }} />
-                      : s.cur ? <PabakoMini size={26} />
-                      : <span style={{ color: T.textMut, fontFamily: T.serif, fontWeight: 700 }}>{i + 1}</span>
-                    }
-                  </div>
-                  <span style={{ fontSize: 11.5, color: s.cur ? T.gold : (s.done ? T.text : T.textFaint), fontWeight: s.cur ? 700 : 500, textAlign: "center" }}>
-                    {s.label}
-                  </span>
-                </div>
-                {i < arr.length - 1 && (
-                  <div style={{ flex: 1, height: 2, background: s.done ? T.gold : T.lineCool, marginBottom: 22, borderRadius: 2, marginInline: 4 }} />
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* ── CULTURAL COLLECTION ───────────────────────────────────────── */}
-        <div style={{ ...card, padding: 24, marginBottom: 18 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <SectionLabel color={T.gold}>Культурная коллекция</SectionLabel>
-              <Pill color={T.textMut} bg="rgba(157,176,199,0.1)"><span style={{ fontSize: 11 }}>2 / 6 открыто</span></Pill>
+                );
+              })}
             </div>
-            <span className="lk-navlink" style={{ display: "inline-flex", alignItems: "center", gap: 5, color: T.gold, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-              Все карточки <ArrowRight size={14} style={{ color: T.gold, display: "block" }} />
-            </span>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(6, 1fr)", gap: 12 }}>
-            {COLLECTION.map((c) => (
-              <div key={c.id} className="lk-lift" style={{ borderRadius: 14, overflow: "hidden", border: `1px solid ${c.got ? T.line : T.lineCool}`, background: T.navy, opacity: c.got ? 1 : 0.62, cursor: "pointer" }}>
-                {/* Photo placeholder */}
-                <div style={{ height: 64, background: `repeating-linear-gradient(135deg, rgba(157,176,199,0.06) 0 10px, rgba(157,176,199,0.12) 10px 20px)`, backgroundColor: "rgba(255,255,255,0.02)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <span style={{ fontFamily: T.mono, fontSize: 10, color: T.textMut, textTransform: "uppercase" as const, textAlign: "center" as const }}>
-                    {c.got ? c.name : "закрыто"}
-                  </span>
-                </div>
-                <div style={{ padding: "10px 11px", position: "relative" }}>
-                  {!c.got && <Lock size={13} style={{ color: T.textFaint, position: "absolute", right: 10, top: 10 }} />}
-                  <div style={{ fontFamily: T.serif, fontSize: 14.5, fontWeight: 700, color: c.got ? T.text : T.textMut }}>{c.name}</div>
-                  <div style={{ fontSize: 11, color: T.textFaint, marginTop: 1 }}>{c.sub}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        )}
 
         {/* ── LEADERBOARD ───────────────────────────────────────────────── */}
         <div style={{ ...card, padding: 24 }}>
@@ -668,13 +812,10 @@ export function DashboardShell() {
             <Trophy size={16} style={{ color: T.gold }} />
             <SectionLabel>Лига Гъумучи · эта неделя</SectionLabel>
           </div>
-
-          {/* Top from API + my row */}
           {(() => {
             const rows = [...data.leaderboardTop];
             const myId = data.myLeaderboardRow?.id;
             const myInTop = rows.some((r) => r.id === myId);
-
             return (
               <div>
                 {rows.slice(0, 5).map((r) => (
@@ -691,7 +832,6 @@ export function DashboardShell() {
                     </span>
                   </div>
                 ))}
-
                 {!myInTop && data.myLeaderboardRow && (
                   <>
                     <div style={{ height: 1, background: T.line, margin: "8px 0" }} />
@@ -709,6 +849,7 @@ export function DashboardShell() {
             );
           })()}
         </div>
+
       </div>
 
       {/* ── FOOTER ─────────────────────────────────────────────────────── */}

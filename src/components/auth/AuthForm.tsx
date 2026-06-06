@@ -17,6 +17,7 @@ export function AuthForm({ mode }: AuthFormProps) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,24 +30,27 @@ export function AuthForm({ mode }: AuthFormProps) {
     setIsSubmitting(true);
 
     try {
+      const body: Record<string, string> = { email, password };
+      if (mode === "register" && displayName.trim()) {
+        body.displayName = displayName.trim();
+      }
+
       const response = await fetch(endpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Accept: "application/json"
+          Accept: "application/json",
         },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify(body),
       });
 
       if (!response.ok) {
         let payload: AuthApiError | null = null;
-
         try {
           payload = (await response.json()) as AuthApiError;
         } catch {
           payload = null;
         }
-
         setError(payload?.error ?? "Не удалось выполнить запрос");
         return;
       }
@@ -62,6 +66,24 @@ export function AuthForm({ mode }: AuthFormProps) {
 
   return (
     <form onSubmit={onSubmit} className="space-y-4 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+
+      {mode === "register" && (
+        <label className="block space-y-2">
+          <span className="text-sm font-medium text-gray-700">
+            Как вас зовут? <span className="text-gray-400 font-normal">(необязательно)</span>
+          </span>
+          <input
+            type="text"
+            autoComplete="name"
+            maxLength={64}
+            className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none transition focus:border-blue-500"
+            value={displayName}
+            onChange={(event) => setDisplayName(event.target.value)}
+            placeholder="Например: Муса"
+          />
+        </label>
+      )}
+
       <label className="block space-y-2">
         <span className="text-sm font-medium text-gray-700">Email</span>
         <input
@@ -101,4 +123,3 @@ export function AuthForm({ mode }: AuthFormProps) {
     </form>
   );
 }
-

@@ -5,6 +5,7 @@ import { setAuthCookies } from "@/lib/server/session";
 type RegisterBody = {
   email?: string;
   password?: string;
+  displayName?: string;
 };
 
 function isValidEmail(email: string): boolean {
@@ -22,6 +23,7 @@ export async function POST(request: Request) {
 
   const email = body.email?.trim().toLowerCase();
   const password = body.password?.trim();
+  const displayName = body.displayName?.trim() || null;
 
   if (!email || !password) {
     return NextResponse.json({ error: "email и password обязательны" }, { status: 400 });
@@ -35,7 +37,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Пароль должен быть не короче 8 символов" }, { status: 400 });
   }
 
-  const user = await registerWithEmail(email, password);
+  // displayName не длиннее 64 символов
+  if (displayName && displayName.length > 64) {
+    return NextResponse.json({ error: "Имя не должно превышать 64 символа" }, { status: 400 });
+  }
+
+  const user = await registerWithEmail(email, password, displayName);
 
   if (!user) {
     return NextResponse.json({ error: "Пользователь с таким email уже существует" }, { status: 409 });

@@ -5,17 +5,19 @@ import { usePathname } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
 const PAGE_TITLES: Record<string, string> = {
-  "/letters":    "Алфавит",
-  "/dictionary": "Словарь",
-  "/review":     "Повторение",
-  "/admin":      "Админ-панель",
+  "/letters":     "Алфавит",
+  "/dictionary":  "Словарь",
+  "/phrasebook":  "Разговорник",
+  "/review":      "Повторение",
+  "/admin":       "Админ-панель",
 };
 
 export function AppBreadcrumb() {
   const pathname = usePathname();
   const isDashboard = pathname === "/dashboard" || pathname === "/";
 
-  if (isDashboard) return null;
+  // Phrasebook и Dictionary имеют свой полноэкранный хедер — breadcrumb не нужен
+  if (isDashboard || pathname === "/phrasebook") return null;
 
   const pageTitle = PAGE_TITLES[pathname] ?? null;
 

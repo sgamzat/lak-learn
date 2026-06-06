@@ -29,10 +29,19 @@ export interface LeaderboardRankRow extends LeaderboardUser {
   rank: number;
 }
 
+// Реальный прогресс по коллекции из БД
+export interface CollectionProgress {
+  id: number;
+  title: string;
+  totalWords: number;
+  learnedWords: number; // слов повторено хотя бы раз
+}
+
 export interface DashboardData {
   profile: UserProfile;
   progress: ProgressMetrics;
   srsSummary: SRSQueueSummary;
   leaderboardTop: LeaderboardRankRow[];
   myLeaderboardRow: LeaderboardRankRow | null;
+  collections: CollectionProgress[]; // реальные данные вместо THEMES/LEVEL_PATH
 }

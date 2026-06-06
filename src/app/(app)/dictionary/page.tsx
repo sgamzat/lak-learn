@@ -28,7 +28,6 @@ type CollectionCard = {
 
 type LoadState = "loading" | "success" | "error";
 
-// Прогресс освоения слова
 type Mastery = { dot: string; label: string };
 
 function getMastery(score: number | null): Mastery {
@@ -59,7 +58,7 @@ export default function DictionaryPage() {
 
   const searchRef = useRef<HTMLInputElement>(null);
 
-  // ── Загрузка ──────────────────────────────────────────────────────────────
+  // ── Загрузка слов ──────────────────────────────────────────────────────────
   const loadWords = async (collectionId: number | null) => {
     const p = new URLSearchParams({ limit: "1000" });
     if (collectionId) p.set("collectionId", String(collectionId));
@@ -72,6 +71,7 @@ export default function DictionaryPage() {
     return Array.isArray(data.words) ? data.words : [];
   };
 
+  // ── Начальная загрузка ────────────────────────────────────────────────────
   useEffect(() => {
     let ok = true;
     (async () => {
@@ -84,7 +84,11 @@ export default function DictionaryPage() {
         if (!colRes.ok) throw new Error(`${colRes.status}`);
         const colData = await colRes.json() as { collections: CollectionCard[] };
         if (ok) {
-          setCollections(Array.isArray(colData.collections) ? colData.collections : []);
+          // ── Только словарные коллекции (sortOrder >= 31) ──────────────────
+          const dictCollections = (colData.collections ?? []).filter(
+            c => c.sortOrder >= 31
+          );
+          setCollections(dictCollections);
           setAllWords(wordsData);
           setWords(wordsData);
           setSelectedWordIds(new Set(study.wordIds));
@@ -144,7 +148,7 @@ export default function DictionaryPage() {
     }
   };
 
-  // ── Фильтрация ────────────────────────────────────────────────────────────
+  // ── Фильтрация + сортировка ───────────────────────────────────────────────
   const partsOfSpeech = useMemo(() => {
     const s = new Set<string>();
     words.forEach(w => { if (w.partOfSpeech) s.add(w.partOfSpeech); });
@@ -173,10 +177,10 @@ export default function DictionaryPage() {
       {/* ── ЛЕВАЯ КОЛОНКА — Коллекции ───────────────────────────────────── */}
       <aside className="flex w-56 shrink-0 flex-col border-r border-gray-200 bg-white lg:w-64">
 
-        {/* Заголовок */}
+        {/* Шапка */}
         <div className="shrink-0 border-b border-gray-100 px-3 py-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
-            Коллекции
+            Части речи
           </p>
           {hasLoaded && (
             <p className="mt-0.5 text-xs text-gray-400">
@@ -185,7 +189,7 @@ export default function DictionaryPage() {
           )}
         </div>
 
-        {/* Список — независимый скролл */}
+        {/* Список коллекций — независимый скролл */}
         <div className="flex-1 overflow-y-auto py-1.5">
 
           {/* Все слова */}
@@ -202,183 +206,169 @@ export default function DictionaryPage() {
             <span>Все слова</span>
             <span className={[
               "rounded-full px-1.5 py-0.5 text-xs",
-              !activeCollectionId ? "bg-white/20 text-white" : "bg-gray-100 text-gray-500",
+              !activeCollectionId
+                ? "bg-white/20 text-white"
+                : "bg-gray-100 text-gray-500",
             ].join(" ")}>
               {allWords.length}
             </span>
           </button>
 
-          {/* Скелетон */}
-          {state === "loading" && !hasLoaded && (
-            <div className="space-y-1 px-2 pt-1">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className="h-9 animate-pulse rounded-lg bg-gray-100" />
-              ))}
-            </div>
-          )}
-
           {/* Коллекции */}
           {collections.map(col => {
             const isActive   = activeCollectionId === col.id;
-            const isStudying = selectedCollectionIds.has(col.id);
+            const isSelected = selectedCollectionIds.has(col.id);
             const isPending  = pendingCollectionIds.has(col.id);
-
             return (
-              <div
-                key={col.id}
-                className={[
-                  "group flex items-center transition-colors",
-                  isActive ? "bg-blue-50" : "hover:bg-gray-50",
-                ].join(" ")}
-              >
+              <div key={col.id} className="group relative flex items-center">
                 <button
                   type="button"
                   onClick={() => void handleCollectionSelect(col.id)}
-                  className="flex flex-1 items-center gap-2 px-3 py-2.5 text-left text-sm"
+                  className={[
+                    "flex flex-1 items-center justify-between px-3 py-2.5 text-left text-sm transition-colors",
+                    isActive
+                      ? "bg-gray-900 font-semibold text-white"
+                      : "text-gray-700 hover:bg-gray-50",
+                  ].join(" ")}
                 >
-                  {/* Зелёная точка — всегда видна если коллекция в изучении */}
-                  <span className={[
-                    "h-2 w-2 shrink-0 rounded-full transition-colors",
-                    isStudying ? "bg-green-500" : "bg-gray-200",
-                  ].join(" ")} />
-
-                  <span className={[
-                    "flex-1 truncate font-medium",
-                    isActive ? "text-blue-800" : "text-gray-700",
-                  ].join(" ")}>
-                    {col.title}
+                  <span className="flex items-center gap-2">
+                    {isSelected && (
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 shrink-0" />
+                    )}
+                    <span className="truncate">{col.title}</span>
                   </span>
-
                   <span className={[
-                    "shrink-0 rounded-full px-1.5 py-0.5 text-xs",
-                    isActive ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-500",
+                    "ml-1 shrink-0 rounded-full px-1.5 py-0.5 text-xs",
+                    isActive
+                      ? "bg-white/20 text-white"
+                      : "bg-gray-100 text-gray-500",
                   ].join(" ")}>
                     {col.wordCount}
                   </span>
                 </button>
 
-                {/* Кнопка + / ✓ — появляется при наведении, всегда видна если изучается */}
+                {/* Кнопка «Учить» — видна при наведении */}
                 <button
                   type="button"
                   onClick={() => void handleToggleCollection(col.id)}
                   disabled={isPending}
-                  title={isStudying ? "Убрать из изучения" : "Учить эту коллекцию"}
+                  title={isSelected ? "Убрать из изучения" : "Учить коллекцию"}
                   className={[
-                    "mr-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border transition-all disabled:opacity-50",
-                    isStudying
-                      ? "border-green-200 bg-green-50 text-green-600 hover:border-red-200 hover:bg-red-50 hover:text-red-500"
-                      : "border-gray-200 bg-white text-gray-400 opacity-0 group-hover:opacity-100 hover:border-blue-200 hover:text-blue-600",
+                    "absolute right-2 flex h-6 w-6 shrink-0 items-center justify-center rounded-md border text-xs transition-all disabled:opacity-50",
+                    "opacity-0 group-hover:opacity-100",
+                    isSelected
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-600"
+                      : "border-gray-200 bg-white text-gray-400",
                   ].join(" ")}
                 >
-                  {isPending ? (
-                    <span className="text-[10px]">·</span>
-                  ) : isStudying ? (
-                    <Check className="h-3 w-3" />
-                  ) : (
-                    <Plus className="h-3 w-3" />
-                  )}
+                  {isPending ? "·" : isSelected ? <Check className="h-3 w-3" /> : <Plus className="h-3 w-3" />}
                 </button>
               </div>
             );
           })}
         </div>
+
+        {/* Легенда прогресса */}
+        <div className="shrink-0 border-t border-gray-100 bg-gray-50 px-3 py-2 space-y-1">
+          <p className="text-xs text-gray-400 mb-1.5">Прогресс:</p>
+          {[
+            { dot: "bg-gray-300",  label: "Новое" },
+            { dot: "bg-blue-400",  label: "Знакомое" },
+            { dot: "bg-amber-400", label: "Изучаемое" },
+            { dot: "bg-green-500", label: "Освоено" },
+          ].map(item => (
+            <div key={item.label} className="flex items-center gap-2">
+              <span className={["h-2 w-2 rounded-full shrink-0", item.dot].join(" ")} />
+              <span className="text-xs text-gray-500">{item.label}</span>
+            </div>
+          ))}
+        </div>
       </aside>
 
-      {/* ── ПРАВАЯ КОЛОНКА — Слова ───────────────────────────────────────── */}
+      {/* ── ПРАВАЯ КОЛОНКА — Слова ──────────────────────────────────────── */}
       <div className="flex flex-1 flex-col overflow-hidden">
 
-        {/* Панель инструментов — всегда видна */}
-        <div className="shrink-0 space-y-2 border-b border-gray-200 bg-white px-4 py-3">
+        {/* Панель поиска и фильтров */}
+        <div className="shrink-0 space-y-2 border-b border-gray-100 bg-white px-4 py-3">
 
-          {/* Строка 1: Поиск */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+          {/* Поиск */}
+          <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2">
+            <Search className="h-4 w-4 shrink-0 text-gray-400" />
             <input
               ref={searchRef}
-              type="text"
+              type="search"
+              placeholder="Поиск по лакскому или русскому..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Поиск на лакском или русском..."
-              className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-9 pr-8 text-sm outline-none transition placeholder:text-gray-400 focus:border-blue-300 focus:bg-white focus:ring-2 focus:ring-blue-100"
+              className="flex-1 bg-transparent text-sm outline-none placeholder:text-gray-400"
             />
             {searchQuery && (
               <button
                 type="button"
-                onClick={() => { setSearchQuery(""); searchRef.current?.focus(); }}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                onClick={() => setSearchQuery("")}
+                className="text-gray-400 hover:text-gray-600"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
             )}
           </div>
 
-          {/* Строка 2: Сортировка + часть речи — всегда видны, без скрытия */}
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-
-            {/* Сортировка */}
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs text-gray-400">Сортировка:</span>
-              <div className="flex gap-1">
-                {([
-                  { v: "default", l: "По умолч." },
-                  { v: "az",      l: "А → Я" },
-                  { v: "za",      l: "Я → А" },
-                ] as const).map(opt => (
+          {/* Фильтр по части речи + сортировка */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Фильтр части речи */}
+            {partsOfSpeech.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                <button
+                  type="button"
+                  onClick={() => setFilterPos("all")}
+                  className={[
+                    "rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors",
+                    filterPos === "all"
+                      ? "border-gray-800 bg-gray-800 text-white"
+                      : "border-gray-200 bg-white text-gray-500 hover:bg-gray-50",
+                  ].join(" ")}
+                >
+                  Все
+                </button>
+                {partsOfSpeech.map(pos => (
                   <button
-                    key={opt.v}
+                    key={pos}
                     type="button"
-                    onClick={() => setSortBy(opt.v)}
+                    onClick={() => setFilterPos(pos)}
                     className={[
-                      "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
-                      sortBy === opt.v
+                      "rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors",
+                      filterPos === pos
                         ? "border-gray-800 bg-gray-800 text-white"
                         : "border-gray-200 bg-white text-gray-500 hover:bg-gray-50",
                     ].join(" ")}
                   >
-                    {opt.l}
+                    {pos}
                   </button>
                 ))}
               </div>
-            </div>
-
-            {/* Часть речи */}
-            {partsOfSpeech.length > 0 && (
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs text-gray-400">Часть речи:</span>
-                <div className="flex flex-wrap gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setFilterPos("all")}
-                    className={[
-                      "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
-                      filterPos === "all"
-                        ? "border-gray-800 bg-gray-800 text-white"
-                        : "border-gray-200 bg-white text-gray-500 hover:bg-gray-50",
-                    ].join(" ")}
-                  >
-                    Все
-                  </button>
-                  {partsOfSpeech.map(pos => (
-                    <button
-                      key={pos}
-                      type="button"
-                      onClick={() => setFilterPos(pos)}
-                      className={[
-                        "rounded-full border px-2.5 py-1 text-xs font-medium transition-colors",
-                        filterPos === pos
-                          ? "border-gray-800 bg-gray-800 text-white"
-                          : "border-gray-200 bg-white text-gray-500 hover:bg-gray-50",
-                      ].join(" ")}
-                    >
-                      {pos}
-                    </button>
-                  ))}
-                </div>
-              </div>
             )}
+
+            {/* Сортировка */}
+            <div className="ml-auto flex gap-1">
+              {(["az", "za"] as const).map(s => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setSortBy(sortBy === s ? "default" : s)}
+                  className={[
+                    "rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors",
+                    sortBy === s
+                      ? "border-gray-800 bg-gray-800 text-white"
+                      : "border-gray-200 bg-white text-gray-500 hover:bg-gray-50",
+                  ].join(" ")}
+                >
+                  {s === "az" ? "А → Я" : "Я → А"}
+                </button>
+              ))}
+            </div>
           </div>
 
-          {/* Строка 3: Статус */}
+          {/* Статус */}
           {state === "success" && (
             <div className="flex items-center justify-between text-xs text-gray-400">
               <span>
@@ -388,7 +378,7 @@ export default function DictionaryPage() {
                 }
               </span>
               {selectedWordIds.size > 0 && (
-                <span className="text-green-600 font-medium">{selectedWordIds.size} в изучении</span>
+                <span className="font-medium text-emerald-600">{selectedWordIds.size} в изучении</span>
               )}
             </div>
           )}
@@ -449,7 +439,7 @@ export default function DictionaryPage() {
                     key={word.id}
                     className={[
                       "group flex items-center gap-3 px-4 py-3 transition-colors hover:bg-gray-50",
-                      isSelected ? "bg-green-50/40" : "",
+                      isSelected ? "bg-emerald-50/40" : "",
                     ].join(" ")}
                   >
                     {/* Точка прогресса */}
@@ -459,7 +449,7 @@ export default function DictionaryPage() {
                     />
 
                     {/* Слово + транскрипция */}
-                    <div className="min-w-0 flex-1">
+                    <div className="min-w-0 w-48 shrink-0">
                       <p className="truncate font-semibold text-gray-900">{word.lemma}</p>
                       {word.transcription && (
                         <p className="truncate font-mono text-xs text-gray-400">
@@ -469,7 +459,7 @@ export default function DictionaryPage() {
                     </div>
 
                     {/* Перевод */}
-                    <p className="max-w-[35%] shrink-0 truncate text-right text-sm text-gray-500">
+                    <p className="flex-1 min-w-0 truncate text-sm text-gray-500">
                       {word.translation}
                     </p>
 
@@ -480,7 +470,7 @@ export default function DictionaryPage() {
                       </span>
                     )}
 
-                    {/* Кнопка — видна всегда для изучаемых, при наведении для остальных */}
+                    {/* Кнопка изучения */}
                     <button
                       type="button"
                       onClick={() => void handleToggleWord(word.id)}
@@ -489,8 +479,8 @@ export default function DictionaryPage() {
                       className={[
                         "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border transition-all disabled:opacity-50",
                         isSelected
-                          ? "border-green-200 bg-green-50 text-green-600 hover:border-red-200 hover:bg-red-50 hover:text-red-500"
-                          : "border-gray-200 bg-white text-gray-400 opacity-0 group-hover:opacity-100 hover:border-blue-200 hover:text-blue-600",
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-600 hover:border-red-200 hover:bg-red-50 hover:text-red-500"
+                          : "border-gray-200 bg-white text-gray-400 opacity-0 group-hover:opacity-100 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600",
                       ].join(" ")}
                     >
                       {isPending ? (
@@ -504,25 +494,10 @@ export default function DictionaryPage() {
                   </div>
                 );
               })}
+              {/* Отступ снизу */}
               <div className="h-6" />
             </div>
           )}
-        </div>
-
-        {/* Легенда прогресса — всегда внизу */}
-        <div className="shrink-0 flex items-center gap-4 border-t border-gray-100 bg-gray-50 px-4 py-2">
-          <span className="text-xs text-gray-400">Прогресс:</span>
-          {[
-            { dot: "bg-gray-300",  label: "Новое" },
-            { dot: "bg-blue-400",  label: "Знакомое" },
-            { dot: "bg-amber-400", label: "Изучаемое" },
-            { dot: "bg-green-500", label: "Освоено" },
-          ].map(item => (
-            <div key={item.label} className="flex items-center gap-1.5">
-              <span className={["h-2 w-2 rounded-full", item.dot].join(" ")} />
-              <span className="text-xs text-gray-500">{item.label}</span>
-            </div>
-          ))}
         </div>
       </div>
     </div>
