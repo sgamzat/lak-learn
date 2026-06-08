@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
 import { Spectral, Golos_Text, IBM_Plex_Mono } from "next/font/google";
+import { ThemeProvider } from "@/components/ThemeProvider";
 import "./globals.css";
 
-// ── Шрифты загружаются на сервере, без мигания при загрузке страницы ─────────
+/* ── Шрифты ────────────────────────────────────────────────────
+   Загружаются на сервере через next/font — без мигания
+──────────────────────────────────────────────────────────────── */
 const spectral = Spectral({
   subsets: ["latin", "cyrillic"],
   weight: ["600", "700", "800"],
@@ -31,15 +34,31 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
     <html
       lang="ru"
-      className={`${spectral.variable} ${golosText.variable} ${ibmPlexMono.variable}`}
+      /* Дефолтная тема — Индиго.
+         ThemeProvider заменит класс после mount из localStorage */
+      className={`
+        ${spectral.variable}
+        ${golosText.variable}
+        ${ibmPlexMono.variable}
+        theme-d-indigo
+      `}
     >
-      <body>{children}</body>
+      <body>
+        {/*
+          ThemeProvider — читает localStorage и применяет
+          нужный класс темы на <html> после гидрации.
+          Оборачивает всё приложение.
+        */}
+        <ThemeProvider>
+          {children}
+        </ThemeProvider>
+      </body>
     </html>
   );
 }

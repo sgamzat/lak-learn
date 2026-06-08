@@ -2,64 +2,547 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ══════════════════════════════════════════════════════════════════
+   ШРИФТЫ — подключены через next/font в layout.tsx
+   Доступны как CSS-переменные: --font-spectral, --font-golos, --font-mono
+══════════════════════════════════════════════════════════════════ */
 :root {
-  color-scheme: light;
-
-  /* Шрифты из next/font — доступны как CSS-переменные */
   --font-spectral: var(--font-spectral);
-  --font-golos: var(--font-golos);
-  --font-mono: var(--font-mono);
+  --font-golos:    var(--font-golos);
+  --font-mono:     var(--font-mono);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   ТЕМЫ — применяются классом на <html>
+   По умолчанию: Индиго (тёмная)
+   Переключение: ThemeProvider добавляет/меняет класс темы
+══════════════════════════════════════════════════════════════════ */
+
+/* ── ТЁМНЫЕ ТЕМЫ ─────────────────────────────────────────────── */
+
+/* Индиго — default */
+:root,
+html.theme-d-indigo {
+  --lk-bg:          #0D0F1A;
+  --lk-card:        #181A2C;
+  --lk-card2:       #1E2038;
+  --lk-card3:       #242644;
+  --lk-gold:        #DDB96A;
+  --lk-gold-dim:    rgba(221, 185, 106, 0.12);
+  --lk-gold-border: rgba(221, 185, 106, 0.28);
+  --lk-text:        #E8EAF5;
+  --lk-text-muted:  #606888;
+  --lk-text-faint:  #343660;
+  --lk-line:        rgba(255, 255, 255, 0.07);
+  --lk-green:       #52A87A;
+  --lk-red:         #C2503F;
+  --lk-blue:        #4A6EC4;
+  --lk-shadow:      0 12px 40px rgba(0, 0, 0, 0.55);
+  --lk-snow:        #C8CFF0;
+  --lk-hero-from:   #141628;
+  --lk-hero-to:     #1C1E38;
+  --lk-mtn-a:       #1C1E38;
+  --lk-mtn-b:       #141628;
+  --lk-scheme:      dark;
+}
+
+/* Тёплая ночь */
+html.theme-d-warm {
+  --lk-bg:          #16120A;
+  --lk-card:        #26201A;
+  --lk-card2:       #2E261E;
+  --lk-card3:       #382E24;
+  --lk-gold:        #D4A537;
+  --lk-gold-dim:    rgba(212, 165, 55, 0.13);
+  --lk-gold-border: rgba(212, 165, 55, 0.25);
+  --lk-text:        #ECE0C4;
+  --lk-text-muted:  #9A8870;
+  --lk-text-faint:  #5C4E3A;
+  --lk-line:        rgba(255, 255, 255, 0.08);
+  --lk-green:       #5BAF7A;
+  --lk-red:         #C2503F;
+  --lk-blue:        #4A90C4;
+  --lk-shadow:      0 12px 40px rgba(0, 0, 0, 0.55);
+  --lk-snow:        #ECE0C4;
+  --lk-hero-from:   #2E261E;
+  --lk-hero-to:     #382E24;
+  --lk-mtn-a:       #382E24;
+  --lk-mtn-b:       #2E261E;
+  --lk-scheme:      dark;
+}
+
+/* Глубокий космос */
+html.theme-d-cosmos {
+  --lk-bg:          #0A0A14;
+  --lk-card:        #12122A;
+  --lk-card2:       #1A1A3A;
+  --lk-card3:       #22224A;
+  --lk-gold:        #C9A96E;
+  --lk-gold-dim:    rgba(201, 169, 110, 0.12);
+  --lk-gold-border: rgba(201, 169, 110, 0.28);
+  --lk-text:        #E8E0F0;
+  --lk-text-muted:  #6A7090;
+  --lk-text-faint:  #3A3A5A;
+  --lk-line:        rgba(255, 255, 255, 0.06);
+  --lk-green:       #6A9E8A;
+  --lk-red:         #C2503F;
+  --lk-blue:        #4A6EC4;
+  --lk-shadow:      0 12px 40px rgba(0, 0, 0, 0.6);
+  --lk-snow:        #D0C8F0;
+  --lk-hero-from:   #12122A;
+  --lk-hero-to:     #1A1A3A;
+  --lk-mtn-a:       #1A1A3A;
+  --lk-mtn-b:       #12122A;
+  --lk-scheme:      dark;
+}
+
+/* Сланец */
+html.theme-d-slate {
+  --lk-bg:          #111418;
+  --lk-card:        #1A1E24;
+  --lk-card2:       #222830;
+  --lk-card3:       #2A3038;
+  --lk-gold:        #E2A84B;
+  --lk-gold-dim:    rgba(226, 168, 75, 0.12);
+  --lk-gold-border: rgba(226, 168, 75, 0.28);
+  --lk-text:        #E8EDF2;
+  --lk-text-muted:  #6B7280;
+  --lk-text-faint:  #404650;
+  --lk-line:        rgba(255, 255, 255, 0.07);
+  --lk-green:       #4FA876;
+  --lk-red:         #C2503F;
+  --lk-blue:        #4A6EC4;
+  --lk-shadow:      0 12px 40px rgba(0, 0, 0, 0.55);
+  --lk-snow:        #C8D4E0;
+  --lk-hero-from:   #1A1E24;
+  --lk-hero-to:     #222830;
+  --lk-mtn-a:       #222830;
+  --lk-mtn-b:       #1A1E24;
+  --lk-scheme:      dark;
+}
+
+/* Ночной лес */
+html.theme-d-forest {
+  --lk-bg:          #0A120E;
+  --lk-card:        #14221A;
+  --lk-card2:       #1A2C20;
+  --lk-card3:       #203626;
+  --lk-gold:        #D4A537;
+  --lk-gold-dim:    rgba(212, 165, 55, 0.12);
+  --lk-gold-border: rgba(212, 165, 55, 0.28);
+  --lk-text:        #D8ECD0;
+  --lk-text-muted:  #527060;
+  --lk-text-faint:  #2A4030;
+  --lk-line:        rgba(255, 255, 255, 0.06);
+  --lk-green:       #5BAF7A;
+  --lk-red:         #C2503F;
+  --lk-blue:        #4A6EC4;
+  --lk-shadow:      0 12px 40px rgba(0, 0, 0, 0.6);
+  --lk-snow:        #C8E0C0;
+  --lk-hero-from:   #0E1C14;
+  --lk-hero-to:     #162410;
+  --lk-mtn-a:       #162410;
+  --lk-mtn-b:       #0E1C14;
+  --lk-scheme:      dark;
+}
+
+/* Обсидиан */
+html.theme-d-obsidian {
+  --lk-bg:          #100C08;
+  --lk-card:        #1C1610;
+  --lk-card2:       #241E16;
+  --lk-card3:       #2C261C;
+  --lk-gold:        #F0B429;
+  --lk-gold-dim:    rgba(240, 180, 41, 0.13);
+  --lk-gold-border: rgba(240, 180, 41, 0.30);
+  --lk-text:        #F5EDD0;
+  --lk-text-muted:  #7A6850;
+  --lk-text-faint:  #4A3820;
+  --lk-line:        rgba(255, 255, 255, 0.06);
+  --lk-green:       #6AB882;
+  --lk-red:         #C2503F;
+  --lk-blue:        #4A6EC4;
+  --lk-shadow:      0 12px 40px rgba(0, 0, 0, 0.65);
+  --lk-snow:        #F5EDD0;
+  --lk-hero-from:   #1A1410;
+  --lk-hero-to:     #221A12;
+  --lk-mtn-a:       #221A12;
+  --lk-mtn-b:       #1A1410;
+  --lk-scheme:      dark;
+}
+
+/* ── СВЕТЛЫЕ ТЕМЫ ─────────────────────────────────────────────── */
+
+/* Бумага */
+html.theme-l-paper {
+  --lk-bg:          #F7F4EE;
+  --lk-card:        #FFFFFF;
+  --lk-card2:       #F0EBE1;
+  --lk-card3:       #E8E0D0;
+  --lk-gold:        #9A6E00;
+  --lk-gold-dim:    rgba(154, 110, 0, 0.09);
+  --lk-gold-border: rgba(154, 110, 0, 0.22);
+  --lk-text:        #1A1A14;
+  --lk-text-muted:  #6B6148;
+  --lk-text-faint:  #B0A488;
+  --lk-line:        rgba(0, 0, 0, 0.07);
+  --lk-green:       #1E6E3A;
+  --lk-red:         #B83232;
+  --lk-blue:        #1A5288;
+  --lk-shadow:      0 8px 24px rgba(0, 0, 0, 0.12);
+  --lk-snow:        #F0EBE1;
+  --lk-hero-from:   #1A2E49;
+  --lk-hero-to:     #253D60;
+  --lk-mtn-a:       #1E3554;
+  --lk-mtn-b:       #16283E;
+  --lk-scheme:      light;
+}
+
+/* Снег */
+html.theme-l-snow {
+  --lk-bg:          #F5F8FF;
+  --lk-card:        #FFFFFF;
+  --lk-card2:       #EEF3FF;
+  --lk-card3:       #E4ECFF;
+  --lk-gold:        #B8860B;
+  --lk-gold-dim:    rgba(184, 134, 11, 0.09);
+  --lk-gold-border: rgba(184, 134, 11, 0.25);
+  --lk-text:        #0F1C2E;
+  --lk-text-muted:  #4A6080;
+  --lk-text-faint:  #96AEBF;
+  --lk-line:        rgba(0, 0, 0, 0.07);
+  --lk-green:       #1A6E42;
+  --lk-red:         #B83232;
+  --lk-blue:        #1246A8;
+  --lk-shadow:      0 8px 24px rgba(0, 0, 0, 0.10);
+  --lk-snow:        #E8EDF4;
+  --lk-hero-from:   #1A2E49;
+  --lk-hero-to:     #253D60;
+  --lk-mtn-a:       #1E3554;
+  --lk-mtn-b:       #16283E;
+  --lk-scheme:      light;
+}
+
+/* Песок */
+html.theme-l-sand {
+  --lk-bg:          #F2EDE4;
+  --lk-card:        #FDFAF6;
+  --lk-card2:       #EDE7DC;
+  --lk-card3:       #E4DDD0;
+  --lk-gold:        #8B5E00;
+  --lk-gold-dim:    rgba(139, 94, 0, 0.09);
+  --lk-gold-border: rgba(139, 94, 0, 0.22);
+  --lk-text:        #1C1610;
+  --lk-text-muted:  #6E5A3A;
+  --lk-text-faint:  #B09878;
+  --lk-line:        rgba(0, 0, 0, 0.07);
+  --lk-green:       #1A5E32;
+  --lk-red:         #B03030;
+  --lk-blue:        #1A4A8A;
+  --lk-shadow:      0 8px 24px rgba(0, 0, 0, 0.10);
+  --lk-snow:        #EDE7DC;
+  --lk-hero-from:   #1A2E49;
+  --lk-hero-to:     #253D60;
+  --lk-mtn-a:       #1E3554;
+  --lk-mtn-b:       #16283E;
+  --lk-scheme:      light;
+}
+
+/* Мята */
+html.theme-l-mint {
+  --lk-bg:          #F0F7F4;
+  --lk-card:        #FFFFFF;
+  --lk-card2:       #E6F2EE;
+  --lk-card3:       #D8EBE4;
+  --lk-gold:        #9A6E00;
+  --lk-gold-dim:    rgba(154, 110, 0, 0.09);
+  --lk-gold-border: rgba(154, 110, 0, 0.22);
+  --lk-text:        #0E1E18;
+  --lk-text-muted:  #3E6054;
+  --lk-text-faint:  #88B0A0;
+  --lk-line:        rgba(0, 0, 0, 0.07);
+  --lk-green:       #1A6E42;
+  --lk-red:         #B83232;
+  --lk-blue:        #1A4E8A;
+  --lk-shadow:      0 8px 24px rgba(0, 0, 0, 0.10);
+  --lk-snow:        #D8EBE4;
+  --lk-hero-from:   #1A2E49;
+  --lk-hero-to:     #253D60;
+  --lk-mtn-a:       #1E3554;
+  --lk-mtn-b:       #16283E;
+  --lk-scheme:      light;
+}
+
+/* Роза */
+html.theme-l-rose {
+  --lk-bg:          #FDF5F5;
+  --lk-card:        #FFFFFF;
+  --lk-card2:       #F8EEEE;
+  --lk-card3:       #F0E4E4;
+  --lk-gold:        #8B5E00;
+  --lk-gold-dim:    rgba(139, 94, 0, 0.09);
+  --lk-gold-border: rgba(139, 94, 0, 0.22);
+  --lk-text:        #1A1014;
+  --lk-text-muted:  #6B4A4E;
+  --lk-text-faint:  #B898A0;
+  --lk-line:        rgba(0, 0, 0, 0.07);
+  --lk-green:       #1A6030;
+  --lk-red:         #A82828;
+  --lk-blue:        #1A4A8A;
+  --lk-shadow:      0 8px 24px rgba(0, 0, 0, 0.10);
+  --lk-snow:        #F0E4E4;
+  --lk-hero-from:   #1A2E49;
+  --lk-hero-to:     #253D60;
+  --lk-mtn-a:       #1E3554;
+  --lk-mtn-b:       #16283E;
+  --lk-scheme:      light;
+}
+
+/* Камень */
+html.theme-l-stone {
+  --lk-bg:          #F4F2F0;
+  --lk-card:        #FFFFFF;
+  --lk-card2:       #EDEBE8;
+  --lk-card3:       #E4E0DC;
+  --lk-gold:        #7A5800;
+  --lk-gold-dim:    rgba(122, 88, 0, 0.09);
+  --lk-gold-border: rgba(122, 88, 0, 0.22);
+  --lk-text:        #18161A;
+  --lk-text-muted:  #605C60;
+  --lk-text-faint:  #AAA4A8;
+  --lk-line:        rgba(0, 0, 0, 0.07);
+  --lk-green:       #1A6038;
+  --lk-red:         #B03030;
+  --lk-blue:        #1A4888;
+  --lk-shadow:      0 8px 24px rgba(0, 0, 0, 0.10);
+  --lk-snow:        #E4E0DC;
+  --lk-hero-from:   #1A2E49;
+  --lk-hero-to:     #253D60;
+  --lk-mtn-a:       #1E3554;
+  --lk-mtn-b:       #16283E;
+  --lk-scheme:      light;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   BASE STYLES — используют CSS-переменные темы
+══════════════════════════════════════════════════════════════════ */
+
+html {
+  color-scheme: var(--lk-scheme, dark);
 }
 
 body {
-  @apply bg-gray-50 text-gray-900 antialiased;
+  background-color: var(--lk-bg);
+  color: var(--lk-text);
+  font-family: var(--font-golos), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.4s ease, color 0.4s ease;
 }
 
-/* ── Глобальные классы дашборда (перенесены из useEffect в DashboardShell) ── */
+/* ══════════════════════════════════════════════════════════════════
+   УТИЛИТЫ — переиспользуемые классы
+══════════════════════════════════════════════════════════════════ */
 
+/* Карточка */
+.lk-card {
+  background: var(--lk-card);
+  border: 1px solid var(--lk-line);
+  border-radius: 14px;
+  transition: background 0.4s ease, border-color 0.4s ease;
+}
+
+/* Hover-эффект поднятия */
 .lk-lift {
   transition: transform 0.18s ease, box-shadow 0.18s ease;
 }
-
 .lk-lift:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.28);
 }
 
-.lk-navlink {
-  transition: color 0.15s;
-}
-
-.lk-navlink:hover {
-  color: #F4EFE6 !important;
-}
-
+/* Кнопка-золото */
 .lk-btn-gold {
-  transition: filter 0.15s;
+  background: var(--lk-gold);
+  color: var(--lk-bg);
+  border: none;
+  border-radius: 10px;
+  font-family: var(--font-golos), system-ui, sans-serif;
+  font-weight: 700;
+  cursor: pointer;
+  transition: filter 0.15s ease, background 0.4s ease, color 0.4s ease;
 }
-
 .lk-btn-gold:hover {
-  filter: brightness(1.12);
+  filter: brightness(1.1);
 }
 
-/* Адаптив: мобильная навигация */
+/* Ссылки-навигации */
+.lk-navlink {
+  color: var(--lk-text-muted);
+  text-decoration: none;
+  transition: color 0.15s ease;
+  font-family: var(--font-golos), system-ui, sans-serif;
+}
+.lk-navlink:hover {
+  color: var(--lk-text);
+}
+.lk-navlink.active {
+  background: var(--lk-gold-dim);
+  color: var(--lk-gold);
+  font-weight: 600;
+}
+
+/* Прогресс-бар */
+.lk-bar-bg {
+  background: var(--lk-line);
+  border-radius: 99px;
+  overflow: hidden;
+}
+.lk-bar-fill {
+  border-radius: 99px;
+  transition: width 0.5s ease;
+}
+
+/* Бейдж */
+.lk-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font-golos), system-ui, sans-serif;
+  transition: all 0.3s ease;
+}
+.lk-badge-gold {
+  background: var(--lk-gold-dim);
+  color: var(--lk-gold);
+}
+.lk-badge-red {
+  background: rgba(194, 80, 63, 0.14);
+  color: var(--lk-red);
+}
+.lk-badge-green {
+  background: rgba(82, 168, 122, 0.14);
+  color: var(--lk-green);
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   АДАПТИВ
+══════════════════════════════════════════════════════════════════ */
+
+/* Десктоп-элементы: скрываем на мобиле */
 @media (max-width: 768px) {
-  .lk-desktop-nav {
+  .lk-desktop-only {
     display: none !important;
   }
-
-  .lk-mobile-burger {
-    display: inline-flex !important;
+  .lk-mobile-only {
+    display: flex !important;
   }
 }
 
+/* Мобильные элементы: скрываем на десктопе */
 @media (min-width: 769px) {
-  .lk-mobile-burger {
+  .lk-mobile-only {
     display: none !important;
+  }
+  .lk-desktop-only {
+    display: flex !important;
   }
 }
 
-/* ── Доступность: отключение анимаций ───────────────────────────────────── */
+/* ══════════════════════════════════════════════════════════════════
+   МОБИЛЬНЫЙ BOTTOM BAR
+   Используется в AppShell — всегда виден за счёт flex-layout
+══════════════════════════════════════════════════════════════════ */
+
+.lk-bottom-bar {
+  background: var(--lk-card);
+  border-top: 1px solid var(--lk-line);
+  transition: background 0.4s ease, border-color 0.4s ease;
+  /* Safe area для iPhone X+ */
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+.lk-bb-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 8px 4px 6px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--font-golos), system-ui, sans-serif;
+  transition: opacity 0.15s;
+  position: relative;
+}
+
+.lk-bb-item:active {
+  opacity: 0.6;
+}
+
+.lk-bb-icon {
+  font-size: 20px;
+  line-height: 1;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.lk-bb-item.active .lk-bb-icon {
+  transform: scale(1.18);
+}
+
+.lk-bb-label {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--lk-text-faint);
+  transition: color 0.15s;
+  white-space: nowrap;
+}
+
+.lk-bb-item.active .lk-bb-label {
+  color: var(--lk-gold);
+}
+
+/* Точка-индикатор активной вкладки */
+.lk-bb-dot {
+  position: absolute;
+  top: 5px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--lk-gold);
+  opacity: 0;
+  transform: scale(0);
+  transition: opacity 0.2s, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.lk-bb-item.active .lk-bb-dot {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* Бейдж на иконке (просроченные карточки) */
+.lk-bb-badge {
+  position: absolute;
+  top: 3px;
+  right: calc(50% - 20px);
+  background: var(--lk-red);
+  color: #fff;
+  font-size: 8px;
+  font-weight: 700;
+  border-radius: 99px;
+  padding: 1px 4px;
+  border: 1.5px solid var(--lk-bg);
+  line-height: 1.4;
+  transition: border-color 0.4s ease;
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   ДОСТУПНОСТЬ — отключение анимаций
+══════════════════════════════════════════════════════════════════ */
 
 @media (prefers-reduced-motion: reduce) {
   *,
