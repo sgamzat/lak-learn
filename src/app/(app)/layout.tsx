@@ -9,9 +9,11 @@ export default async function AppGroupLayout({
   if (!auth) redirect("/login");
 
   return (
-    <main className="min-h-screen bg-gray-50">
+    // Убираем bg-gray-50 — каждая страница управляет своим фоном сама.
+    // DashboardShell имеет собственный тёмный фон.
+    <div className="min-h-screen">
       <AppBreadcrumb />
       {children}
-    </main>
+    </div>
   );
 }
