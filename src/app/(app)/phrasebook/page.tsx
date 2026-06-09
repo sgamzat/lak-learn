@@ -5,62 +5,41 @@ import { getStudySelection, setStudySelection } from "@/lib/api/client";
 import {
   Search, Check, Plus, ChevronRight, Volume2, X, ArrowLeft,
 } from "lucide-react";
-
-// ─── Design tokens (matches DashboardShell) ───────────────────────────────────
-const T = {
-  ink:       "#0E1B2E",
-  navy:      "#13243B",
-  navy2:     "#1A2E49",
-  navy3:     "#22395A",
-  line:      "rgba(212,165,55,0.16)",
-  lineCool:  "rgba(157,176,199,0.14)",
-  gold:      "#D4A537",
-  goldHi:    "#E7C66B",
-  goldDim:   "rgba(212,165,55,0.12)",
-  text:      "#F4EFE6",
-  textMut:   "#9DB0C7",
-  textFaint: "#5E728C",
-  green:     "#3FA06B",
-  greenDim:  "rgba(63,160,107,0.14)",
-  blue:      "#3E86C9",
-  red:       "#C2503F",
-  sans:      "'Golos Text', system-ui, sans-serif",
-  serif:     "'Spectral', Georgia, serif",
-  mono:      "'IBM Plex Mono', ui-monospace, monospace",
-};
+import { useTheme } from "@/components/ThemeProvider";
 
 // ─── Иконки тем (эмодзи + цвет) ──────────────────────────────────────────────
+// Цвета здесь статичные — они привязаны к смыслу темы, а не к UI-теме
 const TOPIC_META: Record<string, { emoji: string; color: string }> = {
-  obrashchenie:    { emoji: "🤝", color: T.gold    },
-  privetstvie:     { emoji: "👋", color: T.green   },
-  proshchanie:     { emoji: "🌅", color: T.blue    },
-  prosba:          { emoji: "🙏", color: T.gold    },
-  blagodarnost:    { emoji: "💛", color: T.gold    },
-  priglashenie:    { emoji: "🏠", color: T.green   },
-  izvinenie:       { emoji: "🌸", color: "#E07BAE" },
-  pozdravlenie:    { emoji: "🎉", color: T.gold    },
-  sozhalenie:      { emoji: "💙", color: T.blue    },
-  soglasie:        { emoji: "✅", color: T.green   },
-  otkaz:           { emoji: "🚫", color: T.red     },
-  voprosy:         { emoji: "❓", color: "#9B59B6" },
-  otvety:          { emoji: "💬", color: T.blue    },
-  znakomstvo:      { emoji: "🤗", color: T.gold    },
-  semya:           { emoji: "👨‍👩‍👧", color: "#E07BAE" },
-  vozrast:         { emoji: "🎂", color: T.gold    },
-  professiya:      { emoji: "💼", color: T.blue    },
-  vremya:          { emoji: "⏰", color: T.textMut },
-  pogoda:          { emoji: "☁️", color: T.blue    },
-  zdorove:         { emoji: "💊", color: T.green   },
-  eda:             { emoji: "🍽️", color: "#E07BAE" },
-  magazin:         { emoji: "🛒", color: T.gold    },
-  transport:       { emoji: "🚌", color: T.blue    },
-  "v-gorode":      { emoji: "🏙️", color: T.textMut },
-  priroda:         { emoji: "🏔️", color: T.green   },
-  "izuchenie-yazyka": { emoji: "📖", color: T.blue },
+  obrashchenie:       { emoji: "🤝", color: "#D4A537" },
+  privetstvie:        { emoji: "👋", color: "#3FA06B" },
+  proshchanie:        { emoji: "🌅", color: "#3E86C9" },
+  prosba:             { emoji: "🙏", color: "#D4A537" },
+  blagodarnost:       { emoji: "💛", color: "#D4A537" },
+  priglashenie:       { emoji: "🏠", color: "#3FA06B" },
+  izvinenie:          { emoji: "🌸", color: "#E07BAE" },
+  pozdravlenie:       { emoji: "🎉", color: "#D4A537" },
+  sozhalenie:         { emoji: "💙", color: "#3E86C9" },
+  soglasie:           { emoji: "✅", color: "#3FA06B" },
+  otkaz:              { emoji: "🚫", color: "#C2503F" },
+  voprosy:            { emoji: "❓", color: "#9B59B6" },
+  otvety:             { emoji: "💬", color: "#3E86C9" },
+  znakomstvo:         { emoji: "🤗", color: "#D4A537" },
+  semya:              { emoji: "👨‍👩‍👧", color: "#E07BAE" },
+  vozrast:            { emoji: "🎂", color: "#D4A537" },
+  professiya:         { emoji: "💼", color: "#3E86C9" },
+  vremya:             { emoji: "⏰", color: "#9DB0C7" },
+  pogoda:             { emoji: "☁️", color: "#3E86C9" },
+  zdorove:            { emoji: "💊", color: "#3FA06B" },
+  eda:                { emoji: "🍽️", color: "#E07BAE" },
+  magazin:            { emoji: "🛒", color: "#D4A537" },
+  transport:          { emoji: "🚌", color: "#3E86C9" },
+  "v-gorode":         { emoji: "🏙️", color: "#9DB0C7" },
+  priroda:            { emoji: "🏔️", color: "#3FA06B" },
+  "izuchenie-yazyka": { emoji: "📖", color: "#3E86C9" },
 };
 
 function getTopicMeta(slug: string) {
-  return TOPIC_META[slug] ?? { emoji: "💬", color: T.blue };
+  return TOPIC_META[slug] ?? { emoji: "💬", color: "#3E86C9" };
 }
 
 // ─── Типы ─────────────────────────────────────────────────────────────────────
@@ -88,140 +67,86 @@ type LoadState = "loading" | "success" | "error";
 
 // ─── Компонент: карточка фразы ────────────────────────────────────────────────
 function PhraseCard({
-  phrase,
-  isSelected,
-  isPending,
-  onToggle,
+  phrase, isSelected, isPending, onToggle,
 }: {
-  phrase: PhraseWord;
-  isSelected: boolean;
-  isPending: boolean;
-  onToggle: () => void;
+  phrase: PhraseWord; isSelected: boolean; isPending: boolean; onToggle: () => void;
 }) {
+  const { tokens: T } = useTheme();
   const [flipped, setFlipped] = useState(false);
-
-  // Сброс флипа при смене фразы
   useEffect(() => { setFlipped(false); }, [phrase.id]);
-
   const isLong = phrase.lemma.length > 30;
 
   return (
     <div
-      style={{
-        perspective: "1000px",
-        height: isLong ? 160 : 140,
-        cursor: "pointer",
-      }}
+      style={{ perspective: "1000px", height: isLong ? 160 : 140, cursor: "pointer" }}
       onClick={() => setFlipped(f => !f)}
     >
-      <div
-        style={{
-          position: "relative",
-          width: "100%",
-          height: "100%",
-          transformStyle: "preserve-3d",
-          transition: "transform 0.45s cubic-bezier(0.4, 0, 0.2, 1)",
-          transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)",
-        }}
-      >
-        {/* ── Лицо (лакский) ── */}
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            backfaceVisibility: "hidden",
-            WebkitBackfaceVisibility: "hidden",
-            background: T.navy2,
-            border: `1px solid ${isSelected ? "rgba(63,160,107,0.5)" : T.lineCool}`,
-            borderRadius: 16,
-            padding: "16px 18px",
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "space-between",
-            boxShadow: isSelected ? `0 0 0 1px rgba(63,160,107,0.3)` : "none",
-          }}
-        >
+      <div style={{
+        position: "relative", width: "100%", height: "100%",
+        transformStyle: "preserve-3d",
+        transition: "transform 0.45s cubic-bezier(0.4, 0, 0.2, 1)",
+        transform: flipped ? "rotateY(180deg)" : "rotateY(0deg)",
+      }}>
+        {/* Лицо (лакский) */}
+        <div style={{
+          position: "absolute", inset: 0,
+          backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden",
+          background: T.navy2,
+          border: `1px solid ${isSelected ? "rgba(63,160,107,0.5)" : T.lineCool}`,
+          borderRadius: 16, padding: "16px 18px",
+          display: "flex", flexDirection: "column", justifyContent: "space-between",
+          boxShadow: isSelected ? "0 0 0 1px rgba(63,160,107,0.3)" : "none",
+          transition: "background 0.4s, border-color 0.4s",
+        }}>
           <div>
-            <p
-              style={{
-                fontFamily: T.serif,
-                fontSize: isLong ? 15 : 19,
-                fontWeight: 700,
-                color: T.text,
-                lineHeight: 1.3,
-                marginBottom: 6,
-              }}
-            >
+            <p style={{
+              fontFamily: T.serif,
+              fontSize: isLong ? 14 : 17,
+              fontWeight: 700, color: T.text, lineHeight: 1.35,
+              transition: "color 0.4s",
+            }}>
               {phrase.lemma}
             </p>
             {phrase.transcription && (
-              <p style={{ fontFamily: T.mono, fontSize: 11, color: T.textFaint }}>
-                [ {phrase.transcription} ]
+              <p style={{ fontFamily: T.mono, fontSize: 11, color: T.textFaint, marginTop: 3, transition: "color 0.4s" }}>
+                [{phrase.transcription}]
               </p>
             )}
           </div>
-
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={{ fontSize: 11, color: T.textFaint }}>
-              нажми — перевод
-            </span>
+            <span style={{ fontSize: 10, color: T.textFaint, transition: "color 0.4s" }}>нажми — перевод</span>
             <button
               type="button"
               onClick={e => { e.stopPropagation(); onToggle(); }}
               style={{
-                width: 28,
-                height: 28,
-                borderRadius: 8,
+                width: 28, height: 28, borderRadius: 8,
                 border: `1px solid ${isSelected ? "rgba(63,160,107,0.6)" : T.lineCool}`,
                 background: isSelected ? T.greenDim : "transparent",
                 color: isSelected ? T.green : T.textFaint,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                transition: "all 0.15s",
-                flexShrink: 0,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                cursor: "pointer", flexShrink: 0, transition: "all 0.15s",
               }}
             >
-              {isPending ? (
-                <span style={{ fontSize: 9, color: T.textFaint }}>…</span>
-              ) : isSelected ? (
-                <Check size={13} />
-              ) : (
-                <Plus size={13} />
-              )}
+              {isPending
+                ? <span style={{ fontSize: 9, color: T.textFaint }}>…</span>
+                : isSelected ? <Check size={13} /> : <Plus size={13} />}
             </button>
           </div>
         </div>
 
-        {/* ── Оборот (перевод) ── */}
-        <div
-          style={{
-            position: "absolute",
-            inset: 0,
-            backfaceVisibility: "hidden",
-            WebkitBackfaceVisibility: "hidden",
-            transform: "rotateY(180deg)",
-            background: `linear-gradient(135deg, rgba(63,160,107,0.18), ${T.navy2})`,
-            border: `1px solid rgba(63,160,107,0.35)`,
-            borderRadius: 16,
-            padding: "16px 18px",
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "center",
-            alignItems: "flex-start",
-            gap: 6,
-          }}
-        >
-          <p
-            style={{
-              fontFamily: T.sans,
-              fontSize: 17,
-              fontWeight: 600,
-              color: T.text,
-              lineHeight: 1.3,
-            }}
-          >
+        {/* Оборот (перевод) */}
+        <div style={{
+          position: "absolute", inset: 0,
+          backfaceVisibility: "hidden", WebkitBackfaceVisibility: "hidden",
+          transform: "rotateY(180deg)",
+          background: `linear-gradient(135deg, rgba(63,160,107,0.18), ${T.navy2})`,
+          border: `1px solid rgba(63,160,107,0.35)`,
+          borderRadius: 16, padding: "16px 18px",
+          display: "flex", flexDirection: "column", justifyContent: "center",
+          alignItems: "flex-start", gap: 6,
+          transition: "background 0.4s",
+        }}>
+          <p style={{ fontFamily: T.sans, fontSize: 17, fontWeight: 600, color: T.text, lineHeight: 1.3, transition: "color 0.4s" }}>
             {phrase.translation}
           </p>
           <span style={{ fontSize: 11, color: T.green }}>← назад</span>
@@ -233,16 +158,11 @@ function PhraseCard({
 
 // ─── Компонент: карточка темы ─────────────────────────────────────────────────
 function TopicCard({
-  topic,
-  isActive,
-  isSelected,
-  onClick,
+  topic, isActive, isSelected, onClick,
 }: {
-  topic: Topic;
-  isActive: boolean;
-  isSelected: boolean;
-  onClick: () => void;
+  topic: Topic; isActive: boolean; isSelected: boolean; onClick: () => void;
 }) {
+  const { tokens: T } = useTheme();
   const meta = getTopicMeta(topic.slug);
 
   return (
@@ -250,63 +170,33 @@ function TopicCard({
       type="button"
       onClick={onClick}
       style={{
-        width: "100%",
-        textAlign: "left",
-        background: isActive
-          ? `linear-gradient(135deg, ${meta.color}22, ${T.navy2})`
-          : T.navy,
+        width: "100%", textAlign: "left",
+        background: isActive ? `linear-gradient(135deg, ${meta.color}22, ${T.navy2})` : T.navy,
         border: `1px solid ${isActive ? `${meta.color}55` : T.lineCool}`,
-        borderRadius: 16,
-        padding: "14px 16px",
-        cursor: "pointer",
-        transition: "all 0.18s",
-        position: "relative",
-        overflow: "hidden",
+        borderRadius: 16, padding: "14px 16px",
+        cursor: "pointer", transition: "all 0.18s",
+        position: "relative", overflow: "hidden",
       }}
     >
-      {/* Индикатор «добавлено в изучение» */}
       {isSelected && (
-        <div
-          style={{
-            position: "absolute",
-            top: 10,
-            right: 10,
-            width: 7,
-            height: 7,
-            borderRadius: "50%",
-            background: T.green,
-          }}
-        />
+        <div style={{ position: "absolute", top: 10, right: 10, width: 7, height: 7, borderRadius: "50%", background: T.green }} />
       )}
-
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <span style={{ fontSize: 24, lineHeight: 1 }}>{meta.emoji}</span>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <p
-            style={{
-              fontFamily: T.sans,
-              fontSize: 13.5,
-              fontWeight: 600,
-              color: isActive ? T.text : T.textMut,
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
+          <p style={{
+            fontFamily: T.sans, fontSize: 13.5, fontWeight: 600,
+            color: isActive ? T.text : T.textMut,
+            whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+            transition: "color 0.4s",
+          }}>
             {topic.title}
           </p>
-          <p style={{ fontSize: 11, color: T.textFaint, marginTop: 2 }}>
+          <p style={{ fontSize: 11, color: T.textFaint, marginTop: 2, transition: "color 0.4s" }}>
             {topic.wordCount} фраз
           </p>
         </div>
-        <ChevronRight
-          size={14}
-          style={{
-            color: isActive ? meta.color : T.textFaint,
-            flexShrink: 0,
-            transition: "color 0.15s",
-          }}
-        />
+        <ChevronRight size={14} style={{ color: isActive ? meta.color : T.textFaint, flexShrink: 0, transition: "color 0.15s" }} />
       </div>
     </button>
   );
@@ -314,6 +204,8 @@ function TopicCard({
 
 // ─── Главный компонент ────────────────────────────────────────────────────────
 export default function PhrasebookPage() {
+  const { tokens: T } = useTheme();
+
   const [allTopics, setAllTopics] = useState<Topic[]>([]);
   const [phrases, setPhrases] = useState<PhraseWord[]>([]);
   const [topicState, setTopicState] = useState<LoadState>("loading");
@@ -343,32 +235,17 @@ export default function PhrasebookPage() {
         if (!colRes.ok) throw new Error(`${colRes.status}`);
         const colData = await colRes.json() as { collections: Array<{ id: number; slug: string; title: string; description: string | null; level: string | null; wordCount: number; sortOrder: number }> };
 
-        // Только разговорник: sortOrder <= 30
         const phrasebookCollections = (colData.collections ?? [])
           .filter(c => c.sortOrder <= 30)
-          .map(c => ({
-            id: c.id,
-            slug: c.slug,
-            title: c.title,
-            description: c.description,
-            level: c.level,
-            wordCount: c.wordCount,
-            sortOrder: c.sortOrder,
-          }));
+          .map(c => ({ id: c.id, slug: c.slug, title: c.title, description: c.description, level: c.level, wordCount: c.wordCount, sortOrder: c.sortOrder }));
 
         setAllTopics(phrasebookCollections);
         setSelectedWordIds(new Set(selRes.wordIds));
         setSelectedCollectionIds(new Set(selRes.collectionIds));
         setTopicState("success");
         setHasLoaded(true);
-
-        // Автовыбор первой темы
-        if (phrasebookCollections.length > 0) {
-          setActiveTopic(phrasebookCollections[0]);
-        }
-      } catch {
-        setTopicState("error");
-      }
+        if (phrasebookCollections.length > 0) setActiveTopic(phrasebookCollections[0] ?? null);
+      } catch { setTopicState("error"); }
     };
     void load();
   }, []);
@@ -376,7 +253,6 @@ export default function PhrasebookPage() {
   // ── Загрузка фраз по теме ─────────────────────────────────────────────────
   useEffect(() => {
     if (!activeTopic) { setPhrases([]); return; }
-
     const load = async () => {
       setPhraseState("loading");
       try {
@@ -386,25 +262,17 @@ export default function PhrasebookPage() {
         const data = await res.json() as { words: PhraseWord[] };
         setPhrases(Array.isArray(data.words) ? data.words : []);
         setPhraseState("success");
-      } catch {
-        setPhraseState("error");
-      }
+      } catch { setPhraseState("error"); }
     };
     void load();
   }, [activeTopic]);
 
-  // ── Поиск ─────────────────────────────────────────────────────────────────
   const q = searchQuery.trim().toLowerCase();
-
   const displayedPhrases = useMemo(() => {
     if (!q) return phrases;
-    return phrases.filter(p =>
-      p.lemma.toLowerCase().includes(q) ||
-      p.translation.toLowerCase().includes(q)
-    );
+    return phrases.filter(p => p.lemma.toLowerCase().includes(q) || p.translation.toLowerCase().includes(q));
   }, [phrases, q]);
 
-  // ── Переключение изучения фразы ───────────────────────────────────────────
   const handleTogglePhrase = async (phraseId: number) => {
     const isSelected = selectedWordIds.has(phraseId);
     setPendingWordIds(p => new Set(p).add(phraseId));
@@ -415,14 +283,10 @@ export default function PhrasebookPage() {
       const res = await setStudySelection("word", phraseId, !isSelected);
       setSelectedWordIds(new Set(res.wordIds));
       setSelectedCollectionIds(new Set(res.collectionIds));
-    } catch {
-      setSelectedWordIds(new Set(selectedWordIds));
-    } finally {
-      setPendingWordIds(p => { const n = new Set(p); n.delete(phraseId); return n; });
-    }
+    } catch { setSelectedWordIds(new Set(selectedWordIds)); }
+    finally { setPendingWordIds(p => { const n = new Set(p); n.delete(phraseId); return n; }); }
   };
 
-  // ── Переключение изучения темы целиком ────────────────────────────────────
   const handleToggleTopic = async (topicId: number) => {
     const isSelected = selectedCollectionIds.has(topicId);
     setPendingCollectionIds(p => new Set(p).add(topicId));
@@ -433,513 +297,210 @@ export default function PhrasebookPage() {
       const res = await setStudySelection("collection", topicId, !isSelected);
       setSelectedWordIds(new Set(res.wordIds));
       setSelectedCollectionIds(new Set(res.collectionIds));
-    } catch {
-      setSelectedCollectionIds(new Set(selectedCollectionIds));
-    } finally {
-      setPendingCollectionIds(p => { const n = new Set(p); n.delete(topicId); return n; });
-    }
+    } catch { setSelectedCollectionIds(new Set(selectedCollectionIds)); }
+    finally { setPendingCollectionIds(p => { const n = new Set(p); n.delete(topicId); return n; }); }
   };
 
-  const activeTopicMeta = activeTopic ? getTopicMeta(activeTopic.slug) : null;
-  const isTopicSelected = activeTopic ? selectedCollectionIds.has(activeTopic.id) : false;
-  const isTopicPending = activeTopic ? pendingCollectionIds.has(activeTopic.id) : false;
-
-  // ─── Рендер ───────────────────────────────────────────────────────────────
+  // ── Рендер ────────────────────────────────────────────────────────────────
   return (
-    <>
-      {/* Шрифты */}
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Spectral:wght@600;700;800&family=Golos+Text:wght@400;500;600;700&family=IBM+Plex+Mono&display=swap');
-      `}</style>
+    <div style={{ minHeight: "100vh", background: T.bg, fontFamily: T.sans, color: T.text, display: "flex", flexDirection: "column", transition: "background 0.4s, color 0.4s" }}>
 
-      <div
-        style={{
-          minHeight: "100vh",
-          background: T.ink,
-          fontFamily: T.sans,
-          color: T.text,
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
-        {/* ── HEADER ──────────────────────────────────────────────────────── */}
-        <header
-          style={{
-            position: "sticky",
-            top: 0,
-            zIndex: 20,
-            background: "rgba(14,27,46,0.92)",
-            backdropFilter: "blur(14px)",
-            borderBottom: `1px solid ${T.line}`,
-            padding: "14px 24px",
-            display: "flex",
-            alignItems: "center",
-            gap: 16,
-          }}
-        >
-          <a
-            href="/dashboard"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              fontSize: 13.5,
-              color: T.textMut,
-              textDecoration: "none",
-              padding: "6px 12px",
-              borderRadius: 10,
-              border: `1px solid ${T.lineCool}`,
-              transition: "color 0.15s",
-            }}
-          >
-            <ArrowLeft size={14} />
-            Главная
-          </a>
+      {/* ── Хедер ── */}
+      <header style={{
+        position: "sticky", top: 0, zIndex: 30,
+        background: `${T.bg}ee`, backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
+        borderBottom: `1px solid ${T.line}`,
+        display: "flex", alignItems: "center", gap: 16,
+        padding: "0 24px", height: 60,
+        transition: "background 0.4s, border-color 0.4s",
+      }}>
+        <a href="/dashboard" style={{ display: "flex", alignItems: "center", gap: 6, color: T.textMut, textDecoration: "none", fontSize: 13, border: `1px solid ${T.lineCool}`, borderRadius: 10, padding: "5px 10px", transition: "color 0.15s" }}>
+          <ArrowLeft size={14} /> Главная
+        </a>
+        <div>
+          <h1 style={{ fontFamily: T.serif, fontSize: 22, fontWeight: 700, color: T.text, lineHeight: 1, transition: "color 0.4s" }}>Разговорник</h1>
+          {hasLoaded && <p style={{ fontSize: 12, color: T.textFaint, marginTop: 3, transition: "color 0.4s" }}>{allTopics.length} тем · {selectedWordIds.size} фраз в изучении</p>}
+        </div>
 
-          <div>
-            <h1
-              style={{
-                fontFamily: T.serif,
-                fontSize: 22,
-                fontWeight: 700,
-                color: T.text,
-                lineHeight: 1,
-              }}
-            >
-              Разговорник
-            </h1>
-            {hasLoaded && (
-              <p style={{ fontSize: 12, color: T.textFaint, marginTop: 3 }}>
-                {allTopics.length} тем · {selectedWordIds.size} фраз в изучении
-              </p>
-            )}
-          </div>
+        {/* Поиск */}
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8, background: T.navy2, border: `1px solid ${T.lineCool}`, borderRadius: 12, padding: "7px 12px", width: 240, transition: "background 0.4s" }}>
+          <Search size={14} style={{ color: T.textFaint, flexShrink: 0 }} />
+          <input
+            ref={searchRef} type="search" placeholder="Поиск фраз..."
+            value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+            style={{ flex: 1, background: "transparent", border: "none", outline: "none", fontSize: 13.5, color: T.text, fontFamily: T.sans }}
+          />
+          {q && (
+            <button type="button" onClick={() => setSearchQuery("")} style={{ background: "none", border: "none", cursor: "pointer", color: T.textFaint, padding: 0, display: "flex" }}>
+              <X size={13} />
+            </button>
+          )}
+        </div>
 
-          {/* Поиск */}
-          <div
-            style={{
-              marginLeft: "auto",
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              background: T.navy2,
-              border: `1px solid ${T.lineCool}`,
-              borderRadius: 12,
-              padding: "7px 12px",
-              width: 240,
-            }}
-          >
-            <Search size={14} style={{ color: T.textFaint, flexShrink: 0 }} />
-            <input
-              ref={searchRef}
-              type="search"
-              placeholder="Поиск фраз..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              style={{
-                flex: 1,
-                background: "transparent",
-                border: "none",
-                outline: "none",
-                fontSize: 13.5,
-                color: T.text,
-                fontFamily: T.sans,
-              }}
+        {/* Переключатель вида */}
+        <div style={{ display: "flex", background: T.navy, borderRadius: 10, padding: 3, border: `1px solid ${T.lineCool}`, transition: "background 0.4s" }}>
+          {(["cards", "list"] as const).map(mode => (
+            <button key={mode} type="button" onClick={() => setViewMode(mode)} style={{
+              padding: "5px 12px", borderRadius: 7, fontSize: 12.5, fontWeight: 600,
+              fontFamily: T.sans, border: "none", cursor: "pointer",
+              background: viewMode === mode ? T.gold : "transparent",
+              color: viewMode === mode ? T.bg : T.textMut,
+              transition: "all 0.15s",
+            }}>
+              {mode === "cards" ? "Карточки" : "Список"}
+            </button>
+          ))}
+        </div>
+      </header>
+
+      {/* ── Основная сетка ── */}
+      <div style={{ display: "flex", flex: 1, maxWidth: 1280, width: "100%", margin: "0 auto", padding: "20px 24px", gap: 24, alignItems: "flex-start" }}>
+
+        {/* Левая колонка: темы */}
+        <aside style={{ width: 240, flexShrink: 0, position: "sticky", top: 72, maxHeight: "calc(100vh - 92px)", overflowY: "auto", display: "flex", flexDirection: "column", gap: 6, paddingRight: 4 }}>
+          <p style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" as const, color: T.textFaint, marginBottom: 6, paddingLeft: 4, transition: "color 0.4s" }}>Темы</p>
+
+          {topicState === "loading" && Array.from({ length: 8 }, (_, i) => (
+            <div key={i} style={{ height: 70, borderRadius: 16, background: T.navy2, opacity: 0.5 + i * 0.05 }} />
+          ))}
+
+          {topicState === "error" && (
+            <p style={{ fontSize: 13, color: T.red, padding: "8px 4px" }}>Не удалось загрузить темы.</p>
+          )}
+
+          {topicState === "success" && allTopics.map(topic => (
+            <TopicCard
+              key={topic.id}
+              topic={topic}
+              isActive={activeTopic?.id === topic.id}
+              isSelected={selectedCollectionIds.has(topic.id)}
+              onClick={() => setActiveTopic(topic)}
             />
-            {q && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery("")}
-                style={{ background: "none", border: "none", cursor: "pointer", color: T.textFaint, padding: 0, display: "flex" }}
-              >
-                <X size={13} />
-              </button>
-            )}
-          </div>
+          ))}
+        </aside>
 
-          {/* Переключатель вида */}
-          <div
-            style={{
-              display: "flex",
-              background: T.navy,
-              borderRadius: 10,
-              padding: 3,
-              border: `1px solid ${T.lineCool}`,
-            }}
-          >
-            {(["cards", "list"] as const).map(mode => (
+        {/* Правая колонка: фразы */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+
+          {/* Заголовок темы */}
+          {activeTopic && topicState === "success" && (
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+              <div>
+                <h2 style={{ fontFamily: T.serif, fontSize: 20, fontWeight: 700, color: T.text, transition: "color 0.4s" }}>{activeTopic.title}</h2>
+                {activeTopic.description && <p style={{ fontSize: 13, color: T.textMut, marginTop: 3, transition: "color 0.4s" }}>{activeTopic.description}</p>}
+              </div>
               <button
-                key={mode}
                 type="button"
-                onClick={() => setViewMode(mode)}
+                disabled={pendingCollectionIds.has(activeTopic.id)}
+                onClick={() => void handleToggleTopic(activeTopic.id)}
                 style={{
-                  padding: "5px 12px",
-                  borderRadius: 7,
-                  fontSize: 12.5,
-                  fontWeight: 600,
-                  fontFamily: T.sans,
-                  border: "none",
-                  cursor: "pointer",
-                  background: viewMode === mode ? T.gold : "transparent",
-                  color: viewMode === mode ? T.ink : T.textMut,
-                  transition: "all 0.15s",
+                  display: "flex", alignItems: "center", gap: 6,
+                  padding: "8px 16px", borderRadius: 10, fontSize: 13, fontWeight: 600,
+                  border: `1px solid ${selectedCollectionIds.has(activeTopic.id) ? "rgba(63,160,107,0.5)" : T.line}`,
+                  background: selectedCollectionIds.has(activeTopic.id) ? T.greenDim : "transparent",
+                  color: selectedCollectionIds.has(activeTopic.id) ? T.green : T.textMut,
+                  cursor: "pointer", fontFamily: T.sans, transition: "all 0.2s",
                 }}
               >
-                {mode === "cards" ? "Карточки" : "Список"}
+                {pendingCollectionIds.has(activeTopic.id)
+                  ? "…"
+                  : selectedCollectionIds.has(activeTopic.id)
+                  ? <><Check size={13} /> Добавлено</>
+                  : <><Plus size={13} /> Добавить тему</>}
               </button>
-            ))}
-          </div>
-        </header>
+            </div>
+          )}
 
-        {/* ── ОСНОВНАЯ СЕТКА ──────────────────────────────────────────────── */}
-        <div
-          style={{
-            display: "flex",
-            flex: 1,
-            maxWidth: 1280,
-            width: "100%",
-            margin: "0 auto",
-            padding: "20px 24px",
-            gap: 24,
-            alignItems: "flex-start",
-          }}
-        >
-          {/* ── ЛЕВАЯ КОЛОНКА: Темы ─────────────────────────────────────── */}
-          <aside
-            style={{
-              width: 240,
-              flexShrink: 0,
-              position: "sticky",
-              top: 72,
-              maxHeight: "calc(100vh - 92px)",
-              overflowY: "auto",
-              display: "flex",
-              flexDirection: "column",
-              gap: 6,
-              paddingRight: 4,
-            }}
-          >
-            <p
-              style={{
-                fontSize: 10.5,
-                fontWeight: 700,
-                letterSpacing: "0.1em",
-                textTransform: "uppercase",
-                color: T.textFaint,
-                marginBottom: 6,
-                paddingLeft: 4,
-              }}
-            >
-              Темы
-            </p>
+          {/* Загрузка */}
+          {phraseState === "loading" && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12 }}>
+              {Array.from({ length: 12 }, (_, i) => (
+                <div key={i} style={{ height: 140, borderRadius: 16, background: T.navy2, opacity: 0.4 + (i % 3) * 0.1 }} />
+              ))}
+            </div>
+          )}
 
-            {topicState === "loading" && (
-              Array.from({ length: 8 }, (_, i) => (
-                <div
-                  key={i}
-                  style={{
-                    height: 58,
-                    borderRadius: 16,
-                    background: T.navy2,
-                    animation: "pulse 1.5s ease-in-out infinite",
-                  }}
+          {/* Ошибка */}
+          {phraseState === "error" && (
+            <div style={{ textAlign: "center" as const, padding: "60px 20px", color: T.textMut }}>
+              <p style={{ fontSize: 40, marginBottom: 12 }}>⚠️</p>
+              <p style={{ fontSize: 16, fontWeight: 600 }}>Не удалось загрузить фразы</p>
+              <p style={{ fontSize: 13, color: T.textFaint, marginTop: 6 }}>Обновите страницу.</p>
+            </div>
+          )}
+
+          {/* Пусто */}
+          {phraseState === "success" && displayedPhrases.length === 0 && (
+            <div style={{ textAlign: "center" as const, padding: "60px 20px", color: T.textMut }}>
+              <p style={{ fontSize: 40, marginBottom: 12 }}>🔍</p>
+              <p style={{ fontSize: 16, fontWeight: 600 }}>{q ? "Ничего не найдено" : "В этой теме пока нет фраз"}</p>
+            </div>
+          )}
+
+          {/* Карточки */}
+          {phraseState === "success" && displayedPhrases.length > 0 && viewMode === "cards" && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 12 }}>
+              {displayedPhrases.map(phrase => (
+                <PhraseCard
+                  key={phrase.id} phrase={phrase}
+                  isSelected={selectedWordIds.has(phrase.id)}
+                  isPending={pendingWordIds.has(phrase.id)}
+                  onToggle={() => void handleTogglePhrase(phrase.id)}
                 />
-              ))
-            )}
+              ))}
+            </div>
+          )}
 
-            {topicState === "success" && allTopics.map(topic => (
-              <TopicCard
-                key={topic.id}
-                topic={topic}
-                isActive={activeTopic?.id === topic.id}
-                isSelected={selectedCollectionIds.has(topic.id)}
-                onClick={() => setActiveTopic(topic)}
-              />
-            ))}
-
-            {topicState === "error" && (
-              <p style={{ fontSize: 13, color: T.red, padding: "8px 4px" }}>
-                Ошибка загрузки
-              </p>
-            )}
-          </aside>
-
-          {/* ── ПРАВАЯ КОЛОНКА: Фразы ───────────────────────────────────── */}
-          <main style={{ flex: 1, minWidth: 0 }}>
-
-            {/* Заголовок активной темы */}
-            {activeTopic && activeTopicMeta && (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  marginBottom: 20,
-                  paddingBottom: 16,
-                  borderBottom: `1px solid ${T.lineCool}`,
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <span
-                    style={{
-                      fontSize: 36,
-                      lineHeight: 1,
-                      filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.3))",
-                    }}
-                  >
-                    {activeTopicMeta.emoji}
-                  </span>
-                  <div>
-                    <h2
-                      style={{
-                        fontFamily: T.serif,
-                        fontSize: 26,
-                        fontWeight: 700,
-                        color: T.text,
-                        lineHeight: 1,
-                      }}
-                    >
-                      {activeTopic.title}
-                    </h2>
-                    {activeTopic.description && (
-                      <p style={{ fontSize: 13, color: T.textMut, marginTop: 4 }}>
-                        {activeTopic.description}
+          {/* Список */}
+          {phraseState === "success" && displayedPhrases.length > 0 && viewMode === "list" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 2, borderRadius: 16, overflow: "hidden", border: `1px solid ${T.lineCool}`, transition: "border-color 0.4s" }}>
+              {displayedPhrases.map((phrase, idx) => {
+                const isSelected = selectedWordIds.has(phrase.id);
+                const isPending  = pendingWordIds.has(phrase.id);
+                return (
+                  <div key={phrase.id} style={{
+                    display: "flex", alignItems: "center", gap: 16, padding: "13px 18px",
+                    background: idx % 2 === 0 ? T.navy : T.navy2,
+                    borderBottom: idx < displayedPhrases.length - 1 ? `1px solid ${T.lineCool}` : "none",
+                    transition: "background 0.4s",
+                  }}>
+                    {/* Лакский */}
+                    <div style={{ flex: "0 0 42%", minWidth: 0 }}>
+                      <p style={{ fontFamily: T.serif, fontSize: 15.5, fontWeight: 700, color: T.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", transition: "color 0.4s" }}>
+                        {phrase.lemma}
                       </p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Кнопка «Учить тему» */}
-                <button
-                  type="button"
-                  onClick={() => void handleToggleTopic(activeTopic.id)}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 7,
-                    padding: "9px 18px",
-                    borderRadius: 12,
-                    border: `1px solid ${isTopicSelected ? "rgba(63,160,107,0.5)" : T.lineCool}`,
-                    background: isTopicSelected ? T.greenDim : T.navy2,
-                    color: isTopicSelected ? T.green : T.textMut,
-                    fontSize: 13.5,
-                    fontWeight: 600,
-                    fontFamily: T.sans,
-                    cursor: "pointer",
-                    transition: "all 0.18s",
-                    flexShrink: 0,
-                  }}
-                >
-                  {isTopicPending ? (
-                    <span style={{ fontSize: 12 }}>…</span>
-                  ) : isTopicSelected ? (
-                    <><Check size={14} /> Изучается</>
-                  ) : (
-                    <><Plus size={14} /> Учить тему</>
-                  )}
-                </button>
-              </div>
-            )}
-
-            {/* Статус */}
-            {phraseState === "success" && (
-              <p style={{ fontSize: 12, color: T.textFaint, marginBottom: 14 }}>
-                {q
-                  ? `Найдено ${displayedPhrases.length} из ${phrases.length}`
-                  : `${displayedPhrases.length} фраз`}
-              </p>
-            )}
-
-            {/* Загрузка фраз */}
-            {phraseState === "loading" && (
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
-                  gap: 12,
-                }}
-              >
-                {Array.from({ length: 8 }, (_, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      height: 140,
-                      borderRadius: 16,
-                      background: T.navy2,
-                      opacity: 1 - i * 0.08,
-                    }}
-                  />
-                ))}
-              </div>
-            )}
-
-            {/* Ошибка */}
-            {phraseState === "error" && (
-              <div
-                style={{
-                  padding: 24,
-                  borderRadius: 16,
-                  background: "rgba(194,80,63,0.1)",
-                  border: `1px solid rgba(194,80,63,0.3)`,
-                  color: T.red,
-                  fontSize: 14,
-                }}
-              >
-                Не удалось загрузить фразы. Обновите страницу.
-              </div>
-            )}
-
-            {/* Пусто */}
-            {phraseState === "success" && displayedPhrases.length === 0 && (
-              <div
-                style={{
-                  textAlign: "center",
-                  padding: "60px 20px",
-                  color: T.textMut,
-                }}
-              >
-                <p style={{ fontSize: 40, marginBottom: 12 }}>🔍</p>
-                <p style={{ fontSize: 16, fontWeight: 600 }}>
-                  {q ? "Ничего не найдено" : "В этой теме пока нет фраз"}
-                </p>
-              </div>
-            )}
-
-            {/* ── Режим: КАРТОЧКИ ─────────────────────────────────────── */}
-            {phraseState === "success" && displayedPhrases.length > 0 && viewMode === "cards" && (
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
-                  gap: 12,
-                }}
-              >
-                {displayedPhrases.map(phrase => (
-                  <PhraseCard
-                    key={phrase.id}
-                    phrase={phrase}
-                    isSelected={selectedWordIds.has(phrase.id)}
-                    isPending={pendingWordIds.has(phrase.id)}
-                    onToggle={() => void handleTogglePhrase(phrase.id)}
-                  />
-                ))}
-              </div>
-            )}
-
-            {/* ── Режим: СПИСОК ───────────────────────────────────────── */}
-            {phraseState === "success" && displayedPhrases.length > 0 && viewMode === "list" && (
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 2,
-                  borderRadius: 16,
-                  overflow: "hidden",
-                  border: `1px solid ${T.lineCool}`,
-                }}
-              >
-                {displayedPhrases.map((phrase, idx) => {
-                  const isSelected = selectedWordIds.has(phrase.id);
-                  const isPending = pendingWordIds.has(phrase.id);
-                  return (
-                    <div
-                      key={phrase.id}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 16,
-                        padding: "13px 18px",
-                        background: idx % 2 === 0 ? T.navy : T.navy2,
-                        borderBottom: idx < displayedPhrases.length - 1
-                          ? `1px solid ${T.lineCool}` : "none",
-                        transition: "background 0.15s",
-                      }}
-                    >
-                      {/* Лакский */}
-                      <div style={{ flex: "0 0 42%", minWidth: 0 }}>
-                        <p
-                          style={{
-                            fontFamily: T.serif,
-                            fontSize: 15.5,
-                            fontWeight: 700,
-                            color: T.text,
-                            whiteSpace: "nowrap",
-                            overflow: "hidden",
-                            textOverflow: "ellipsis",
-                          }}
-                        >
-                          {phrase.lemma}
+                      {phrase.transcription && (
+                        <p style={{ fontFamily: T.mono, fontSize: 10, color: T.textFaint, marginTop: 2, transition: "color 0.4s" }}>
+                          [{phrase.transcription}]
                         </p>
-                        {phrase.transcription && (
-                          <p style={{ fontFamily: T.mono, fontSize: 10, color: T.textFaint, marginTop: 2 }}>
-                            [{phrase.transcription}]
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Перевод */}
-                      <p
-                        style={{
-                          flex: 1,
-                          fontSize: 14,
-                          color: T.textMut,
-                          minWidth: 0,
-                          whiteSpace: "nowrap",
-                          overflow: "hidden",
-                          textOverflow: "ellipsis",
-                        }}
-                      >
-                        {phrase.translation}
-                      </p>
-
-                      {/* Кнопка изучения */}
-                      <button
-                        type="button"
-                        onClick={() => void handleTogglePhrase(phrase.id)}
-                        style={{
-                          width: 28,
-                          height: 28,
-                          borderRadius: 8,
-                          border: `1px solid ${isSelected ? "rgba(63,160,107,0.6)" : T.lineCool}`,
-                          background: isSelected ? T.greenDim : "transparent",
-                          color: isSelected ? T.green : T.textFaint,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          cursor: "pointer",
-                          flexShrink: 0,
-                          transition: "all 0.15s",
-                        }}
-                      >
-                        {isPending ? (
-                          <span style={{ fontSize: 9 }}>…</span>
-                        ) : isSelected ? (
-                          <Check size={12} />
-                        ) : (
-                          <Plus size={12} />
-                        )}
-                      </button>
+                      )}
                     </div>
-                  );
-                })}
-              </div>
-            )}
-          </main>
+                    {/* Перевод */}
+                    <p style={{ flex: 1, fontSize: 14, color: T.textMut, minWidth: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", transition: "color 0.4s" }}>
+                      {phrase.translation}
+                    </p>
+                    {/* Кнопка */}
+                    <button
+                      type="button"
+                      onClick={() => void handleTogglePhrase(phrase.id)}
+                      style={{
+                        width: 28, height: 28, borderRadius: 8,
+                        border: `1px solid ${isSelected ? "rgba(63,160,107,0.6)" : T.lineCool}`,
+                        background: isSelected ? T.greenDim : "transparent",
+                        color: isSelected ? T.green : T.textFaint,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        cursor: "pointer", flexShrink: 0, transition: "all 0.15s",
+                      }}
+                    >
+                      {isPending ? <span style={{ fontSize: 9 }}>…</span> : isSelected ? <Check size={13} /> : <Plus size={13} />}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
-
-      <style>{`
-        @keyframes pulse {
-          0%, 100% { opacity: 0.6; }
-          50% { opacity: 0.3; }
-        }
-        * { box-sizing: border-box; }
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: rgba(157,176,199,0.2); border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: rgba(157,176,199,0.35); }
-        input[type='search']::-webkit-search-cancel-button { display: none; }
-      `}</style>
-    </>
+    </div>
   );
 }
