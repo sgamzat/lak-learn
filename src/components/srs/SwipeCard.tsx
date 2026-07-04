@@ -5,29 +5,25 @@ import { motion, useMotionValue, useTransform } from "framer-motion";
 import type { FlashcardData, SRSRating } from "@/types/srs";
 
 interface SwipeCardProps {
-  card: FlashcardData;
-  isRevealed: boolean;
-  onReveal: () => void;
-  onRate: (rating: SRSRating) => void;
+  card:         FlashcardData;
+  isRevealed:   boolean;
+  onReveal:     () => void;
+  onRate:       (rating: SRSRating) => void;
   reduceMotion: boolean;
 }
 
-// Порог свайпа в пикселях — дальше этого карточка улетает
 const SWIPE_THRESHOLD = 80;
 
 export function SwipeCard({ card, isRevealed, onReveal, onRate, reduceMotion }: SwipeCardProps) {
   const cardRef = useRef<HTMLDivElement>(null);
 
-  // Motion values для drag
-  const x = useMotionValue(0);
-  const rotate = useTransform(x, [-200, 0, 200], [-12, 0, 12]);
-  const opacity = useTransform(x, [-200, -80, 0, 80, 200], [0, 1, 1, 1, 0]);
-
-  // Индикаторы — появляются при свайпе
+  const x           = useMotionValue(0);
+  const rotate      = useTransform(x, [-200, 0, 200], [-12, 0, 12]);
+  const opacity     = useTransform(x, [-200, -80, 0, 80, 200], [0, 1, 1, 1, 0]);
   const forgotOpacity = useTransform(x, [-120, -40, 0], [1, 0.4, 0]);
   const knowOpacity   = useTransform(x, [0, 40, 120], [0, 0.4, 1]);
 
-  const [isDragging, setIsDragging] = useState(false);
+  const [isDragging, setIsDragging]     = useState(false);
   const [dragDirection, setDragDirection] = useState<"left" | "right" | null>(null);
 
   const handleDragStart = () => {
@@ -37,28 +33,23 @@ export function SwipeCard({ card, isRevealed, onReveal, onRate, reduceMotion }: 
 
   const handleDrag = (_: unknown, info: { offset: { x: number } }) => {
     if (!isRevealed) return;
-    if (info.offset.x < -20) setDragDirection("left");
-    else if (info.offset.x > 20) setDragDirection("right");
-    else setDragDirection(null);
+    if (info.offset.x < -20)      setDragDirection("left");
+    else if (info.offset.x > 20)  setDragDirection("right");
+    else                          setDragDirection(null);
   };
 
   const handleDragEnd = (_: unknown, info: { offset: { x: number }; velocity: { x: number } }) => {
     setIsDragging(false);
     setDragDirection(null);
 
-    if (!isRevealed) {
-      // Если карточка не открыта — свайп просто возвращает на место
-      x.set(0);
-      return;
-    }
+    if (!isRevealed) { x.set(0); return; }
 
-    const swipedFar   = Math.abs(info.offset.x)   > SWIPE_THRESHOLD;
-    const swipedFast  = Math.abs(info.velocity.x)  > 400;
+    const swipedFar  = Math.abs(info.offset.x)  > SWIPE_THRESHOLD;
+    const swipedFast = Math.abs(info.velocity.x) > 400;
 
     if (swipedFar || swipedFast) {
       onRate(info.offset.x < 0 ? "forgot" : "know");
     } else {
-      // Пружина назад
       x.set(0);
     }
   };
@@ -68,10 +59,17 @@ export function SwipeCard({ card, isRevealed, onReveal, onRate, reduceMotion }: 
     if (!isRevealed) onReveal();
   };
 
+  // Грамматическая метка: «Сущ. · ж» или «Глаг. · несов.»
+  const grammarLabel = [
+    card.partOfSpeech,
+    card.gender,
+    card.verbAspect,
+  ].filter(Boolean).join(" · ");
+
   return (
     <div className="relative select-none">
 
-      {/* ── Индикатор «Не знаю» (левый) ─────────────────────────────────── */}
+      {/* ── Индикатор «Не знаю» ───────────────────────────────────────────── */}
       <motion.div
         style={{ opacity: forgotOpacity }}
         className="pointer-events-none absolute inset-y-4 left-4 z-10 flex items-center"
@@ -82,7 +80,7 @@ export function SwipeCard({ card, isRevealed, onReveal, onRate, reduceMotion }: 
         </div>
       </motion.div>
 
-      {/* ── Индикатор «Знаю» (правый) ────────────────────────────────────── */}
+      {/* ── Индикатор «Знаю» ──────────────────────────────────────────────── */}
       <motion.div
         style={{ opacity: knowOpacity }}
         className="pointer-events-none absolute inset-y-4 right-4 z-10 flex items-center"
@@ -93,7 +91,7 @@ export function SwipeCard({ card, isRevealed, onReveal, onRate, reduceMotion }: 
         </div>
       </motion.div>
 
-      {/* ── Сама карточка ────────────────────────────────────────────────── */}
+      {/* ── Карточка ──────────────────────────────────────────────────────── */}
       <motion.div
         ref={cardRef}
         style={reduceMotion ? {} : { x, rotate, opacity }}
@@ -108,17 +106,31 @@ export function SwipeCard({ card, isRevealed, onReveal, onRate, reduceMotion }: 
         className={[
           "relative w-full cursor-pointer rounded-3xl bg-white p-8 text-center shadow-lg",
           "transition-shadow duration-200",
-          isDragging ? "shadow-2xl" : "hover:shadow-xl",
+          isDragging       ? "shadow-2xl"          : "hover:shadow-xl",
           dragDirection === "left"  ? "ring-2 ring-red-200"     : "",
           dragDirection === "right" ? "ring-2 ring-emerald-200" : "",
         ].join(" ")}
       >
 
-        {/* Часть речи */}
-        {card.partOfSpeech && (
-          <span className="mb-4 inline-block rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-600">
-            {card.partOfSpeech}
-          </span>
+        {/* Грамматика: часть речи + род + вид */}
+        {grammarLabel && (
+          <div className="mb-4 flex flex-wrap justify-center gap-1.5">
+            {card.partOfSpeech && (
+              <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-600">
+                {card.partOfSpeech}
+              </span>
+            )}
+            {card.gender && (
+              <span className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-600">
+                {card.gender === "м" ? "муж. р." : card.gender === "ж" ? "жен. р." : "ср. р."}
+              </span>
+            )}
+            {card.verbAspect && (
+              <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-600">
+                {card.verbAspect}
+              </span>
+            )}
+          </div>
         )}
 
         {/* Лакское слово */}
@@ -141,21 +153,51 @@ export function SwipeCard({ card, isRevealed, onReveal, onRate, reduceMotion }: 
             : "w-6 border-t border-dashed border-gray-200",
         ].join(" ")} />
 
-        {/* Перевод + пример — появляются после тапа */}
+        {/* ── Обратная сторона — появляется после тапа ────────────────────── */}
         <div className={[
           "overflow-hidden transition-all duration-300 ease-out",
-          isRevealed ? "mt-5 max-h-72 opacity-100" : "max-h-0 opacity-0",
+          isRevealed ? "mt-5 max-h-96 opacity-100" : "max-h-0 opacity-0",
         ].join(" ")}>
+
+          {/* Перевод */}
           <p className="text-2xl font-semibold text-gray-800">
             {card.translation}
           </p>
+
+          {/* Пометы: устар., разг. и т.д. */}
+          {card.notes && (
+            <p className="mt-1 text-xs text-amber-600 italic">
+              {card.notes}
+            </p>
+          )}
+
+          {/* Пример */}
           {card.exampleSentence && (
             <p className="mt-3 text-sm italic leading-relaxed text-gray-400">
               «{card.exampleSentence}»
             </p>
           )}
 
-          {/* Кнопки — запасной вариант для тех кто не хочет свайпать */}
+          {/* Синонимы — другие лакские слова с тем же переводом */}
+          {card.synonyms && card.synonyms.length > 0 && (
+            <div className="mt-4 rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3 text-left">
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+                Другие слова для «{card.translation}»
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {card.synonyms.map((s) => (
+                  <span
+                    key={s.id}
+                    className="rounded-lg bg-white px-3 py-1 text-sm font-medium text-gray-700 border border-gray-200"
+                  >
+                    {s.lemma}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Кнопки оценки */}
           <div className="mt-6 flex gap-3">
             <button
               type="button"
@@ -163,7 +205,7 @@ export function SwipeCard({ card, isRevealed, onReveal, onRate, reduceMotion }: 
               className="flex flex-1 items-center justify-center gap-2 rounded-2xl border-2 border-red-100 bg-red-50 py-3 text-sm font-semibold text-red-600 transition hover:bg-red-100 active:scale-[0.97]"
             >
               <span className="text-lg">✕</span>
-              Не знаю
+              Не знал
             </button>
             <button
               type="button"
@@ -171,7 +213,7 @@ export function SwipeCard({ card, isRevealed, onReveal, onRate, reduceMotion }: 
               className="flex flex-1 items-center justify-center gap-2 rounded-2xl border-2 border-emerald-100 bg-emerald-50 py-3 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 active:scale-[0.97]"
             >
               <span className="text-lg">✓</span>
-              Знаю
+              Знал
             </button>
           </div>
         </div>
@@ -182,6 +224,7 @@ export function SwipeCard({ card, isRevealed, onReveal, onRate, reduceMotion }: 
             Нажмите чтобы открыть
           </p>
         )}
+
       </motion.div>
     </div>
   );

@@ -1,28 +1,45 @@
+// src/app/api/srs/queue/route.ts
 import { NextResponse } from "next/server";
 import { getAuthContextFromRequest } from "@/lib/server/auth";
 import { query } from "@/lib/server/db";
 import { setAccessCookie } from "@/lib/server/session";
 import type { FlashcardData, IntervalState } from "@/types/srs";
 
+// ─── Тип строки из БД ────────────────────────────────────────────────────────
+
 type QueueRow = {
-  id: string;
-  word: string;
-  transcription: string | null;
-  part_of_speech: string | null;
-  translation: string;
+  id:               string;
+  word:             string;
+  transcription:    string | null;
+  part_of_speech:   string | null;
+  gender:           string | null;
+  verb_aspect:      string | null;
+  word_type:        string;
+  notes:            string | null;
+  translation:      string;
+  synonym_group_id: string | null;
   example_sentence: string | null;
-  due_at: string | null;
-  interval_state: IntervalState;
-  repetition: number;
+  due_at:           string | null;
+  interval_state:   IntervalState;
+  repetition:       number;
 };
+
+type SynonymRow = {
+  word_id:          number;
+  lemma:            string;
+  synonym_group_id: string;
+};
+
+// ─── GET /api/srs/queue ───────────────────────────────────────────────────────
 
 export async function GET(request: Request) {
   const auth = await getAuthContextFromRequest(request);
-
   if (!auth) {
     return NextResponse.json({ error: "Не авторизован" }, { status: 401 });
   }
 
+  // Основной запрос — только translation_priority = 1
+  // Синонимы (priority > 1) НЕ попадают в SRS-очередь
   const rowsResult = await query<QueueRow>(
     `
       WITH selected_collections_words AS (
@@ -33,6 +50,7 @@ export async function GET(request: Request) {
         WHERE usc.user_id = $1
           AND c.is_active = TRUE
           AND c.is_public = TRUE
+          AND w.translation_priority = 1
           AND (
             EXISTS (
               SELECT 1
@@ -40,13 +58,11 @@ export async function GET(request: Request) {
               JOIN word_tags wt ON wt.tag_id = t.id
               WHERE wt.word_id = w.id
                 AND LOWER(t.code) = ANY (
-                  SELECT LOWER(value)
-                  FROM unnest(c.rule_tag_codes) AS value
+                  SELECT LOWER(value) FROM unnest(c.rule_tag_codes) AS value
                 )
             )
             OR EXISTS (
-              SELECT 1
-              FROM collection_words cw
+              SELECT 1 FROM collection_words cw
               WHERE cw.collection_id = c.id
                 AND cw.word_id = w.id
                 AND cw.is_manual = TRUE
@@ -54,8 +70,7 @@ export async function GET(request: Request) {
             )
           )
           AND NOT EXISTS (
-            SELECT 1
-            FROM collection_words cw
+            SELECT 1 FROM collection_words cw
             WHERE cw.collection_id = c.id
               AND cw.word_id = w.id
               AND cw.is_excluded = TRUE
@@ -67,17 +82,9 @@ export async function GET(request: Request) {
         JOIN words w ON w.id = usw.word_id
         WHERE usw.user_id = $1
           AND w.is_active = TRUE
+          AND w.translation_priority = 1
         UNION
-        SELECT word_id
-        FROM selected_collections_words
-      ),
-      latest_review AS (
-        SELECT DISTINCT ON (rh.word_id)
-          rh.word_id,
-          rh.next_review_at
-        FROM review_history rh
-        WHERE rh.user_id = $1
-        ORDER BY rh.word_id, rh.reviewed_at DESC, rh.id DESC
+        SELECT word_id FROM selected_collections_words
       ),
       card_state AS (
         SELECT usc.word_id, usc.due_at, usc.repetition
@@ -85,60 +92,101 @@ export async function GET(request: Request) {
         WHERE usc.user_id = $1
       )
       SELECT
-        w.id::text AS id,
-        w.lemma AS word,
+        w.id::text                                                        AS id,
+        w.lemma                                                           AS word,
         w.transcription,
         w.part_of_speech,
+        w.gender,
+        w.verb_aspect,
+        w.word_type,
+        w.notes,
         w.translation,
-        ex.sentence_src AS example_sentence,
-        COALESCE(cs.due_at, lr.next_review_at)::text AS due_at,
-        COALESCE(cs.repetition, 0) AS repetition,
+        w.synonym_group_id,
+        (
+          SELECT we.sentence_src || COALESCE(' — ' || we.sentence_translation, '')
+          FROM word_examples we
+          WHERE we.word_id = w.id
+          LIMIT 1
+        )                                                                 AS example_sentence,
+        cs.due_at,
         CASE
-          WHEN COALESCE(cs.due_at, lr.next_review_at) IS NULL OR COALESCE(cs.due_at, lr.next_review_at) <= NOW() THEN 'overdue'
-          WHEN COALESCE(cs.due_at, lr.next_review_at) <= NOW() + INTERVAL '24 hours' THEN 'dueSoon'
-          ELSE 'scheduled'
-        END AS interval_state
+          WHEN cs.due_at IS NULL                    THEN 'scheduled'
+          WHEN cs.due_at <= NOW()                   THEN 'overdue'
+          WHEN cs.due_at <= NOW() + INTERVAL '1 day' THEN 'dueSoon'
+          ELSE                                           'scheduled'
+        END::text                                                         AS interval_state,
+        COALESCE(cs.repetition, 0)                                        AS repetition
       FROM selected_words sw
       JOIN words w ON w.id = sw.word_id
-      LEFT JOIN latest_review lr ON lr.word_id = w.id
       LEFT JOIN card_state cs ON cs.word_id = w.id
-      LEFT JOIN LATERAL (
-        SELECT sentence_src
-        FROM word_examples we
-        WHERE we.word_id = w.id
-        ORDER BY we.id ASC
-        LIMIT 1
-      ) ex ON TRUE
       ORDER BY
         CASE
-          WHEN COALESCE(cs.due_at, lr.next_review_at) IS NULL OR COALESCE(cs.due_at, lr.next_review_at) <= NOW() THEN 0
-          WHEN COALESCE(cs.due_at, lr.next_review_at) <= NOW() + INTERVAL '24 hours' THEN 1
-          ELSE 2
+          WHEN cs.due_at IS NULL    THEN 2
+          WHEN cs.due_at <= NOW()   THEN 0
+          ELSE                           1
         END ASC,
-        COALESCE(cs.due_at, lr.next_review_at, NOW()) ASC,
-        w.id ASC
-      LIMIT 200
+        cs.due_at ASC NULLS LAST
+      LIMIT 50
     `,
     [auth.user.id]
   );
 
-  const payload: FlashcardData[] = rowsResult.rows.map((row: QueueRow) => ({
-    id: row.id,
-    word: row.word,
-    transcription: row.transcription ?? "",
-    partOfSpeech: row.part_of_speech ?? "—",
-    translation: row.translation,
-    exampleSentence: row.example_sentence ?? "",
-    intervalState: row.interval_state,
-    nextReviewDate: row.due_at ?? new Date().toISOString(),
-    repetition: row.repetition ?? 0,
-  }));
-
-  const response = NextResponse.json(payload, { status: 200 });
-
-  if (auth.refreshedAccessToken) {
-    setAccessCookie(response, auth.refreshedAccessToken);
+  if (rowsResult.rows.length === 0) {
+    const response = NextResponse.json([], { status: 200 });
+    if (auth.refreshedAccessToken) setAccessCookie(response, auth.refreshedAccessToken);
+    return response;
   }
 
+  // Подтягиваем синонимы для всех слов у которых есть synonym_group_id
+  // Они показываются на карточке как справка — не изучаются
+  const groupIds = [...new Set(
+    rowsResult.rows
+      .map(r => r.synonym_group_id)
+      .filter((g): g is string => g !== null)
+  )];
+
+  const synonymMap = new Map<string, { id: number; lemma: string }[]>();
+
+  if (groupIds.length > 0) {
+    const synResult = await query<SynonymRow>(
+      `SELECT id AS word_id, lemma, synonym_group_id
+       FROM words
+       WHERE synonym_group_id = ANY($1)
+         AND translation_priority > 1
+         AND is_active = TRUE
+       ORDER BY translation_priority ASC`,
+      [groupIds]
+    );
+
+    for (const row of synResult.rows) {
+      const list = synonymMap.get(row.synonym_group_id) ?? [];
+      list.push({ id: row.word_id, lemma: row.lemma });
+      synonymMap.set(row.synonym_group_id, list);
+    }
+  }
+
+  // Формируем FlashcardData
+  const queue: FlashcardData[] = rowsResult.rows.map((row) => ({
+    id:              row.id,
+    word:            row.word,
+    transcription:   row.transcription ?? "",
+    partOfSpeech:    row.part_of_speech ?? "",
+    gender:          (row.gender as FlashcardData["gender"]) ?? null,
+    verbAspect:      (row.verb_aspect as FlashcardData["verbAspect"]) ?? null,
+    wordType:        (row.word_type as FlashcardData["wordType"]) ?? "word",
+    notes:           row.notes ?? null,
+    translation:     row.translation,
+    exampleSentence: row.example_sentence ?? "",
+    // Синонимы — только лакские слова, показываем на обратной стороне карточки
+    synonyms:        row.synonym_group_id
+      ? (synonymMap.get(row.synonym_group_id) ?? [])
+      : [],
+    intervalState:   row.interval_state as IntervalState,
+    nextReviewDate:  row.due_at ?? new Date().toISOString(),
+    repetition:      row.repetition,
+  }));
+
+  const response = NextResponse.json(queue, { status: 200 });
+  if (auth.refreshedAccessToken) setAccessCookie(response, auth.refreshedAccessToken);
   return response;
 }
