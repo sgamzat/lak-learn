@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { Search, Pencil, Trash2, Check, X } from "lucide-react";
 
 // ── Типы ─────────────────────────────────────────────────────────────────────
@@ -294,6 +294,11 @@ export function AdminWordsPanel() {
   const [loading,  setLoading]  = useState(false);
   const [status,   setStatus]   = useState<StatusState>({ type: "idle" });
   const [searched, setSearched] = useState(false);
+  const [newLemma, setNewLemma] = useState("");
+  const [newTranslation, setNewTranslation] = useState("");
+  const [newTranscription, setNewTranscription] = useState("");
+  const [newPartOfSpeech, setNewPartOfSpeech] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -353,12 +358,103 @@ export function AdminWordsPanel() {
     setTimeout(() => setStatus({ type: "idle" }), 3000);
   }
 
+  async function createWord(event: FormEvent) {
+    event.preventDefault();
+    setIsCreating(true);
+    setStatus({ type: "idle" });
+
+    try {
+      const res = await fetch("/api/admin/words", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          lemma: newLemma,
+          translation: newTranslation,
+          transcription: newTranscription || undefined,
+          partOfSpeech: newPartOfSpeech || undefined,
+        }),
+      });
+
+      const payload = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        id?: number;
+        lemma?: string;
+        translation?: string;
+        transcription?: string | null;
+        partOfSpeech?: string | null;
+      };
+
+      if (!res.ok) {
+        setStatus({ type: "error", message: payload.error ?? "Не удалось добавить слово" });
+        return;
+      }
+
+      const created: Word = {
+        id: payload.id ?? Date.now(),
+        lemma: payload.lemma ?? newLemma.trim(),
+        translation: payload.translation ?? newTranslation.trim(),
+        transcription: payload.transcription ?? (newTranscription.trim() || null),
+        partOfSpeech: payload.partOfSpeech ?? (newPartOfSpeech.trim() || null),
+      };
+
+      setWords((prev) => [created, ...prev]);
+      setSearched(true);
+      setQuery(created.lemma);
+      setNewLemma("");
+      setNewTranslation("");
+      setNewTranscription("");
+      setNewPartOfSpeech("");
+      setStatus({ type: "success", message: `«${created.lemma}» добавлено` });
+      setTimeout(() => setStatus({ type: "idle" }), 3000);
+    } catch {
+      setStatus({ type: "error", message: "Сетевая ошибка при создании" });
+    } finally {
+      setIsCreating(false);
+    }
+  }
+
   return (
     <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
       <h2 className="text-lg font-semibold">Все слова</h2>
       <p className="mt-0.5 text-sm text-gray-500">
-        Поиск по всей базе, инлайн-редактирование и удаление.
+        Создание, поиск, инлайн-редактирование и удаление.
       </p>
+
+      <form onSubmit={(e) => void createWord(e)} className="mt-4 grid grid-cols-1 gap-2 rounded-xl border border-blue-200 bg-blue-50 p-3 sm:grid-cols-5">
+        <input
+          value={newLemma}
+          onChange={(e) => setNewLemma(e.target.value)}
+          required
+          placeholder="Лакское слово"
+          className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm"
+        />
+        <input
+          value={newTranslation}
+          onChange={(e) => setNewTranslation(e.target.value)}
+          required
+          placeholder="Перевод"
+          className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm"
+        />
+        <input
+          value={newTranscription}
+          onChange={(e) => setNewTranscription(e.target.value)}
+          placeholder="Транскрипция"
+          className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm"
+        />
+        <input
+          value={newPartOfSpeech}
+          onChange={(e) => setNewPartOfSpeech(e.target.value)}
+          placeholder="Часть речи"
+          className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm"
+        />
+        <button
+          type="submit"
+          disabled={isCreating}
+          className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+        >
+          {isCreating ? "Добавление…" : "Добавить"}
+        </button>
+      </form>
 
       {/* Поиск */}
       <div className="relative mt-4">

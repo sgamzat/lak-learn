@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getPageAuthContext } from "@/lib/server/page-auth";
-import { AppBreadcrumb } from "@/components/AppBreadcrumb";
+import { AppShell } from "@/components/AppShell";
 
 export default async function AppGroupLayout({
   children,
@@ -8,12 +8,5 @@ export default async function AppGroupLayout({
   const auth = await getPageAuthContext();
   if (!auth) redirect("/login");
 
-  return (
-    // Убираем bg-gray-50 — каждая страница управляет своим фоном сама.
-    // DashboardShell имеет собственный тёмный фон.
-    <div className="min-h-screen">
-      <AppBreadcrumb />
-      {children}
-    </div>
-  );
+  return <AppShell>{children}</AppShell>;
 }

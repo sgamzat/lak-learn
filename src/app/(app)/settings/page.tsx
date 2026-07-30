@@ -1,41 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import { useTheme, DARK_THEMES, LIGHT_THEMES, type ThemeOption } from "@/components/ThemeProvider";
-
-/* ── Переключатель темы ─────────────────────────────────────────── */
-function ThemeToggle() {
-  const { isDark, toggleMode, tokens: T } = useTheme();
-  return (
-    <div
-      onClick={toggleMode}
-      role="switch"
-      aria-checked={isDark}
-      style={{
-        width: 44, height: 24, borderRadius: 99,
-        background: isDark ? T.goldDim : "rgba(0,0,0,0.08)",
-        border: `1px solid ${isDark ? T.goldBorder : T.line}`,
-        position: "relative", cursor: "pointer",
-        transition: "all 0.3s", flexShrink: 0,
-      }}
-    >
-      <span style={{
-        position: "absolute", top: 2, left: 2,
-        width: 18, height: 18, borderRadius: "50%",
-        background: isDark ? T.gold : T.textMut,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: 10, lineHeight: 1,
-        transform: isDark ? "translateX(20px)" : "translateX(0)",
-        transition: "transform 0.25s cubic-bezier(0.4,0,0.2,1), background 0.25s",
-        boxShadow: "0 1px 4px rgba(0,0,0,0.4)",
-      }}>
-        {isDark ? "🌙" : "☀️"}
-      </span>
-    </div>
-  );
-}
+import { ThemeToggle } from "@/components/AppShell";
 
 /* ── Карточка темы ──────────────────────────────────────────────
    Принимает ThemeOption напрямую — поля bg/gold/green (не preview*)
@@ -146,19 +113,7 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-lk-bg font-sans text-lk-text transition-colors duration-[400ms]">
-
-      {/* Хедер */}
-      <div className="sticky top-0 z-20 border-b border-lk-line bg-lk-bg/93 backdrop-blur-[12px] transition-colors duration-[400ms]">
-        <div className="mx-auto flex h-[52px] max-w-[720px] items-center gap-3.5 px-5">
-          <Link href="/dashboard" className="flex items-center gap-1.5 text-[13px] text-lk-muted no-underline">
-            <ArrowLeft size={15} /> Главная
-          </Link>
-          <span className="text-lk-faint">/</span>
-          <span className="text-[13px] font-semibold text-lk-text">Настройки</span>
-        </div>
-      </div>
-
+    <div className="bg-lk-bg font-sans text-lk-text transition-colors duration-[400ms]">
       <div style={{ maxWidth: 720, margin: "0 auto", padding: "28px 20px 64px" }}>
         <div style={{ fontFamily: T.serif, fontSize: 22, fontWeight: 700, marginBottom: 4 }}>
           Настройки профиля

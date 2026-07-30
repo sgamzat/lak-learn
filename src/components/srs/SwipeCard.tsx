@@ -198,22 +198,33 @@ export function SwipeCard({ card, isRevealed, onReveal, onRate, reduceMotion }: 
           )}
 
           {/* Кнопки оценки */}
-          <div className="mt-6 flex gap-3">
+          <div className="mt-6 flex gap-2">
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onRate("forgot"); }}
-              className="flex flex-1 items-center justify-center gap-2 rounded-2xl border-2 border-red-100 bg-red-50 py-3 text-sm font-semibold text-red-600 transition hover:bg-red-100 active:scale-[0.97]"
+              className="flex flex-1 flex-col items-center gap-1 rounded-2xl border-2 border-red-100 bg-red-50 py-3 text-sm font-semibold text-red-600 transition hover:bg-red-100 active:scale-[0.97]"
             >
-              <span className="text-lg">✕</span>
-              Не знал
+              <span className="text-lg leading-none">✕</span>
+              Забыл
+              <span className="font-mono text-[10px] opacity-60">1</span>
+            </button>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onRate("unsure"); }}
+              className="flex flex-1 flex-col items-center gap-1 rounded-2xl border-2 border-amber-100 bg-amber-50 py-3 text-sm font-semibold text-amber-700 transition hover:bg-amber-100 active:scale-[0.97]"
+            >
+              <span className="text-lg leading-none">~</span>
+              Не уверен
+              <span className="font-mono text-[10px] opacity-60">2</span>
             </button>
             <button
               type="button"
               onClick={(e) => { e.stopPropagation(); onRate("know"); }}
-              className="flex flex-1 items-center justify-center gap-2 rounded-2xl border-2 border-emerald-100 bg-emerald-50 py-3 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 active:scale-[0.97]"
+              className="flex flex-1 flex-col items-center gap-1 rounded-2xl border-2 border-emerald-100 bg-emerald-50 py-3 text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 active:scale-[0.97]"
             >
-              <span className="text-lg">✓</span>
-              Знал
+              <span className="text-lg leading-none">✓</span>
+              Знаю
+              <span className="font-mono text-[10px] opacity-60">3</span>
             </button>
           </div>
         </div>
@@ -221,10 +232,15 @@ export function SwipeCard({ card, isRevealed, onReveal, onRate, reduceMotion }: 
         {/* Подсказка когда закрыто */}
         {!isRevealed && (
           <p className="mt-4 text-xs text-gray-400">
-            Нажмите чтобы открыть
+            Нажмите чтобы открыть · Space / Enter
           </p>
         )}
 
+        {isRevealed && (
+          <p className="mt-3 text-center text-xs text-gray-400">
+            1 — забыл · 2 — не уверен · 3 — знаю · или свайп ← / →
+          </p>
+        )}
       </motion.div>
     </div>
   );

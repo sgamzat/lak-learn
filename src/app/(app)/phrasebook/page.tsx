@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getStudySelection, setStudySelection } from "@/lib/api/client";
 import {
-  Search, Check, Plus, ChevronRight, Volume2, X, ArrowLeft,
+  Search, Check, Plus, ChevronRight, Volume2, X,
 } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 
@@ -305,14 +305,15 @@ export default function PhrasebookPage() {
   return (
     <div className="flex min-h-screen flex-col bg-lk-bg font-sans text-lk-text transition-colors duration-[400ms]">
 
-      {/* ── Хедер ── */}
-      <header className="sticky top-0 z-30 flex h-[60px] items-center gap-4 border-b border-lk-line bg-lk-bg/93 px-6 backdrop-blur-[12px] transition-colors duration-[400ms]">
-        <a href="/dashboard" className="flex items-center gap-1.5 rounded-[10px] border border-lk-line-cool px-2.5 py-1 text-[13px] text-lk-muted no-underline transition-colors duration-150">
-          <ArrowLeft size={14} /> Главная
-        </a>
-        <div>
-          <h1 className="font-serif text-[22px] font-bold leading-none text-lk-text transition-colors duration-[400ms]">Разговорник</h1>
-          {hasLoaded && <p className="mt-0.5 text-xs text-lk-faint transition-colors duration-[400ms]">{allTopics.length} тем · {selectedWordIds.size} фраз в изучении</p>}
+      {/* ── Хедер страницы ── */}
+      <div className="flex flex-wrap items-center gap-4 border-b border-lk-line px-6 py-4">
+        <div className="min-w-0 flex-1">
+          <h1 className="font-serif text-[22px] font-bold leading-none text-lk-text">Разговорник</h1>
+          {hasLoaded && (
+            <p className="mt-1 text-xs text-lk-faint">
+              {allTopics.length} тем · {selectedWordIds.size} фраз в изучении
+            </p>
+          )}
         </div>
 
         {/* Поиск */}
@@ -344,7 +345,7 @@ export default function PhrasebookPage() {
             </button>
           ))}
         </div>
-      </header>
+      </div>
 
       {/* ── Основная сетка ── */}
       <div style={{ display: "flex", flex: 1, maxWidth: 1280, width: "100%", margin: "0 auto", padding: "20px 24px", gap: 24, alignItems: "flex-start" }}>

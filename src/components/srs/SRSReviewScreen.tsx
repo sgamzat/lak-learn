@@ -207,8 +207,10 @@ export function SRSReviewScreen() {
         e.preventDefault();
         dispatch({ type: "reveal" });
       }
-      if (e.key === "ArrowLeft"  && state.isRevealed) handleRate("forgot");
-      if (e.key === "ArrowRight" && state.isRevealed) handleRate("know");
+      if (!state.isRevealed) return;
+      if (e.key === "1" || e.key === "ArrowLeft") handleRate("forgot");
+      if (e.key === "2") handleRate("unsure");
+      if (e.key === "3" || e.key === "ArrowRight") handleRate("know");
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
