@@ -115,45 +115,45 @@ export default function LettersPage() {
   };
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-6 space-y-6">
+    <div className="mx-auto min-h-screen max-w-5xl space-y-6 bg-lk-bg px-4 py-6 font-sans text-lk-text transition-colors duration-[400ms]">
 
       {/* Заголовок */}
-      <section className="rounded-2xl border border-gray-200 bg-white p-6">
+      <section className="lk-card rounded-2xl p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Лакский алфавит</h1>
-            <p className="mt-1 text-sm text-gray-500">
+            <h1 className="font-serif text-2xl font-bold text-lk-text">Лакский алфавит</h1>
+            <p className="mt-1 text-sm text-lk-muted">
               {LAK_ALPHABET.length} букв · {LAK_ALPHABET.filter((l) => l.isSpecial).length} специфических лакских символов
             </p>
           </div>
-          <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-800 select-none">
+          <label className="inline-flex cursor-pointer select-none items-center gap-2 rounded-xl border border-lk-gold-border bg-lk-gold-dim px-4 py-2 text-sm font-medium text-lk-gold">
             <input
               type="checkbox"
               checked={showSpecialOnly}
               onChange={(e) => setShowSpecialOnly(e.target.checked)}
-              className="accent-amber-500"
+              className="accent-[var(--lk-gold)]"
             />
             Только лакские символы
           </label>
         </div>
-        <div className="mt-4 flex flex-wrap gap-3 text-xs text-gray-500">
+        <div className="mt-4 flex flex-wrap gap-3 text-xs text-lk-muted">
           <span className="inline-flex items-center gap-1.5">
-            <span className="inline-block h-2.5 w-2.5 rounded-full bg-amber-400" />
+            <span className="inline-block h-2.5 w-2.5 rounded-full bg-lk-gold" />
             Специфический лакский звук
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <span className="inline-block h-2.5 w-2.5 rounded-full bg-gray-200" />
+            <span className="inline-block h-2.5 w-2.5 rounded-full bg-lk-navy3" />
             Общий с русским
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <span className="inline-block h-2.5 w-2.5 rounded-full bg-blue-500" />
+            <span className="inline-block h-2.5 w-2.5 rounded-full bg-lk-blue" />
             Выбранная буква
           </span>
         </div>
       </section>
 
       {/* Сетка букв */}
-      <section className="rounded-2xl border border-gray-200 bg-white p-6">
+      <section className="lk-card rounded-2xl p-6">
         <div className="flex flex-wrap gap-2">
           {displayedAlphabet.map((letter) => {
             const isActive = selectedLetter?.char === letter.char;

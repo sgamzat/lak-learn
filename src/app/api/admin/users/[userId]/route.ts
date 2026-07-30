@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAuthContextFromRequest } from "@/lib/server/auth";
+import { requireAdmin } from "@/lib/server/auth";
 import { withTransaction } from "@/lib/server/db";
 import { setAccessCookie } from "@/lib/server/session";
 
@@ -16,15 +16,13 @@ type ExistingUserRow = {
 };
 
 export async function PATCH(request: Request, { params }: { params: { userId: string } }) {
-  const auth = await getAuthContextFromRequest(request);
+  const guard = await requireAdmin(request);
 
-  if (!auth) {
-    return NextResponse.json({ error: "Не авторизован" }, { status: 401 });
+  if (!guard.auth || guard.response) {
+    return guard.response;
   }
 
-  if (auth.user.role !== "admin") {
-    return NextResponse.json({ error: "Недостаточно прав" }, { status: 403 });
-  }
+  const auth = guard.auth;
 
   const userId = params.userId;
 
@@ -129,15 +127,13 @@ export async function PATCH(request: Request, { params }: { params: { userId: st
 }
 
 export async function DELETE(request: Request, { params }: { params: { userId: string } }) {
-  const auth = await getAuthContextFromRequest(request);
+  const guard = await requireAdmin(request);
 
-  if (!auth) {
-    return NextResponse.json({ error: "Не авторизован" }, { status: 401 });
+  if (!guard.auth || guard.response) {
+    return guard.response;
   }
 
-  if (auth.user.role !== "admin") {
-    return NextResponse.json({ error: "Недостаточно прав" }, { status: 403 });
-  }
+  const auth = guard.auth;
 
   const userId = params.userId;
 

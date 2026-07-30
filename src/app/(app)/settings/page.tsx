@@ -146,36 +146,16 @@ export default function SettingsPage() {
   };
 
   return (
-    <div style={{
-      minHeight: "100vh",
-      background: T.bg,
-      fontFamily: T.sans,
-      color: T.text,
-      transition: "background 0.4s, color 0.4s",
-    }}>
+    <div className="min-h-screen bg-lk-bg font-sans text-lk-text transition-colors duration-[400ms]">
 
       {/* Хедер */}
-      <div style={{
-        backdropFilter: "blur(12px)",
-        WebkitBackdropFilter: "blur(12px)",
-        borderBottom: `1px solid ${T.line}`,
-        position: "sticky", top: 0, zIndex: 20,
-        background: `${T.bg}ee`,
-        transition: "background 0.4s",
-      }}>
-        <div style={{
-          maxWidth: 720, margin: "0 auto",
-          padding: "0 20px", height: 52,
-          display: "flex", alignItems: "center", gap: 14,
-        }}>
-          <Link href="/dashboard" style={{
-            display: "flex", alignItems: "center", gap: 6,
-            color: T.textMut, textDecoration: "none", fontSize: 13,
-          }}>
+      <div className="sticky top-0 z-20 border-b border-lk-line bg-lk-bg/93 backdrop-blur-[12px] transition-colors duration-[400ms]">
+        <div className="mx-auto flex h-[52px] max-w-[720px] items-center gap-3.5 px-5">
+          <Link href="/dashboard" className="flex items-center gap-1.5 text-[13px] text-lk-muted no-underline">
             <ArrowLeft size={15} /> Главная
           </Link>
-          <span style={{ color: T.textFaint }}>/</span>
-          <span style={{ fontSize: 13, fontWeight: 600, color: T.text }}>Настройки</span>
+          <span className="text-lk-faint">/</span>
+          <span className="text-[13px] font-semibold text-lk-text">Настройки</span>
         </div>
       </div>
 

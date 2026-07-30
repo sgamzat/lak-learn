@@ -3,17 +3,20 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { LogOut, Settings, User, Trophy, Flame, Target, ArrowRight, BookOpen } from "lucide-react";
+import {
+  LogOut, Settings, User, Trophy, Flame, Target, ArrowRight, BookOpen,
+  Home, BookMarked, Type, RefreshCw, Star
+} from "lucide-react";
 import { getDashboardData, logout } from "@/lib/api/client";
 import type { DashboardData } from "@/types/dashboard";
 import { useTheme } from "@/components/ThemeProvider";
 
 /* ── Навигация ─────────────────────────────────────────────────── */
 const NAV_LINKS = [
-  { href: "/dashboard",  label: "Главная",    icon: "🏠" },
-  { href: "/dictionary", label: "Словарь",    icon: "📖" },
-  { href: "/letters",    label: "Буквы",      icon: "🔤" },
-  { href: "/review",     label: "Повторение", icon: "🔄" },
+  { href: "/dashboard",  label: "Главная",    Icon: Home },
+  { href: "/dictionary", label: "Словарь",    Icon: BookMarked },
+  { href: "/letters",    label: "Буквы",      Icon: Type },
+  { href: "/review",     label: "Повторение", Icon: RefreshCw },
 ] as const;
 
 const COLLECTION_COLORS_DARK  = ["#D4A537","#3E86C9","#C2503F","#3FA06B","#D4A537","#3E86C9","#C2503F","#3FA06B"];
@@ -211,10 +214,10 @@ export function DashboardShell() {
   /* ── Загрузка ── */
   if (isLoading) {
     return (
-      <div style={{ minHeight:"100vh", background: T.bg, display:"flex", alignItems:"center", justifyContent:"center", transition:"background 0.4s" }}>
-        <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:18 }}>
+      <div className="flex min-h-screen items-center justify-center bg-lk-bg transition-colors duration-[400ms]">
+        <div className="flex flex-col items-center gap-[18px]">
           <PabakoMini size={56} gold={T.gold} />
-          <span style={{ fontFamily: T.sans, color: T.textFaint, fontSize:14 }}>Загрузка…</span>
+          <span className="font-sans text-sm text-lk-faint">Загрузка…</span>
         </div>
       </div>
     );
@@ -223,11 +226,11 @@ export function DashboardShell() {
   /* ── Ошибка ── */
   if (!data) {
     return (
-      <div style={{ minHeight:"100vh", background: T.bg, display:"flex", alignItems:"center", justifyContent:"center", transition:"background 0.4s" }}>
-        <div style={{ textAlign:"center" as const, color: T.textMut, fontFamily: T.sans }}>
-          <p style={{ fontSize:16 }}>Не удалось загрузить данные</p>
+      <div className="flex min-h-screen items-center justify-center bg-lk-bg font-sans transition-colors duration-[400ms]">
+        <div className="text-center text-lk-muted">
+          <p className="text-base">Не удалось загрузить данные</p>
           <button type="button" onClick={() => window.location.reload()}
-            style={{ marginTop:16, padding:"10px 20px", borderRadius:10, background: T.gold, color: T.bg, border:"none", fontWeight:700, cursor:"pointer", fontFamily: T.sans }}>
+            className="mt-4 cursor-pointer rounded-[10px] border-none bg-lk-gold px-5 py-2.5 font-sans font-bold text-lk-bg">
             Обновить
           </button>
         </div>
@@ -236,7 +239,7 @@ export function DashboardShell() {
   }
 
   return (
-    <div style={{ width:"100%", minHeight:"100vh", background: T.bg, fontFamily: T.sans, color: T.text, display:"flex", flexDirection:"column", transition:"background 0.4s, color 0.4s" }}>
+    <div className="flex min-h-screen w-full flex-col bg-lk-bg font-sans text-lk-text transition-colors duration-[400ms]">
 
       {/* ── ОНБОРДИНГ ─────────────────────────────────────────────── */}
       {onboardingStep > 0 && (
@@ -325,11 +328,19 @@ export function DashboardShell() {
           </Link>
 
           {/* Центральная навигация (только десктоп) */}
-          <nav className="lk-desktop-only" style={{ display:"flex", gap:2 }}>
+          <nav className="lk-desktop-only flex gap-0.5">
             {NAV_LINKS.map(link => {
               const active = pathname === link.href || (link.href !== "/dashboard" && pathname.startsWith(link.href));
+              const { Icon } = link;
               return (
-                <Link key={link.href} href={link.href} style={{ padding:"6px 13px", borderRadius:99, fontSize:13, fontWeight: active ? 600 : 500, textDecoration:"none", background: active ? T.goldDim : "transparent", color: active ? T.gold : T.textMut, transition:"all 0.15s" }}>
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] no-underline transition-all duration-150 ${
+                    active ? "bg-lk-gold-dim font-semibold text-lk-gold" : "font-medium text-lk-muted hover:text-lk-text"
+                  }`}
+                >
+                  <Icon size={14} />
                   {link.label}
                 </Link>
               );
@@ -338,14 +349,15 @@ export function DashboardShell() {
 
           {/* Правая часть */}
           <div style={{ display:"flex", alignItems:"center", gap:7 }}>
-            <span className="lk-desktop-only" style={{ display:"inline-flex", alignItems:"center", gap:4, borderRadius:99, padding:"5px 10px", fontSize:11, fontWeight:600, background: T.goldDim, color: T.gold, transition:"all 0.4s" }}>
-              🔥 {data.profile.streak}
+            <span className="lk-desktop-only inline-flex items-center gap-1 rounded-full bg-lk-gold-dim px-2.5 py-1 text-[11px] font-semibold text-lk-gold transition-all duration-[400ms]">
+              <Flame size={12} /> {data.profile.streak}
             </span>
-            <span className="lk-desktop-only" style={{ display:"inline-flex", alignItems:"center", gap:4, borderRadius:99, padding:"5px 10px", fontSize:11, fontWeight:600, background: isDark ? "rgba(157,176,199,0.1)" : "rgba(0,0,0,0.05)", color: T.textMut, border:`1px solid ${T.line}`, transition:"all 0.4s" }}>
-              ⭐ {data.profile.xp}
+            <span className="lk-desktop-only inline-flex items-center gap-1 rounded-full border border-lk-line px-2.5 py-1 text-[11px] font-semibold text-lk-muted transition-all duration-[400ms]"
+              style={{ background: isDark ? "rgba(157,176,199,0.1)" : "rgba(0,0,0,0.05)" }}>
+              <Star size={12} /> {data.profile.xp}
             </span>
-            <span className="lk-mobile-only" style={{ display:"none", alignItems:"center", gap:4, borderRadius:99, padding:"4px 8px", fontSize:10, fontWeight:600, background: T.goldDim, color: T.gold }}>
-              🔥 {data.profile.streak}
+            <span className="lk-mobile-only hidden items-center gap-1 rounded-full bg-lk-gold-dim px-2 py-1 text-[10px] font-semibold text-lk-gold">
+              <Flame size={11} /> {data.profile.streak}
             </span>
 
             {/* Аватар */}
@@ -511,18 +523,17 @@ export function DashboardShell() {
       </div>
 
       {/* ── BOTTOM BAR (мобиль) ───────────────────────────────────── */}
-      <nav className="lk-mobile-only lk-bottom-bar" aria-label="Мобильная навигация"
-        style={{ display:"none", flexShrink:0, height:62, background: T.navy2, borderTop:`1px solid ${T.line}`, transition:"background 0.4s, border-color 0.4s" }}>
-        <div style={{ display:"flex", width:"100%", height:"100%" }}>
+      <nav className="lk-mobile-only lk-bottom-bar hidden h-[62px] shrink-0 border-t border-lk-line bg-lk-navy2 transition-colors duration-[400ms]" aria-label="Мобильная навигация">
+        <div className="flex h-full w-full">
           {NAV_LINKS.map((link, index) => {
             const active = pathname === link.href || (link.href !== "/dashboard" && pathname.startsWith(link.href));
+            const { Icon } = link;
             return (
               <Link key={link.href} href={link.href}
-                className={`lk-bb-item${active ? " active" : ""}`}
-                aria-current={active ? "page" : undefined}
-                style={{ textDecoration:"none", flex:1, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", gap:3, padding:"8px 4px 6px", position:"relative" }}>
+                className={`lk-bb-item${active ? " active" : ""} relative flex flex-1 flex-col items-center justify-center gap-0.5 px-1 py-2 no-underline`}
+                aria-current={active ? "page" : undefined}>
                 <span className="lk-bb-dot" />
-                <span className="lk-bb-icon">{link.icon}</span>
+                <span className="lk-bb-icon text-lk-faint"><Icon size={20} className={active ? "text-lk-gold" : undefined} /></span>
                 <span className="lk-bb-label">{link.label}</span>
                 {index === 3 && totalSRS > 0 && <span className="lk-bb-badge">{totalSRS}</span>}
               </Link>

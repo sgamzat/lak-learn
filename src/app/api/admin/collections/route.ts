@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { getAuthContextFromRequest } from "@/lib/server/auth";
+import { requireAdmin } from "@/lib/server/auth";
 import { query, withTransaction } from "@/lib/server/db";
 import { setAccessCookie } from "@/lib/server/session";
+import { normalizeCollectionKind, type CollectionKind } from "@/types/collection";
 
 type CreateCollectionBody = {
   slug?: string;
@@ -12,6 +13,7 @@ type CreateCollectionBody = {
   isPublic?: boolean;
   sortOrder?: number;
   ruleTagCodes?: string[];
+  kind?: CollectionKind;
 };
 
 type CollectionRow = {
@@ -25,6 +27,7 @@ type CollectionRow = {
   sort_order: number;
   rule_tag_codes: string[];
   is_active: boolean;
+  kind: CollectionKind;
   word_count: number;
 };
 
@@ -51,20 +54,6 @@ function normalizeTagCodes(value: unknown): string[] {
   );
 }
 
-async function requireAdmin(request: Request) {
-  const auth = await getAuthContextFromRequest(request);
-
-  if (!auth) {
-    return { auth: null, response: NextResponse.json({ error: "Не авторизован" }, { status: 401 }) };
-  }
-
-  if (auth.user.role !== "admin") {
-    return { auth: null, response: NextResponse.json({ error: "Недостаточно прав" }, { status: 403 }) };
-  }
-
-  return { auth, response: null };
-}
-
 export async function GET(request: Request) {
   const guard = await requireAdmin(request);
 
@@ -85,6 +74,7 @@ export async function GET(request: Request) {
         c.sort_order,
         c.rule_tag_codes,
         c.is_active,
+        c.kind,
         COUNT(w.id)::int AS word_count
       FROM collections c
       LEFT JOIN words w
@@ -135,6 +125,7 @@ export async function GET(request: Request) {
         sortOrder: row.sort_order,
         ruleTagCodes: row.rule_tag_codes ?? [],
         isActive: row.is_active,
+        kind: row.kind,
         wordCount: row.word_count
       }))
     },
@@ -165,6 +156,7 @@ export async function POST(request: Request) {
 
   const slug = normalizeOptional(body.slug)?.toLowerCase();
   const title = normalizeOptional(body.title);
+  const kind = normalizeCollectionKind(body.kind);
 
   if (!slug || !title) {
     return NextResponse.json({ error: "slug и title обязательны" }, { status: 400 });
@@ -182,10 +174,11 @@ export async function POST(request: Request) {
           is_public,
           sort_order,
           rule_tag_codes,
+          kind,
           created_by,
           updated_by
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8::text[], $9, $9)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8::text[], $9, $10, $10)
         RETURNING id
       `,
       [
@@ -197,6 +190,7 @@ export async function POST(request: Request) {
         Boolean(body.isPublic),
         Number.isInteger(body.sortOrder) ? Number(body.sortOrder) : 0,
         normalizeTagCodes(body.ruleTagCodes),
+        kind,
         guard.auth.user.id
       ]
     );
@@ -213,7 +207,7 @@ export async function POST(request: Request) {
         "admin.collection.create",
         "collection",
         String(collectionId),
-        JSON.stringify({ slug, title })
+        JSON.stringify({ slug, title, kind })
       ]
     );
 

@@ -24,9 +24,38 @@ docker compose up --build -d
 Запускаются сервисы:
 
 - `postgres` — база данных
-- `migrate` — одноразовое применение SQL-миграций из `db/migrations`
+- `migrate` — применение **только ещё не применённых** SQL-миграций из `db/migrations` (учёт в таблице `schema_migrations`)
 - `app` — Next.js приложение (frontend + API)
 - `nginx` — reverse proxy
+
+### Миграции вручную (локально)
+
+Нужны `psql` и доступный Postgres. Из корня:
+
+```bash
+export PGPASSWORD=lak_password
+export POSTGRES_USER=lak_user
+export POSTGRES_DB=lak_learn
+export PGHOST=localhost
+./db/migrate.sh ./db/migrations
+```
+
+Или одной командой через Compose:
+
+```bash
+docker compose run --rm migrate
+```
+
+Повторный прогон безопасен: уже записанные файлы пропускаются.
+
+### Стартовый админ
+
+После миграций создаётся пользователь с ролью `admin`:
+
+- email: `admin@laklearn.local`
+- password: `Admin123!`
+
+В проде сразу смените пароль (или удалите пользователя).
 
 ## 4) Проверка статуса
 

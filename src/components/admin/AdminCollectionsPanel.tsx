@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import type { CollectionKind } from "@/types/collection";
 
 type AdminCollection = {
   id: number;
@@ -13,6 +14,7 @@ type AdminCollection = {
   sortOrder: number;
   ruleTagCodes: string[];
   isActive: boolean;
+  kind: CollectionKind;
   wordCount: number;
 };
 
@@ -50,11 +52,13 @@ export function AdminCollectionsPanel() {
 
   const [newSlug, setNewSlug] = useState("");
   const [newTitle, setNewTitle] = useState("");
+  const [newKind, setNewKind] = useState<CollectionKind>("topic");
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editLevel, setEditLevel] = useState("");
   const [editRuleTagCodes, setEditRuleTagCodes] = useState("");
   const [editSortOrder, setEditSortOrder] = useState("0");
+  const [editKind, setEditKind] = useState<CollectionKind>("topic");
   const [isPublic, setIsPublic] = useState(false);
   const [addWordQuery, setAddWordQuery] = useState("");
   const [wordSuggestions, setWordSuggestions] = useState<AdminWordSuggestion[]>([]);
@@ -79,6 +83,7 @@ export function AdminCollectionsPanel() {
     setEditLevel(collection.level ?? "");
     setEditRuleTagCodes((collection.ruleTagCodes ?? []).join(", "));
     setEditSortOrder(String(collection.sortOrder));
+    setEditKind(collection.kind ?? "topic");
     setIsPublic(collection.isPublic);
     setAddWordQuery("");
     setWordSuggestions([]);
@@ -241,6 +246,7 @@ export function AdminCollectionsPanel() {
         body: JSON.stringify({
           slug: newSlug,
           title: newTitle,
+          kind: newKind,
           isPublic: false,
           sortOrder: collections.length
         })
@@ -255,6 +261,7 @@ export function AdminCollectionsPanel() {
 
       setNewSlug("");
       setNewTitle("");
+      setNewKind("topic");
       setStatus({ type: "success", message: "Набор создан" });
       await loadCollections();
     } catch {
@@ -284,6 +291,7 @@ export function AdminCollectionsPanel() {
           description: editDescription,
           level: editLevel,
           isPublic,
+          kind: editKind,
           sortOrder: Number.parseInt(editSortOrder, 10),
           ruleTagCodes: editRuleTagCodes
             .split(",")
@@ -435,7 +443,7 @@ export function AdminCollectionsPanel() {
       {status.type === "error" ? <p className="mt-2 text-sm text-red-600">{status.message}</p> : null}
       {status.type === "success" ? <p className="mt-2 text-sm text-green-700">{status.message}</p> : null}
 
-      <form onSubmit={onCreate} className="mt-4 grid grid-cols-1 gap-2 rounded-xl border border-gray-200 p-3 sm:grid-cols-4">
+      <form onSubmit={onCreate} className="mt-4 grid grid-cols-1 gap-2 rounded-xl border border-gray-200 p-3 sm:grid-cols-5">
         <input
           value={newSlug}
           onChange={(event) => setNewSlug(event.target.value)}
@@ -450,6 +458,14 @@ export function AdminCollectionsPanel() {
           placeholder="Название набора"
           className="rounded-lg border border-gray-300 px-3 py-2 text-sm sm:col-span-2"
         />
+        <select
+          value={newKind}
+          onChange={(event) => setNewKind(event.target.value as CollectionKind)}
+          className="rounded-lg border border-gray-300 px-3 py-2 text-sm"
+        >
+          <option value="topic">Тема</option>
+          <option value="alphabet">Алфавит</option>
+        </select>
         <button
           type="submit"
           disabled={isCreating}
@@ -480,7 +496,8 @@ export function AdminCollectionsPanel() {
             >
               <p className="font-medium text-gray-900">{collection.title}</p>
               <p className="mt-1 text-xs text-gray-500">
-                slug: {collection.slug} · слов: {collection.wordCount}
+                slug: {collection.slug} · слов: {collection.wordCount} ·{" "}
+                {collection.kind === "alphabet" ? "алфавит" : "тема"}
               </p>
             </button>
           ))}
@@ -630,6 +647,18 @@ export function AdminCollectionsPanel() {
                   Опубликован
                 </label>
               </div>
+
+              <label className="block text-sm text-gray-700">
+                Тип набора
+                <select
+                  value={editKind}
+                  onChange={(event) => setEditKind(event.target.value as CollectionKind)}
+                  className="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                >
+                  <option value="topic">Тема (разговорник, виден в «Прогресс по темам»)</option>
+                  <option value="alphabet">Алфавит (страница /letters)</option>
+                </select>
+              </label>
 
               <div className="flex gap-2">
                 <button

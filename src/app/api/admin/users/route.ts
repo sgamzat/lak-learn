@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { getAuthContextFromRequest } from "@/lib/server/auth";
+import { requireAdmin } from "@/lib/server/auth";
 import { query } from "@/lib/server/db";
 import { setAccessCookie } from "@/lib/server/session";
+import { deriveDisplayName } from "@/lib/server/dashboard";
 
 type UserListRow = {
   id: string;
@@ -14,22 +15,14 @@ type UserListRow = {
   learned_words: number;
 };
 
-function deriveDisplayName(email: string): string {
-  const [localPart] = email.split("@");
-  const normalized = localPart?.trim();
-  return normalized && normalized.length > 0 ? normalized : email;
-}
-
 export async function GET(request: Request) {
-  const auth = await getAuthContextFromRequest(request);
+  const guard = await requireAdmin(request);
 
-  if (!auth) {
-    return NextResponse.json({ error: "Не авторизован" }, { status: 401 });
+  if (!guard.auth || guard.response) {
+    return guard.response;
   }
 
-  if (auth.user.role !== "admin") {
-    return NextResponse.json({ error: "Недостаточно прав" }, { status: 403 });
-  }
+  const auth = guard.auth;
 
   const usersResult = await query<UserListRow>(
     `
@@ -54,7 +47,7 @@ export async function GET(request: Request) {
       users: usersResult.rows.map((row) => ({
         id: row.id,
         email: row.email,
-        displayName: deriveDisplayName(row.email),
+        displayName: deriveDisplayName(row.email, null),
         role: row.role,
         isBlocked: row.is_blocked,
         createdAt: row.created_at,

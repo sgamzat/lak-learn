@@ -30,16 +30,12 @@ services:
       PGPASSWORD: ${POSTGRES_PASSWORD:-lak_password}
       POSTGRES_DB: ${POSTGRES_DB:-lak_learn}
       POSTGRES_USER: ${POSTGRES_USER:-lak_user}
+      PGHOST: postgres
+      PGPORT: "5432"
     volumes:
       - ./db/migrations:/migrations:ro
-    command: >
-      sh -c '
-        set -e;
-        for file in /migrations/*.sql; do
-          echo "Applying $$file";
-          psql -h postgres -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}" -v ON_ERROR_STOP=1 -f "$$file";
-        done
-      '
+      - ./db/migrate.sh:/migrate.sh:ro
+    command: ["sh", "/migrate.sh", "/migrations"]
     restart: "no"
     networks:
       - app_net

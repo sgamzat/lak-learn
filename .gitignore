@@ -7,3 +7,9 @@ coverage
 .env
 .env.local
 .env.production
+tsconfig.tsbuildinfo
+
+# Local scratch / export dumps
+test.html
+words-*-export.*
+words-export.*

@@ -303,23 +303,16 @@ export default function PhrasebookPage() {
 
   // ── Рендер ────────────────────────────────────────────────────────────────
   return (
-    <div style={{ minHeight: "100vh", background: T.bg, fontFamily: T.sans, color: T.text, display: "flex", flexDirection: "column", transition: "background 0.4s, color 0.4s" }}>
+    <div className="flex min-h-screen flex-col bg-lk-bg font-sans text-lk-text transition-colors duration-[400ms]">
 
       {/* ── Хедер ── */}
-      <header style={{
-        position: "sticky", top: 0, zIndex: 30,
-        background: `${T.bg}ee`, backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
-        borderBottom: `1px solid ${T.line}`,
-        display: "flex", alignItems: "center", gap: 16,
-        padding: "0 24px", height: 60,
-        transition: "background 0.4s, border-color 0.4s",
-      }}>
-        <a href="/dashboard" style={{ display: "flex", alignItems: "center", gap: 6, color: T.textMut, textDecoration: "none", fontSize: 13, border: `1px solid ${T.lineCool}`, borderRadius: 10, padding: "5px 10px", transition: "color 0.15s" }}>
+      <header className="sticky top-0 z-30 flex h-[60px] items-center gap-4 border-b border-lk-line bg-lk-bg/93 px-6 backdrop-blur-[12px] transition-colors duration-[400ms]">
+        <a href="/dashboard" className="flex items-center gap-1.5 rounded-[10px] border border-lk-line-cool px-2.5 py-1 text-[13px] text-lk-muted no-underline transition-colors duration-150">
           <ArrowLeft size={14} /> Главная
         </a>
         <div>
-          <h1 style={{ fontFamily: T.serif, fontSize: 22, fontWeight: 700, color: T.text, lineHeight: 1, transition: "color 0.4s" }}>Разговорник</h1>
-          {hasLoaded && <p style={{ fontSize: 12, color: T.textFaint, marginTop: 3, transition: "color 0.4s" }}>{allTopics.length} тем · {selectedWordIds.size} фраз в изучении</p>}
+          <h1 className="font-serif text-[22px] font-bold leading-none text-lk-text transition-colors duration-[400ms]">Разговорник</h1>
+          {hasLoaded && <p className="mt-0.5 text-xs text-lk-faint transition-colors duration-[400ms]">{allTopics.length} тем · {selectedWordIds.size} фраз в изучении</p>}
         </div>
 
         {/* Поиск */}

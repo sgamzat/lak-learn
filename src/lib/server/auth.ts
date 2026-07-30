@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { NextResponse } from "next/server";
 import { query, withTransaction } from "@/lib/server/db";
 import { env } from "@/lib/server/env";
 import { createJwt, ttlToMaxAgeSeconds, verifyJwt } from "@/lib/server/jwt";
@@ -323,6 +324,24 @@ export async function getAuthContextFromCookieMap(cookieMap: Map<string, string>
 
 export async function getAuthContextFromRequest(request: Request): Promise<AuthContext | null> {
   return getAuthContextFromCookieMap(parseCookieHeader(request.headers.get("cookie")));
+}
+
+export type AdminGuardResult =
+  | { auth: AuthContext; response: null }
+  | { auth: null; response: Response };
+
+export async function requireAdmin(request: Request): Promise<AdminGuardResult> {
+  const auth = await getAuthContextFromRequest(request);
+
+  if (!auth) {
+    return { auth: null, response: NextResponse.json({ error: "Не авторизован" }, { status: 401 }) };
+  }
+
+  if (auth.user.role !== "admin") {
+    return { auth: null, response: NextResponse.json({ error: "Недостаточно прав" }, { status: 403 }) };
+  }
+
+  return { auth, response: null };
 }
 
 export { ACCESS_COOKIE_NAME, REFRESH_COOKIE_NAME };

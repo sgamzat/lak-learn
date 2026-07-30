@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { getAuthContextFromRequest } from "@/lib/server/auth";
+import { requireAdmin } from "@/lib/server/auth";
 import { withTransaction } from "@/lib/server/db";
 import { setAccessCookie } from "@/lib/server/session";
+import { normalizeCollectionKind, type CollectionKind } from "@/types/collection";
 
 type UpdateCollectionBody = {
   slug?: string;
@@ -12,6 +13,7 @@ type UpdateCollectionBody = {
   isPublic?: boolean;
   sortOrder?: number;
   ruleTagCodes?: string[];
+  kind?: CollectionKind;
   manualIncludeWordIds?: number[];
   manualExcludeWordIds?: number[];
 };
@@ -61,20 +63,6 @@ function normalizeWordIds(value: unknown): number[] {
         .filter((item) => Number.isInteger(item) && item > 0)
     )
   );
-}
-
-async function requireAdmin(request: Request) {
-  const auth = await getAuthContextFromRequest(request);
-
-  if (!auth) {
-    return { auth: null, response: NextResponse.json({ error: "Не авторизован" }, { status: 401 }) };
-  }
-
-  if (auth.user.role !== "admin") {
-    return { auth: null, response: NextResponse.json({ error: "Недостаточно прав" }, { status: 403 }) };
-  }
-
-  return { auth, response: null };
 }
 
 export async function GET(request: Request, { params }: { params: { collectionId: string } }) {
@@ -251,6 +239,7 @@ export async function PATCH(request: Request, { params }: { params: { collection
     const coverUrl = body.coverUrl === undefined ? undefined : normalizeOptional(body.coverUrl);
     const sortOrder = body.sortOrder;
     const ruleTagCodes = body.ruleTagCodes === undefined ? undefined : normalizeTagCodes(body.ruleTagCodes);
+    const kind = body.kind === undefined ? undefined : normalizeCollectionKind(body.kind);
 
     await client.query(
       `
@@ -264,7 +253,8 @@ export async function PATCH(request: Request, { params }: { params: { collection
           is_public = COALESCE($7, is_public),
           sort_order = COALESCE($8, sort_order),
           rule_tag_codes = COALESCE($9::text[], rule_tag_codes),
-          updated_by = $10,
+          kind = COALESCE($10, kind),
+          updated_by = $11,
           updated_at = NOW()
         WHERE id = $1
       `,
@@ -278,6 +268,7 @@ export async function PATCH(request: Request, { params }: { params: { collection
         typeof body.isPublic === "boolean" ? body.isPublic : null,
         Number.isInteger(sortOrder) ? Number(sortOrder) : null,
         ruleTagCodes ?? null,
+        kind ?? null,
         guard.auth.user.id
       ]
     );
@@ -321,6 +312,7 @@ export async function PATCH(request: Request, { params }: { params: { collection
         JSON.stringify({
           slug,
           title,
+          kind: kind ?? null,
           manualIncludeWordIds,
           manualExcludeWordIds,
           changedRuleTagCodes: ruleTagCodes ?? null

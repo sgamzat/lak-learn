@@ -27,15 +27,22 @@ html.theme-d-indigo {
   --lk-card:        #181A2C;
   --lk-card2:       #1E2038;
   --lk-card3:       #242644;
+  --lk-navy:        #181A2C;
+  --lk-navy2:       #1E2038;
+  --lk-navy3:       #242644;
   --lk-gold:        #DDB96A;
+  --lk-gold-hi:     #EDD08A;
   --lk-gold-dim:    rgba(221, 185, 106, 0.12);
   --lk-gold-border: rgba(221, 185, 106, 0.28);
   --lk-text:        #E8EAF5;
   --lk-text-muted:  #606888;
   --lk-text-faint:  #343660;
-  --lk-line:        rgba(255, 255, 255, 0.07);
+  --lk-line:        rgba(221, 185, 106, 0.15);
+  --lk-line-cool:   rgba(157, 176, 199, 0.14);
   --lk-green:       #52A87A;
+  --lk-green-dim:   rgba(82, 168, 122, 0.14);
   --lk-red:         #C2503F;
+  --lk-red-dim:     rgba(194, 80, 63, 0.14);
   --lk-blue:        #4A6EC4;
   --lk-shadow:      0 12px 40px rgba(0, 0, 0, 0.55);
   --lk-snow:        #C8CFF0;
@@ -43,6 +50,9 @@ html.theme-d-indigo {
   --lk-hero-to:     #1C1E38;
   --lk-mtn-a:       #1C1E38;
   --lk-mtn-b:       #141628;
+  --lk-font-serif:  'Spectral', Georgia, serif;
+  --lk-font-sans:   'Golos Text', system-ui, sans-serif;
+  --lk-font-mono:   'IBM Plex Mono', ui-monospace, monospace;
   --lk-scheme:      dark;
 }
 

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAuthContextFromRequest } from "@/lib/server/auth";
+import { requireAdmin } from "@/lib/server/auth";
 import { query } from "@/lib/server/db";
 import { setAccessCookie } from "@/lib/server/session";
 
@@ -11,15 +11,13 @@ type StatsRow = {
 };
 
 export async function GET(request: Request) {
-  const auth = await getAuthContextFromRequest(request);
+  const guard = await requireAdmin(request);
 
-  if (!auth) {
-    return NextResponse.json({ error: "Не авторизован" }, { status: 401 });
+  if (!guard.auth || guard.response) {
+    return guard.response;
   }
 
-  if (auth.user.role !== "admin") {
-    return NextResponse.json({ error: "Недостаточно прав" }, { status: 403 });
-  }
+  const auth = guard.auth;
 
   const result = await query<StatsRow>(`
     SELECT

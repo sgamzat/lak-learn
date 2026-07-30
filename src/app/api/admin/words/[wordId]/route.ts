@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getAuthContextFromRequest } from "@/lib/server/auth";
+import { requireAdmin } from "@/lib/server/auth";
 import { withTransaction } from "@/lib/server/db";
 import { setAccessCookie } from "@/lib/server/session";
 
@@ -22,15 +22,6 @@ function normalizeOptional(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const t = value.trim();
   return t.length ? t : null;
-}
-
-async function requireAdmin(request: Request) {
-  const auth = await getAuthContextFromRequest(request);
-  if (!auth)
-    return { auth: null, response: NextResponse.json({ error: "Не авторизован" }, { status: 401 }) };
-  if (auth.user.role !== "admin")
-    return { auth: null, response: NextResponse.json({ error: "Недостаточно прав" }, { status: 403 }) };
-  return { auth, response: null };
 }
 
 // ── PATCH /api/admin/words/:wordId ────────────────────────────────────────────

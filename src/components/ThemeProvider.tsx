@@ -196,6 +196,48 @@ function applyThemeClass(id: ThemeId) {
   html.classList.add(`theme-${id}`);
 }
 
+/** Синхронизирует JS-токены с CSS-переменными (единый источник для Tailwind/утилит). */
+function applyCssVariables(tokens: ThemeTokens, isDark: boolean) {
+  const root = document.documentElement;
+  const map: Record<string, string> = {
+    "--lk-bg": tokens.bg,
+    "--lk-card": tokens.navy,
+    "--lk-card2": tokens.navy2,
+    "--lk-card3": tokens.navy3,
+    "--lk-navy": tokens.navy,
+    "--lk-navy2": tokens.navy2,
+    "--lk-navy3": tokens.navy3,
+    "--lk-line": tokens.line,
+    "--lk-line-cool": tokens.lineCool,
+    "--lk-gold": tokens.gold,
+    "--lk-gold-hi": tokens.goldHi,
+    "--lk-gold-dim": tokens.goldDim,
+    "--lk-gold-border": tokens.goldBorder,
+    "--lk-text": tokens.text,
+    "--lk-text-muted": tokens.textMut,
+    "--lk-text-faint": tokens.textFaint,
+    "--lk-green": tokens.green,
+    "--lk-green-dim": tokens.greenDim,
+    "--lk-blue": tokens.blue,
+    "--lk-red": tokens.red,
+    "--lk-red-dim": tokens.redDim,
+    "--lk-snow": tokens.snow,
+    "--lk-hero-from": tokens.heroFrom,
+    "--lk-hero-to": tokens.heroTo,
+    "--lk-mtn-a": tokens.mtnA,
+    "--lk-mtn-b": tokens.mtnB,
+    "--lk-font-serif": tokens.serif,
+    "--lk-font-sans": tokens.sans,
+    "--lk-font-mono": tokens.mono,
+    "--lk-scheme": isDark ? "dark" : "light",
+    "--lk-shadow": isDark ? "0 12px 40px rgba(0,0,0,0.55)" : "0 8px 24px rgba(0,0,0,0.12)",
+  };
+
+  for (const [key, value] of Object.entries(map)) {
+    root.style.setProperty(key, value);
+  }
+}
+
 function readSaved(): { mode: "dark" | "light"; dark: DarkTheme; light: LightTheme } {
   try {
     const mode  = (localStorage.getItem(LS_MODE)  ?? "dark") as "dark" | "light";
@@ -222,19 +264,28 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setDarkTheme(dark);
     setLightTheme(light);
     setIsDark(isD);
-    applyThemeClass(isD ? dark : light);
+    const activeId = isD ? dark : light;
+    applyThemeClass(activeId);
+    applyCssVariables(getThemeOption(activeId).tokens, isD);
   }, []);
+
+  useEffect(() => {
+    applyThemeClass(theme);
+    applyCssVariables(tokens, isDark);
+  }, [theme, tokens, isDark]);
 
   const setTheme = useCallback((id: ThemeId) => {
     if (isDarkId(id)) {
       setDarkTheme(id);
       setIsDark(true);
       applyThemeClass(id);
+      applyCssVariables(getThemeOption(id).tokens, true);
       try { localStorage.setItem(LS_DARK, id); localStorage.setItem(LS_MODE, "dark"); } catch { /* ignore */ }
     } else {
       setLightTheme(id);
       setIsDark(false);
       applyThemeClass(id);
+      applyCssVariables(getThemeOption(id).tokens, false);
       try { localStorage.setItem(LS_LIGHT, id); localStorage.setItem(LS_MODE, "light"); } catch { /* ignore */ }
     }
   }, []);
@@ -244,6 +295,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       const next     = !prev;
       const newTheme = next ? darkTheme : lightTheme;
       applyThemeClass(newTheme);
+      applyCssVariables(getThemeOption(newTheme).tokens, next);
       try { localStorage.setItem(LS_MODE, next ? "dark" : "light"); } catch { /* ignore */ }
       return next;
     });
