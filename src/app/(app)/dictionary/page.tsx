@@ -1,620 +1,885 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import {
+  BookMarked, Check, ChevronRight, Plus, RefreshCw, Search, Sparkles, Type, X,
+} from "lucide-react";
 import { getStudySelection, setStudySelection } from "@/lib/api/client";
-import { Check, Plus, Search, X } from "lucide-react";
+import { useTheme } from "@/components/ThemeProvider";
 import type { DictionaryWord } from "@/types/word";
+import type { CollectionKind } from "@/types/collection";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Типы
-// ─────────────────────────────────────────────────────────────────────────────
+type DictMode = "search" | "start" | "alphabet" | "mine";
+type AlphaMode = "lak" | "ru";
+type LoadState = "idle" | "loading" | "success" | "error";
 
 type CollectionCard = {
-  id:          number;
-  slug:        string;
-  title:       string;
+  id: number;
+  slug: string;
+  title: string;
   description: string | null;
-  wordCount:   number;
-  sortOrder:   number;
+  wordCount: number;
+  sortOrder: number;
+  kind: CollectionKind;
 };
 
-type LoadState = "loading" | "success" | "error";
+const RU_ALPHABET = "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ".split("");
 
-// Буквы русского алфавита для навигации
-const ALPHABET = "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ".split("");
+/** Лакский алфавитный индекс (как на /letters), удобный для навигации по леммам */
+const LAK_ALPHABET = [
+  "А", "Аь", "Б", "В", "Г", "Гъ", "Гь", "Д", "Е", "Ж", "З", "И",
+  "К", "Кк", "Кь", "Къ", "КI", "Л", "М", "Н", "О", "Оь", "П", "Пп", "ПI",
+  "Р", "С", "Сс", "Т", "Тт", "ТI", "У", "Х", "Хх", "Хъ", "Хь", "Хьхь", "ХI",
+  "Ц", "Цц", "ЦI", "Ч", "Чч", "ЧI", "Ш", "Щ", "Ю", "Я",
+];
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Вспомогательные функции
-// ─────────────────────────────────────────────────────────────────────────────
+const MODES: { id: DictMode; label: string; hint: string }[] = [
+  { id: "start", label: "Начать", hint: "Готовые наборы" },
+  { id: "search", label: "Искать", hint: "Поиск по словарю" },
+  { id: "alphabet", label: "Алфавит", hint: "По буквам" },
+  { id: "mine", label: "Моё", hint: "В изучении" },
+];
 
 function genderLabel(g: string | null): string | null {
-  if (g === "м")  return "м.р.";
-  if (g === "ж")  return "ж.р.";
+  if (g === "м") return "м.р.";
+  if (g === "ж") return "ж.р.";
   if (g === "ср") return "ср.р.";
   return null;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Компонент: детальная панель выбранного слова
-// ─────────────────────────────────────────────────────────────────────────────
+async function fetchWords(params: Record<string, string>): Promise<DictionaryWord[]> {
+  const qs = new URLSearchParams({ wordType: "word", primaryOnly: "true", ...params });
+  const res = await fetch(`/api/words?${qs}`, {
+    headers: { Accept: "application/json" },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error(String(res.status));
+  const data = (await res.json()) as { words?: DictionaryWord[] };
+  return Array.isArray(data.words) ? data.words : [];
+}
 
 function WordDetail({
   word,
   isStudying,
   isPending,
   onToggle,
+  onClose,
 }: {
-  word:       DictionaryWord;
+  word: DictionaryWord;
   isStudying: boolean;
-  isPending:  boolean;
-  onToggle:   () => void;
+  isPending: boolean;
+  onToggle: () => void;
+  onClose?: () => void;
 }) {
+  const { tokens: T } = useTheme();
   const gl = genderLabel(word.gender ?? null);
-  const meta = [word.partOfSpeech, gl, word.verbAspect].filter(Boolean).join(" · ");
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Шапка */}
-      <div className="p-4 border-b border-gray-100">
-        <div className="flex items-start justify-between gap-3 mb-2">
-          <div>
-            <p className="text-2xl font-bold text-gray-900 leading-tight">{word.lemma}</p>
-            <p className="text-base text-gray-500 mt-1">{word.translation}</p>
-          </div>
+    <div className="flex h-full flex-col">
+      <div className="flex items-start justify-between gap-3 border-b border-lk-line px-4 py-4">
+        <div className="min-w-0">
+          <p className="font-serif text-2xl font-bold leading-tight text-lk-text">{word.lemma}</p>
+          <p className="mt-1 text-base text-lk-muted">{word.translation}</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
           <button
             type="button"
             onClick={onToggle}
             disabled={isPending}
-            className={[
-              "flex items-center gap-1.5 shrink-0 rounded-xl border px-3 py-1.5 text-xs font-semibold transition-all disabled:opacity-50",
+            className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition disabled:opacity-50 ${
               isStudying
-                ? "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-red-50 hover:border-red-200 hover:text-red-600"
-                : "border-gray-200 bg-white text-gray-500 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600",
-            ].join(" ")}
+                ? "border-lk-green bg-lk-green-dim text-lk-green"
+                : "border-lk-line bg-lk-navy2 text-lk-muted hover:border-lk-gold-border hover:text-lk-gold"
+            }`}
           >
-            {isPending ? (
-              <span>...</span>
-            ) : isStudying ? (
-              <><Check className="h-3 w-3" /> В изучении</>
-            ) : (
-              <><Plus className="h-3 w-3" /> Учить</>
-            )}
+            {isPending ? "…" : isStudying ? <><Check size={12} /> В изучении</> : <><Plus size={12} /> Учить</>}
           </button>
+          {onClose ? (
+            <button type="button" onClick={onClose} className="text-lk-faint hover:text-lk-text" aria-label="Закрыть">
+              <X size={18} />
+            </button>
+          ) : null}
         </div>
-
-        {/* Грамматика */}
-        {meta && (
-          <div className="flex flex-wrap gap-1.5 mt-2">
-            {word.partOfSpeech && (
-              <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs text-gray-600">
-                {word.partOfSpeech}
-              </span>
-            )}
-            {gl && (
-              <span className="rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs text-indigo-600">
-                {gl}
-              </span>
-            )}
-            {word.verbAspect && (
-              <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs text-amber-600">
-                {word.verbAspect}
-              </span>
-            )}
-            {word.notes && (
-              <span className="rounded-full bg-orange-50 px-2.5 py-0.5 text-xs text-orange-600 italic">
-                {word.notes}
-              </span>
-            )}
-          </div>
-        )}
       </div>
 
-      {/* Карточка SRS */}
-      <div className="p-4 border-b border-gray-100">
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-3">
-          Карточка повторения
-        </p>
-        <div className="rounded-2xl bg-gray-50 overflow-hidden">
-          {/* Лицо */}
-          <div className="px-4 py-5 text-center border-b border-gray-100">
-            <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-2">
-              лакский → русский
+      <div className="space-y-4 px-4 py-4">
+        <div className="flex flex-wrap gap-1.5">
+          {word.partOfSpeech ? (
+            <span className="rounded-full bg-lk-navy3 px-2.5 py-0.5 text-xs text-lk-muted">{word.partOfSpeech}</span>
+          ) : null}
+          {gl ? <span className="rounded-full bg-lk-gold-dim px-2.5 py-0.5 text-xs text-lk-gold">{gl}</span> : null}
+          {word.verbAspect ? (
+            <span className="rounded-full bg-lk-green-dim px-2.5 py-0.5 text-xs text-lk-green">{word.verbAspect}</span>
+          ) : null}
+          {word.notes ? (
+            <span className="rounded-full bg-lk-red-dim px-2.5 py-0.5 text-xs italic text-lk-red">{word.notes}</span>
+          ) : null}
+        </div>
+
+        {word.transcription ? (
+          <div>
+            <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-lk-faint">Транскрипция</p>
+            <p className="font-mono text-sm text-lk-muted">[{word.transcription}]</p>
+          </div>
+        ) : null}
+
+        {word.translationPriority === 1 && word.synonymGroupId ? (
+          <div className="rounded-xl border border-lk-line bg-lk-navy2 p-3">
+            <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-lk-faint">Синонимы</p>
+            <p className="text-xs text-lk-muted">
+              Другие лакские слова для «{word.translation}» появятся на карточке при повторении.
             </p>
-            <p className="text-2xl font-bold text-gray-900">{word.lemma}</p>
-            {(word.partOfSpeech || word.gender) && (
-              <div className="flex justify-center gap-1.5 mt-2">
-                {word.partOfSpeech && (
-                  <span className="rounded-full bg-white border border-gray-200 px-2 py-0.5 text-xs text-gray-500">
-                    {word.partOfSpeech}
-                  </span>
-                )}
-                {word.gender && (
-                  <span className="rounded-full bg-white border border-gray-200 px-2 py-0.5 text-xs text-gray-500">
-                    {word.gender}
-                  </span>
-                )}
-              </div>
-            )}
           </div>
-          {/* Оборот */}
-          <div className="px-4 py-4">
-            <p className="text-base font-semibold text-gray-800">{word.translation}</p>
-            {(word.partOfSpeech || gl) && (
-              <p className="text-xs text-gray-400 mt-0.5">
-                {[word.partOfSpeech, gl].filter(Boolean).join(", ")}
-              </p>
-            )}
-            <div className="grid grid-cols-2 gap-2 mt-4">
-              <button
-                type="button"
-                className="rounded-xl border border-red-100 bg-red-50 py-2.5 text-sm font-semibold text-red-600"
-              >
-                Не знал
-              </button>
-              <button
-                type="button"
-                className="rounded-xl border border-emerald-100 bg-emerald-50 py-2.5 text-sm font-semibold text-emerald-700"
-              >
-                Знал
-              </button>
-            </div>
-          </div>
-        </div>
+        ) : null}
+
+        <Link
+          href="/review"
+          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-lk-gold py-3 text-sm font-bold text-lk-bg no-underline transition hover:brightness-110"
+          style={{ fontFamily: T.sans }}
+        >
+          <RefreshCw size={14} /> Перейти к повторению
+        </Link>
       </div>
-
-      {/* Транскрипция */}
-      {word.transcription && (
-        <div className="px-4 py-3 border-b border-gray-100">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-1">
-            Транскрипция
-          </p>
-          <p className="font-mono text-sm text-gray-600">[{word.transcription}]</p>
-        </div>
-      )}
-
-      {/* Подсказка про синонимы */}
-      {word.translationPriority === 1 && word.synonymGroupId && (
-        <div className="px-4 py-3">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-1">
-            Синонимы
-          </p>
-          <p className="text-xs text-gray-400">
-            Другие лакские слова для «{word.translation}» появятся на карточке при повторении
-          </p>
-        </div>
-      )}
     </div>
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Главный компонент
-// ─────────────────────────────────────────────────────────────────────────────
+function WordRow({
+  word,
+  isActive,
+  isStudying,
+  isPending,
+  onSelect,
+  onToggle,
+}: {
+  word: DictionaryWord;
+  isActive: boolean;
+  isStudying: boolean;
+  isPending: boolean;
+  onSelect: () => void;
+  onToggle: () => void;
+}) {
+  const gl = genderLabel(word.gender ?? null);
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
+      className={`flex cursor-pointer items-center gap-3 border-b border-lk-line px-4 py-3 transition-colors ${
+        isActive ? "bg-lk-gold-dim" : "hover:bg-lk-navy2"
+      }`}
+    >
+      <span className={`h-2 w-2 shrink-0 rounded-full ${isStudying ? "bg-lk-green" : "bg-lk-navy3"}`} />
+      <div className="w-40 shrink-0 sm:w-48">
+        <p className={`truncate text-sm font-semibold ${isActive ? "text-lk-gold" : "text-lk-text"}`}>
+          {word.lemma}
+        </p>
+      </div>
+      <p className="min-w-0 flex-1 truncate text-sm text-lk-muted">{word.translation}</p>
+      <div className="hidden items-center gap-1.5 sm:flex">
+        {word.partOfSpeech ? (
+          <span className="rounded-full bg-lk-navy3 px-2 py-0.5 text-xs text-lk-muted">{word.partOfSpeech}</span>
+        ) : null}
+        {gl ? <span className="rounded-full bg-lk-gold-dim px-2 py-0.5 text-xs text-lk-gold">{gl}</span> : null}
+      </div>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggle();
+        }}
+        disabled={isPending}
+        title={isStudying ? "Убрать из изучения" : "Добавить в изучение"}
+        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition disabled:opacity-50 ${
+          isStudying
+            ? "border-lk-green bg-lk-green-dim text-lk-green"
+            : "border-lk-line bg-lk-navy2 text-lk-muted hover:border-lk-gold-border hover:text-lk-gold"
+        }`}
+      >
+        {isPending ? <span className="text-[10px]">·</span> : isStudying ? <Check size={14} /> : <Plus size={14} />}
+      </button>
+    </div>
+  );
+}
 
 export default function DictionaryPage() {
-  const [allWords,     setAllWords]     = useState<DictionaryWord[]>([]);
-  const [words,        setWords]        = useState<DictionaryWord[]>([]);
-  const [collections,  setCollections]  = useState<CollectionCard[]>([]);
-  const [state,        setState]        = useState<LoadState>("loading");
-  const [hasLoaded,    setHasLoaded]    = useState(false);
+  const { tokens: T } = useTheme();
 
-  // Фильтры
-  const [activeLetter,  setActiveLetter]  = useState<string>("all");
-  const [filterPos,     setFilterPos]     = useState<string>("all");
-  const [searchQuery,   setSearchQuery]   = useState("");
-  const [selectedWord,  setSelectedWord]  = useState<DictionaryWord | null>(null);
+  const [mode, setMode] = useState<DictMode>("start");
+  const [alphaMode, setAlphaMode] = useState<AlphaMode>("lak");
+  const [activeLetter, setActiveLetter] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterPos, setFilterPos] = useState("all");
 
-  // Изучение
-  const [selectedWordIds,         setSelectedWordIds]         = useState<Set<number>>(new Set());
-  const [selectedCollectionIds,   setSelectedCollectionIds]   = useState<Set<number>>(new Set());
-  const [pendingWordIds,           setPendingWordIds]          = useState<Set<number>>(new Set());
+  const [words, setWords] = useState<DictionaryWord[]>([]);
+  const [collections, setCollections] = useState<CollectionCard[]>([]);
+  const [state, setState] = useState<LoadState>("idle");
+  const [bootstrapped, setBootstrapped] = useState(false);
 
-  const searchInputRef = useRef<HTMLInputElement>(null);
+  const [selectedWord, setSelectedWord] = useState<DictionaryWord | null>(null);
+  const [selectedWordIds, setSelectedWordIds] = useState<Set<number>>(new Set());
+  const [selectedCollectionIds, setSelectedCollectionIds] = useState<Set<number>>(new Set());
+  const [pendingWordIds, setPendingWordIds] = useState<Set<number>>(new Set());
+  const [pendingCollectionIds, setPendingCollectionIds] = useState<Set<number>>(new Set());
+  const [bulkPending, setBulkPending] = useState(false);
+  const [packTitle, setPackTitle] = useState<string | null>(null);
 
-  // ── Загрузка слов ──────────────────────────────────────────────────────────
-  const loadWords = useCallback(async (collectionId?: number) => {
-    const p = new URLSearchParams({ limit: "30000", wordType: "word" });
-    if (collectionId) p.set("collectionId", String(collectionId));
-    const res = await fetch(`/api/words?${p}`, {
-      headers: { Accept: "application/json" },
-      cache: "no-store",
-    });
-    if (!res.ok) throw new Error(`${res.status}`);
-    const data = await res.json() as { words: DictionaryWord[] };
-    return Array.isArray(data.words) ? data.words : [];
+  const searchRef = useRef<HTMLInputElement>(null);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const letterCollections = useMemo(() => {
+    const map = new Map<string, CollectionCard>();
+    for (const c of collections) {
+      if (!c.slug.startsWith("slovar-1958-")) continue;
+      const letter = c.slug.slice("slovar-1958-".length).toUpperCase();
+      map.set(letter, c);
+    }
+    return map;
+  }, [collections]);
+
+  const topicCollections = useMemo(
+    () => collections.filter((c) => c.kind === "topic" && c.wordCount > 0),
+    [collections]
+  );
+
+  const alphabetLetters = alphaMode === "lak" ? LAK_ALPHABET : RU_ALPHABET;
+
+  const loadList = useCallback(async (loader: () => Promise<DictionaryWord[]>) => {
+    setState("loading");
+    setSelectedWord(null);
+    try {
+      const data = await loader();
+      setWords(data);
+      setState("success");
+    } catch {
+      setWords([]);
+      setState("error");
+    }
   }, []);
 
-  // ── Начальная загрузка ────────────────────────────────────────────────────
+  // Bootstrap collections + study selection
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
-        const [colRes, wordsData, study] = await Promise.all([
+        const [colRes, study] = await Promise.all([
           fetch("/api/collections", { headers: { Accept: "application/json" }, cache: "no-store" }),
-          loadWords(),
           getStudySelection(),
         ]);
-        if (!colRes.ok) throw new Error(`${colRes.status}`);
-        const colData = await colRes.json() as { collections: CollectionCard[] };
-        if (mounted) {
-          // Только словарные коллекции по slug (slovar-1958-а, slovar-1958-б, ...)
-          const dictCols = (colData.collections ?? [])
-            .filter(c => c.slug.startsWith("slovar-1958-"))
-            .sort((a, b) => a.sortOrder - b.sortOrder);
-          setCollections(dictCols);
-          setAllWords(wordsData);
-          setWords(wordsData);
-          setSelectedWordIds(new Set(study.wordIds));
-          setSelectedCollectionIds(new Set(study.collectionIds));
-          setState("success");
-          setHasLoaded(true);
-        }
+        if (!colRes.ok) throw new Error(String(colRes.status));
+        const colData = (await colRes.json()) as { collections?: CollectionCard[] };
+        if (!mounted) return;
+        setCollections(colData.collections ?? []);
+        setSelectedWordIds(new Set(study.wordIds));
+        setSelectedCollectionIds(new Set(study.collectionIds));
+        setBootstrapped(true);
       } catch {
-        if (mounted) setState("error");
+        if (mounted) {
+          setBootstrapped(true);
+          setState("error");
+        }
       }
     })();
-    return () => { mounted = false; };
-  }, [loadWords]);
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
-  // ── Переключение буквы алфавита ───────────────────────────────────────────
-  const handleLetterChange = useCallback(async (letter: string) => {
-    setActiveLetter(letter);
-    setSearchQuery("");
-    setSelectedWord(null);
-    setFilterPos("all");
+  // Mode-driven data loading (не трогаем pack-просмотр из «Начать»)
+  useEffect(() => {
+    if (!bootstrapped) return;
+    if (mode === "start") return;
 
-    if (letter === "all") {
-      setState("loading");
-      try {
-        const data = await loadWords();
-        setWords(data);
-        setState("success");
-      } catch { setState("error"); }
+    if (mode === "search") {
+      const q = searchQuery.trim();
+      if (q.length < 1) {
+        setWords([]);
+        setState("idle");
+        return;
+      }
+      if (searchTimer.current) clearTimeout(searchTimer.current);
+      searchTimer.current = setTimeout(() => {
+        void loadList(() => fetchWords({ q, limit: "80" }));
+      }, 280);
+      return () => {
+        if (searchTimer.current) clearTimeout(searchTimer.current);
+      };
+    }
+
+    if (mode === "alphabet") {
+      if (!activeLetter) {
+        setWords([]);
+        setState("idle");
+        return;
+      }
+      const col = letterCollections.get(activeLetter);
+      void loadList(() =>
+        col
+          ? fetchWords({ collectionId: String(col.id), limit: "2000" })
+          : fetchWords({ startsWith: activeLetter.toLowerCase(), limit: "500" })
+      );
       return;
     }
 
-    // Ищем коллекцию с этой буквой по slug
-    const slugSuffix = letter.toLowerCase();
-    const col = collections.find(c => c.slug === `slovar-1958-${slugSuffix}`);
-    if (col) {
-      setState("loading");
-      try {
-        const data = await loadWords(col.id);
-        setWords(data);
+    if (mode === "mine") {
+      const ids = Array.from(selectedWordIds);
+      if (ids.length === 0) {
+        setWords([]);
         setState("success");
-      } catch { setState("error"); }
+        return;
+      }
+      void loadList(() => fetchWords({ ids: ids.slice(0, 500).join(","), limit: "500" }));
     }
-  }, [collections, loadWords]);
+  }, [bootstrapped, mode, searchQuery, activeLetter, letterCollections, loadList, selectedWordIds]);
 
-  // ── Добавить/убрать слово ─────────────────────────────────────────────────
-  const handleToggleWord = useCallback(async (wordId: number) => {
-    if (pendingWordIds.has(wordId)) return;
-    const was = selectedWordIds.has(wordId);
-    setSelectedWordIds(prev => {
-      const n = new Set(prev);
-      was ? n.delete(wordId) : n.add(wordId);
-      return n;
-    });
-    setPendingWordIds(prev => new Set(prev).add(wordId));
-    try {
-      const r = await setStudySelection("word", wordId, !was);
-      setSelectedWordIds(new Set(r.wordIds));
-      setSelectedCollectionIds(new Set(r.collectionIds));
-    } catch {
-      setSelectedWordIds(prev => {
-        const n = new Set(prev);
-        was ? n.add(wordId) : n.delete(wordId);
-        return n;
-      });
-    } finally {
-      setPendingWordIds(prev => {
-        const n = new Set(prev);
-        n.delete(wordId);
-        return n;
-      });
-    }
-  }, [pendingWordIds, selectedWordIds]);
-
-  // ── Фильтрация ────────────────────────────────────────────────────────────
   const partsOfSpeech = useMemo(() => {
     const s = new Set<string>();
-    words.forEach(w => { if (w.partOfSpeech) s.add(w.partOfSpeech); });
+    words.forEach((w) => {
+      if (w.partOfSpeech) s.add(w.partOfSpeech);
+    });
     return Array.from(s).sort();
   }, [words]);
 
-  const q = searchQuery.trim().toLowerCase();
   const displayedWords = useMemo(() => {
-    // Показываем только основные слова (priority=1) в списке
-    let r = words.filter(w => w.translationPriority === 1);
-    if (q) {
-      r = r.filter(w =>
-        w.lemma.toLowerCase().includes(q) ||
-        w.translation.toLowerCase().includes(q)
-      );
+    if (filterPos === "all") return words;
+    return words.filter((w) => w.partOfSpeech === filterPos);
+  }, [words, filterPos]);
+
+  const handleToggleWord = useCallback(
+    async (wordId: number) => {
+      if (pendingWordIds.has(wordId)) return;
+      const was = selectedWordIds.has(wordId);
+      setSelectedWordIds((prev) => {
+        const n = new Set(prev);
+        was ? n.delete(wordId) : n.add(wordId);
+        return n;
+      });
+      setPendingWordIds((prev) => new Set(prev).add(wordId));
+      try {
+        const r = await setStudySelection("word", wordId, !was);
+        setSelectedWordIds(new Set(r.wordIds));
+        setSelectedCollectionIds(new Set(r.collectionIds));
+      } catch {
+        setSelectedWordIds((prev) => {
+          const n = new Set(prev);
+          was ? n.add(wordId) : n.delete(wordId);
+          return n;
+        });
+      } finally {
+        setPendingWordIds((prev) => {
+          const n = new Set(prev);
+          n.delete(wordId);
+          return n;
+        });
+      }
+    },
+    [pendingWordIds, selectedWordIds]
+  );
+
+  const handleToggleCollection = useCallback(
+    async (collectionId: number) => {
+      if (pendingCollectionIds.has(collectionId)) return;
+      const was = selectedCollectionIds.has(collectionId);
+      setSelectedCollectionIds((prev) => {
+        const n = new Set(prev);
+        was ? n.delete(collectionId) : n.add(collectionId);
+        return n;
+      });
+      setPendingCollectionIds((prev) => new Set(prev).add(collectionId));
+      try {
+        const r = await setStudySelection("collection", collectionId, !was);
+        setSelectedWordIds(new Set(r.wordIds));
+        setSelectedCollectionIds(new Set(r.collectionIds));
+      } catch {
+        setSelectedCollectionIds((prev) => {
+          const n = new Set(prev);
+          was ? n.add(collectionId) : n.delete(collectionId);
+          return n;
+        });
+      } finally {
+        setPendingCollectionIds((prev) => {
+          const n = new Set(prev);
+          n.delete(collectionId);
+          return n;
+        });
+      }
+    },
+    [pendingCollectionIds, selectedCollectionIds]
+  );
+
+  const handleAddVisible = useCallback(async () => {
+    const toAdd = displayedWords.filter((w) => !selectedWordIds.has(w.id)).slice(0, 100);
+    if (toAdd.length === 0) return;
+    setBulkPending(true);
+    try {
+      let last = { wordIds: Array.from(selectedWordIds), collectionIds: Array.from(selectedCollectionIds) };
+      for (const w of toAdd) {
+        last = await setStudySelection("word", w.id, true);
+      }
+      setSelectedWordIds(new Set(last.wordIds));
+      setSelectedCollectionIds(new Set(last.collectionIds));
+    } finally {
+      setBulkPending(false);
     }
-    if (filterPos !== "all") r = r.filter(w => w.partOfSpeech === filterPos);
-    return r;
-  }, [words, q, filterPos]);
+  }, [displayedWords, selectedWordIds, selectedCollectionIds]);
 
-  // Буквы у которых есть коллекция в БД
-  const lettersWithData = useMemo(() => {
-    const s = new Set<string>();
-    collections.forEach(c => {
-      // slug вида "slovar-1958-а" → берём последний сегмент и приводим к верхнему регистру
-      const parts = c.slug.split("-");
-      const letter = parts[parts.length - 1].toUpperCase();
-      if (letter) s.add(letter);
-    });
-    return s;
-  }, [collections]);
+  const openPack = useCallback(
+    async (title: string, loader: () => Promise<DictionaryWord[]>) => {
+      setMode("start");
+      setPackTitle(title);
+      setSearchQuery("");
+      setFilterPos("all");
+      setActiveLetter(null);
+      await loadList(loader);
+    },
+    [loadList]
+  );
 
-  // ─────────────────────────────────────────────────────────────────────────
+  const activeLetterCollection = activeLetter ? letterCollections.get(activeLetter) ?? null : null;
+  const letterInStudy = activeLetterCollection
+    ? selectedCollectionIds.has(activeLetterCollection.id)
+    : false;
+
+  const showWordList =
+    (mode === "search" && (searchQuery.trim().length > 0 || state === "loading" || state === "success")) ||
+    (mode === "alphabet" && activeLetter !== null) ||
+    mode === "mine" ||
+    (mode === "start" && packTitle !== null);
+
   return (
-    <div className="flex flex-col h-screen bg-gray-50 overflow-hidden">
-
-      {/* ── ВЕРХНЯЯ ПАНЕЛЬ ────────────────────────────────────────────────── */}
-      <div className="bg-white border-b border-gray-100 px-4 pt-4 pb-0 shrink-0">
-
-        {/* Заголовок + кнопка повторить */}
-        <div className="flex items-center justify-between mb-3">
+    <div className="flex min-h-[calc(100vh-3.5rem)] flex-col bg-lk-bg font-sans text-lk-text">
+      {/* Header */}
+      <div className="shrink-0 border-b border-lk-line bg-lk-bg/95 px-4 pt-4 backdrop-blur">
+        <div className="mx-auto flex max-w-[1200px] items-start justify-between gap-3">
           <div>
-            <h1 className="text-xl font-bold text-gray-900">Словарь</h1>
-            {hasLoaded && (
-              <p className="text-xs text-gray-400 mt-0.5">
-                {displayedWords.length.toLocaleString()} слов
-                {selectedWordIds.size > 0 && (
-                  <> · <span className="text-emerald-600 font-medium">{selectedWordIds.size} в изучении</span></>
-                )}
-              </p>
-            )}
+            <h1 className="font-serif text-xl font-bold text-lk-text">Словарь</h1>
+            <p className="mt-0.5 text-xs text-lk-faint">
+              {selectedWordIds.size > 0 ? (
+                <>
+                  <span className="font-medium text-lk-green">{selectedWordIds.size} в изучении</span>
+                  {" · "}выбирайте слова и наборы, затем повторяйте
+                </>
+              ) : (
+                "Найдите слова или добавьте набор — потом откройте повторение"
+              )}
+            </p>
           </div>
-          <a
-            href="/study"
-            className="flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100"
+          <Link
+            href="/review"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-lk-gold-border bg-lk-gold-dim px-3 py-1.5 text-xs font-semibold text-lk-gold no-underline transition hover:brightness-110"
           >
-            Повторить
-          </a>
+            <RefreshCw size={13} /> Повторение
+          </Link>
         </div>
 
-        {/* Поиск */}
-        <div className="relative mb-3">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-          <input
-            ref={searchInputRef}
-            type="text"
-            value={searchQuery}
-            onChange={e => {
-              setSearchQuery(e.target.value);
-              if (e.target.value) setActiveLetter("all");
-            }}
-            placeholder="Поиск по-лакски или по-русски..."
-            className="w-full rounded-xl border border-gray-200 bg-gray-50 py-2.5 pl-9 pr-9 text-sm text-gray-900 placeholder-gray-400 outline-none focus:border-emerald-300 focus:bg-white focus:ring-2 focus:ring-emerald-100 transition"
-          />
-          {searchQuery && (
-            <button
-              type="button"
-              onClick={() => { setSearchQuery(""); searchInputRef.current?.focus(); }}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
-        </div>
-
-        {/* Алфавит — горизонтальный скролл */}
-        <div className="flex gap-1 overflow-x-auto scrollbar-none pb-3">
-          <button
-            type="button"
-            onClick={() => void handleLetterChange("all")}
-            className={[
-              "shrink-0 rounded-lg px-2.5 py-1.5 text-sm font-semibold transition-colors",
-              activeLetter === "all"
-                ? "bg-emerald-500 text-white"
-                : "text-gray-500 hover:bg-gray-100",
-            ].join(" ")}
-          >
-            Все
-          </button>
-          {ALPHABET.map(letter => {
-            const hasData = lettersWithData.has(letter);
-            const isActive = activeLetter === letter;
+        {/* Mode tabs */}
+        <div className="mx-auto mt-3 flex max-w-[1200px] gap-1 overflow-x-auto pb-3">
+          {MODES.map((m) => {
+            const active = mode === m.id && !(m.id === "start" && packTitle);
             return (
               <button
-                key={letter}
+                key={m.id}
                 type="button"
-                onClick={() => hasData ? void handleLetterChange(letter) : undefined}
-                disabled={!hasData}
-                className={[
-                  "relative shrink-0 rounded-lg px-2.5 py-1.5 text-sm font-semibold transition-colors",
-                  isActive
-                    ? "bg-emerald-500 text-white"
-                    : hasData
-                      ? "text-gray-700 hover:bg-gray-100"
-                      : "text-gray-300 cursor-default",
-                ].join(" ")}
+                onClick={() => {
+                  setPackTitle(null);
+                  setMode(m.id);
+                  setFilterPos("all");
+                  if (m.id === "search") {
+                    setTimeout(() => searchRef.current?.focus(), 50);
+                  }
+                  if (m.id !== "alphabet") setActiveLetter(null);
+                }}
+                className={`shrink-0 rounded-full px-3.5 py-1.5 text-sm font-semibold transition ${
+                  active || (m.id === "start" && mode === "start" && !packTitle)
+                    ? "bg-lk-gold text-lk-bg"
+                    : "bg-lk-navy2 text-lk-muted hover:text-lk-text"
+                }`}
               >
-                {letter}
-                {/* Зелёная точка — буква в изучении */}
-                {hasData && selectedCollectionIds.has(
-                  collections.find(c => c.slug === `slovar-1958-${letter.toLowerCase()}`)?.id ?? -1
-                ) && (
-                  <span className="absolute top-0.5 right-0.5 h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                )}
+                {m.label}
               </button>
             );
           })}
         </div>
-
-        {/* Фильтр по части речи */}
-        {partsOfSpeech.length > 0 && !searchQuery && (
-          <div className="flex gap-1.5 overflow-x-auto scrollbar-none pb-3">
-            <button
-              type="button"
-              onClick={() => setFilterPos("all")}
-              className={[
-                "shrink-0 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-                filterPos === "all"
-                  ? "border-emerald-300 bg-emerald-50 text-emerald-700"
-                  : "border-gray-200 bg-white text-gray-500 hover:border-gray-300",
-              ].join(" ")}
-            >
-              Все
-            </button>
-            {partsOfSpeech.map(pos => (
-              <button
-                key={pos}
-                type="button"
-                onClick={() => setFilterPos(pos)}
-                className={[
-                  "shrink-0 rounded-full border px-3 py-1 text-xs font-medium transition-colors",
-                  filterPos === pos
-                    ? "border-emerald-300 bg-emerald-50 text-emerald-700"
-                    : "border-gray-200 bg-white text-gray-500 hover:border-gray-300",
-                ].join(" ")}
-              >
-                {pos}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Статус */}
-        <div className="flex items-center justify-between pb-2 text-xs text-gray-400">
-          {activeLetter !== "all" && !searchQuery
-            ? <span><span className="font-medium text-gray-700">{activeLetter}</span> — {displayedWords.length} слов</span>
-            : searchQuery
-              ? <span>Найдено: <span className="font-medium text-gray-700">{displayedWords.length}</span></span>
-              : <span>Всего: <span className="font-medium text-gray-700">{displayedWords.length.toLocaleString()}</span></span>
-          }
-        </div>
       </div>
 
-      {/* ── ОСНОВНАЯ ОБЛАСТЬ ────────────────────────────────────────────── */}
-      <div className="flex flex-1 overflow-hidden">
-
-        {/* ── СПИСОК СЛОВ ─────────────────────────────────────────────── */}
-        <div className="flex-1 overflow-y-auto">
-
-          {/* Загрузка */}
-          {state === "loading" && (
-            <div className="space-y-0">
-              {Array.from({ length: 12 }).map((_, i) => (
-                <div key={i} className="flex items-center gap-3 px-4 py-3 border-b border-gray-100">
-                  <div className="h-2 w-2 rounded-full bg-gray-200 shrink-0" />
-                  <div className="h-4 w-32 rounded bg-gray-200 animate-pulse" />
-                  <div className="h-3 w-24 rounded bg-gray-100 animate-pulse ml-2" />
+      <div className="mx-auto flex w-full max-w-[1200px] flex-1 overflow-hidden">
+        {/* Main column */}
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          {/* START mode hub */}
+          {mode === "start" && !packTitle && (
+            <div className="flex-1 space-y-4 overflow-y-auto p-4">
+              <section>
+                <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-lk-faint">С чего начать</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => void openPack("100 частых слов", () => fetchWords({ limit: "100" }))}
+                    className="lk-card lk-lift flex items-start gap-3 p-4 text-left"
+                  >
+                    <span className="rounded-xl bg-lk-gold-dim p-2 text-lk-gold"><Sparkles size={18} /></span>
+                    <span>
+                      <span className="block font-semibold text-lk-text">100 частых слов</span>
+                      <span className="mt-0.5 block text-xs text-lk-muted">Лучший старт — высокая частотность</span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void openPack("500 частых слов", () => fetchWords({ limit: "500" }))}
+                    className="lk-card lk-lift flex items-start gap-3 p-4 text-left"
+                  >
+                    <span className="rounded-xl bg-lk-green-dim p-2 text-lk-green"><BookMarked size={18} /></span>
+                    <span>
+                      <span className="block font-semibold text-lk-text">500 частых слов</span>
+                      <span className="mt-0.5 block text-xs text-lk-muted">Расширенный базовый запас</span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMode("alphabet");
+                      setAlphaMode("lak");
+                      setActiveLetter(null);
+                    }}
+                    className="lk-card lk-lift flex items-start gap-3 p-4 text-left"
+                  >
+                    <span className="rounded-xl bg-lk-navy3 p-2 text-lk-muted"><Type size={18} /></span>
+                    <span>
+                      <span className="block font-semibold text-lk-text">По алфавиту</span>
+                      <span className="mt-0.5 block text-xs text-lk-muted">Лакский индекс букв и диграфов</span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMode("search")}
+                    className="lk-card lk-lift flex items-start gap-3 p-4 text-left"
+                  >
+                    <span className="rounded-xl bg-lk-navy3 p-2 text-lk-muted"><Search size={18} /></span>
+                    <span>
+                      <span className="block font-semibold text-lk-text">Поиск</span>
+                      <span className="mt-0.5 block text-xs text-lk-muted">Лакский или русский запрос</span>
+                    </span>
+                  </button>
                 </div>
+              </section>
+
+              <section>
+                <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-lk-faint">Тематические наборы</p>
+                {topicCollections.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-lk-line bg-lk-navy2/50 p-6 text-center">
+                    <p className="text-sm font-medium text-lk-text">Наборов пока нет</p>
+                    <p className="mt-1 text-xs text-lk-muted">
+                      Когда в админке появятся тематические коллекции, они отобразятся здесь.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {topicCollections.map((col) => {
+                      const inStudy = selectedCollectionIds.has(col.id);
+                      const pending = pendingCollectionIds.has(col.id);
+                      return (
+                        <div
+                          key={col.id}
+                          className="lk-card flex items-center gap-3 p-3"
+                        >
+                          <button
+                            type="button"
+                            className="min-w-0 flex-1 text-left"
+                            onClick={() =>
+                              void openPack(col.title, () =>
+                                fetchWords({ collectionId: String(col.id), limit: "2000" })
+                              )
+                            }
+                          >
+                            <span className="block truncate font-semibold text-lk-text">{col.title}</span>
+                            <span className="text-xs text-lk-muted">
+                              {col.wordCount} слов
+                              {col.description ? ` · ${col.description}` : ""}
+                            </span>
+                          </button>
+                          <button
+                            type="button"
+                            disabled={pending}
+                            onClick={() => void handleToggleCollection(col.id)}
+                            className={`shrink-0 rounded-xl border px-3 py-1.5 text-xs font-semibold transition disabled:opacity-50 ${
+                              inStudy
+                                ? "border-lk-green bg-lk-green-dim text-lk-green"
+                                : "border-lk-line text-lk-muted hover:border-lk-gold-border hover:text-lk-gold"
+                            }`}
+                          >
+                            {pending ? "…" : inStudy ? "В изучении" : "Учить набор"}
+                          </button>
+                          <ChevronRight size={16} className="shrink-0 text-lk-faint" />
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </section>
+            </div>
+          )}
+
+          {/* Search bar */}
+          {mode === "search" && (
+            <div className="shrink-0 border-b border-lk-line px-4 py-3">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-lk-faint" />
+                <input
+                  ref={searchRef}
+                  type="search"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Поиск по-лакски или по-русски…"
+                  className="w-full rounded-xl border border-lk-line bg-lk-navy2 py-2.5 pl-9 pr-9 text-sm text-lk-text outline-none placeholder:text-lk-faint focus:border-lk-gold-border"
+                  style={{ fontFamily: T.sans }}
+                />
+                {searchQuery ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchQuery("");
+                      searchRef.current?.focus();
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-lk-faint hover:text-lk-text"
+                  >
+                    <X size={16} />
+                  </button>
+                ) : null}
+              </div>
+            </div>
+          )}
+
+          {/* Alphabet controls */}
+          {mode === "alphabet" && (
+            <div className="shrink-0 space-y-2 border-b border-lk-line px-4 py-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex rounded-xl border border-lk-line bg-lk-navy2 p-0.5">
+                  {([
+                    { id: "lak" as const, label: "Лакский" },
+                    { id: "ru" as const, label: "Как в словаре" },
+                  ]).map((opt) => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => {
+                        setAlphaMode(opt.id);
+                        setActiveLetter(null);
+                        setWords([]);
+                        setState("idle");
+                      }}
+                      className={`rounded-lg px-3 py-1 text-xs font-semibold transition ${
+                        alphaMode === opt.id ? "bg-lk-gold text-lk-bg" : "text-lk-muted"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                {activeLetter ? (
+                  <div className="flex items-center gap-2">
+                    {activeLetterCollection ? (
+                      <button
+                        type="button"
+                        disabled={pendingCollectionIds.has(activeLetterCollection.id)}
+                        onClick={() => void handleToggleCollection(activeLetterCollection.id)}
+                        className={`rounded-xl border px-3 py-1.5 text-xs font-semibold transition disabled:opacity-50 ${
+                          letterInStudy
+                            ? "border-lk-green bg-lk-green-dim text-lk-green"
+                            : "border-lk-line text-lk-muted hover:border-lk-gold-border hover:text-lk-gold"
+                        }`}
+                      >
+                        {letterInStudy ? "Буква в изучении" : "Учить букву"}
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={bulkPending || displayedWords.length === 0}
+                        onClick={() => void handleAddVisible()}
+                        className="rounded-xl border border-lk-line px-3 py-1.5 text-xs font-semibold text-lk-muted transition hover:border-lk-gold-border hover:text-lk-gold disabled:opacity-50"
+                      >
+                        {bulkPending ? "Добавляю…" : "Добавить показанные"}
+                      </button>
+                    )}
+                  </div>
+                ) : null}
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {alphabetLetters.map((letter) => {
+                  const hasCol = letterCollections.has(letter);
+                  const active = activeLetter === letter;
+                  const inStudy = hasCol && selectedCollectionIds.has(letterCollections.get(letter)!.id);
+                  return (
+                    <button
+                      key={letter}
+                      type="button"
+                      onClick={() => setActiveLetter(letter)}
+                      className={`relative shrink-0 rounded-lg px-2.5 py-1.5 text-sm font-semibold transition ${
+                        active
+                          ? "bg-lk-gold text-lk-bg"
+                          : "bg-lk-navy2 text-lk-muted hover:text-lk-text"
+                      }`}
+                    >
+                      {letter}
+                      {inStudy ? (
+                        <span className="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-lk-green" />
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+              {!activeLetter ? (
+                <p className="text-xs text-lk-faint">
+                  Выберите букву. «Лакский» — диграфы как на странице Буквы; «Как в словаре» — русская разбивка (если есть наборы slovar-1958).
+                </p>
+              ) : null}
+            </div>
+          )}
+
+          {/* Pack header when browsing from Start */}
+          {mode === "start" && packTitle ? (
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-lk-line px-4 py-3">
+              <div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPackTitle(null);
+                    setWords([]);
+                    setState("idle");
+                  }}
+                  className="text-xs font-medium text-lk-muted hover:text-lk-gold"
+                >
+                  ← Наборы
+                </button>
+                <p className="font-semibold text-lk-text">{packTitle}</p>
+              </div>
+              <button
+                type="button"
+                disabled={bulkPending || displayedWords.length === 0}
+                onClick={() => void handleAddVisible()}
+                className="rounded-xl border border-lk-gold-border bg-lk-gold-dim px-3 py-1.5 text-xs font-semibold text-lk-gold disabled:opacity-50"
+              >
+                {bulkPending ? "Добавляю…" : "Добавить показанные"}
+              </button>
+            </div>
+          ) : null}
+
+          {/* POS filter */}
+          {showWordList && partsOfSpeech.length > 0 ? (
+            <div className="flex shrink-0 gap-1.5 overflow-x-auto border-b border-lk-line px-4 py-2">
+              <button
+                type="button"
+                onClick={() => setFilterPos("all")}
+                className={`shrink-0 rounded-full border px-3 py-1 text-xs font-medium ${
+                  filterPos === "all"
+                    ? "border-lk-gold-border bg-lk-gold-dim text-lk-gold"
+                    : "border-lk-line text-lk-muted"
+                }`}
+              >
+                Все
+              </button>
+              {partsOfSpeech.map((pos) => (
+                <button
+                  key={pos}
+                  type="button"
+                  onClick={() => setFilterPos(pos)}
+                  className={`shrink-0 rounded-full border px-3 py-1 text-xs font-medium ${
+                    filterPos === pos
+                      ? "border-lk-gold-border bg-lk-gold-dim text-lk-gold"
+                      : "border-lk-line text-lk-muted"
+                  }`}
+                >
+                  {pos}
+                </button>
               ))}
             </div>
-          )}
+          ) : null}
 
-          {/* Ошибка */}
-          {state === "error" && (
-            <p className="m-4 rounded-2xl border border-red-100 bg-red-50 p-4 text-sm text-red-600">
-              Не удалось загрузить словарь. Обновите страницу.
-            </p>
-          )}
-
-          {/* Пустой результат поиска */}
-          {state === "success" && displayedWords.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-16 text-center">
-              <p className="text-4xl mb-3">🔍</p>
-              <p className="text-sm font-medium text-gray-700">Ничего не найдено</p>
-              <p className="text-xs text-gray-400 mt-1">Попробуйте другой запрос или букву</p>
+          {/* Status line */}
+          {showWordList ? (
+            <div className="shrink-0 px-4 py-2 text-xs text-lk-faint">
+              {state === "loading"
+                ? "Загрузка…"
+                : state === "error"
+                  ? "Не удалось загрузить"
+                  : mode === "search" && !searchQuery.trim()
+                    ? "Введите запрос"
+                    : `${displayedWords.length.toLocaleString()} слов`}
             </div>
-          )}
+          ) : null}
 
-          {/* Список */}
-          {state === "success" && displayedWords.length > 0 && (
-            <>
-              {displayedWords.map(word => {
-                const isSelected = selectedWordIds.has(word.id);
-                const isPending  = pendingWordIds.has(word.id);
-                const isActive   = selectedWord?.id === word.id;
-                const gl         = genderLabel(word.gender ?? null);
+          {/* Word list */}
+          {showWordList ? (
+            <div className="flex-1 overflow-y-auto pb-24 lg:pb-8">
+              {state === "loading" &&
+                Array.from({ length: 10 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-3 border-b border-lk-line px-4 py-3">
+                    <div className="h-2 w-2 rounded-full bg-lk-navy3" />
+                    <div className="h-4 w-28 animate-pulse rounded bg-lk-navy3" />
+                    <div className="h-3 w-24 animate-pulse rounded bg-lk-navy2" />
+                  </div>
+                ))}
 
-                return (
-                  <div
-                    key={word.id}
-                    onClick={() => setSelectedWord(isActive ? null : word)}
-                    className={[
-                      "group flex items-center gap-3 px-4 py-3 border-b border-gray-100 cursor-pointer transition-colors",
-                      isActive
-                        ? "bg-emerald-50"
-                        : "hover:bg-gray-50",
-                    ].join(" ")}
-                  >
-                    {/* Точка изучения */}
-                    <span className={[
-                      "h-2 w-2 shrink-0 rounded-full transition-colors",
-                      isSelected ? "bg-emerald-500" : "bg-gray-200",
-                    ].join(" ")} />
+              {state === "error" && (
+                <p className="m-4 rounded-2xl border border-lk-red bg-lk-red-dim p-4 text-sm text-lk-red">
+                  Не удалось загрузить слова. Обновите страницу.
+                </p>
+              )}
 
-                    {/* Лакское слово */}
-                    <div className="w-44 shrink-0">
-                      <p className={[
-                        "text-sm font-semibold truncate",
-                        isActive ? "text-emerald-900" : "text-gray-900",
-                      ].join(" ")}>
-                        {word.lemma}
-                      </p>
-                    </div>
+              {state === "idle" && mode === "search" && (
+                <div className="flex flex-col items-center justify-center gap-2 px-6 py-16 text-center">
+                  <Search className="text-lk-faint" size={28} />
+                  <p className="text-sm font-medium text-lk-text">Начните вводить слово</p>
+                  <p className="text-xs text-lk-muted">Поиск идёт по всему словарю — лакский и русский</p>
+                </div>
+              )}
 
-                    {/* Перевод */}
-                    <p className="flex-1 min-w-0 text-sm text-gray-500 truncate">
-                      {word.translation}
-                    </p>
-
-                    {/* Бейджи */}
-                    <div className="hidden sm:flex items-center gap-1.5 shrink-0">
-                      {word.partOfSpeech && (
-                        <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
-                          {word.partOfSpeech}
-                        </span>
-                      )}
-                      {gl && (
-                        <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-xs text-indigo-500">
-                          {gl}
-                        </span>
-                      )}
-                      {word.verbAspect && (
-                        <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-600">
-                          {word.verbAspect}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Кнопка изучать */}
+              {state === "success" && displayedWords.length === 0 && (
+                <div className="flex flex-col items-center justify-center gap-2 px-6 py-16 text-center">
+                  <p className="text-sm font-medium text-lk-text">
+                    {mode === "mine" ? "Пока ничего в изучении" : "Ничего не найдено"}
+                  </p>
+                  <p className="text-xs text-lk-muted">
+                    {mode === "mine"
+                      ? "Добавьте слова из поиска, алфавита или готовых наборов"
+                      : "Словарь пуст или нет совпадений — загрузите слова в админке"}
+                  </p>
+                  {mode === "mine" ? (
                     <button
                       type="button"
-                      onClick={e => { e.stopPropagation(); void handleToggleWord(word.id); }}
-                      disabled={isPending}
-                      title={isSelected ? "Убрать из изучения" : "Добавить в изучение"}
-                      className={[
-                        "flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border transition-all disabled:opacity-50",
-                        isSelected
-                          ? "border-emerald-200 bg-emerald-50 text-emerald-600 hover:border-red-200 hover:bg-red-50 hover:text-red-500"
-                          : "border-gray-200 bg-white text-gray-400 opacity-0 group-hover:opacity-100 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-600",
-                      ].join(" ")}
+                      onClick={() => setMode("start")}
+                      className="mt-2 rounded-xl bg-lk-gold px-4 py-2 text-xs font-bold text-lk-bg"
                     >
-                      {isPending ? (
-                        <span className="text-[10px]">·</span>
-                      ) : isSelected ? (
-                        <Check className="h-3.5 w-3.5" />
-                      ) : (
-                        <Plus className="h-3.5 w-3.5" />
-                      )}
+                      К наборам
                     </button>
-                  </div>
-                );
-              })}
-              <div className="h-8" />
-            </>
-          )}
+                  ) : null}
+                </div>
+              )}
+
+              {state === "success" &&
+                displayedWords.map((word) => (
+                  <WordRow
+                    key={word.id}
+                    word={word}
+                    isActive={selectedWord?.id === word.id}
+                    isStudying={selectedWordIds.has(word.id)}
+                    isPending={pendingWordIds.has(word.id)}
+                    onSelect={() => setSelectedWord((prev) => (prev?.id === word.id ? null : word))}
+                    onToggle={() => void handleToggleWord(word.id)}
+                  />
+                ))}
+            </div>
+          ) : null}
         </div>
 
-        {/* ── ДЕТАЛЬНАЯ ПАНЕЛЬ (десктоп) ──────────────────────────────── */}
-        <div className="hidden lg:flex w-80 shrink-0 border-l border-gray-100 bg-white overflow-y-auto flex-col">
+        {/* Desktop detail */}
+        <div className="hidden w-80 shrink-0 flex-col overflow-y-auto border-l border-lk-line bg-lk-navy lg:flex">
           {selectedWord ? (
             <WordDetail
               word={selectedWord}
@@ -623,46 +888,32 @@ export default function DictionaryPage() {
               onToggle={() => void handleToggleWord(selectedWord.id)}
             />
           ) : (
-            <div className="flex flex-1 flex-col items-center justify-center gap-3 p-8 text-center text-gray-400">
-              <span className="text-4xl">👈</span>
-              <p className="text-sm">Выберите слово<br />чтобы увидеть карточку</p>
+            <div className="flex flex-1 flex-col items-center justify-center gap-2 p-8 text-center text-lk-faint">
+              <BookMarked size={28} />
+              <p className="text-sm">Выберите слово,<br />чтобы увидеть карточку</p>
             </div>
           )}
         </div>
       </div>
 
-      {/* ── ШТОРКА СНИЗУ (мобильный) ─────────────────────────────────── */}
-      {selectedWord && (
-        <div className="lg:hidden fixed inset-x-0 bottom-0 z-40 bg-white rounded-t-2xl shadow-xl border-t border-gray-100 max-h-[70vh] overflow-y-auto">
-          {/* Ручка */}
-          <div className="flex justify-center pt-3 pb-1">
-            <div className="h-1 w-10 rounded-full bg-gray-200" />
+      {/* Mobile sheet */}
+      {selectedWord ? (
+        <>
+          <div className="fixed inset-0 z-30 bg-black/40 lg:hidden" onClick={() => setSelectedWord(null)} />
+          <div className="fixed inset-x-0 bottom-0 z-40 max-h-[70vh] overflow-y-auto rounded-t-2xl border-t border-lk-line bg-lk-navy pb-[calc(62px+env(safe-area-inset-bottom))] shadow-lk lg:hidden">
+            <div className="flex justify-center pt-3">
+              <div className="h-1 w-10 rounded-full bg-lk-navy3" />
+            </div>
+            <WordDetail
+              word={selectedWord}
+              isStudying={selectedWordIds.has(selectedWord.id)}
+              isPending={pendingWordIds.has(selectedWord.id)}
+              onToggle={() => void handleToggleWord(selectedWord.id)}
+              onClose={() => setSelectedWord(null)}
+            />
           </div>
-          {/* Крестик */}
-          <button
-            type="button"
-            onClick={() => setSelectedWord(null)}
-            className="absolute right-4 top-3 text-gray-400 hover:text-gray-600"
-          >
-            <X className="h-5 w-5" />
-          </button>
-          <WordDetail
-            word={selectedWord}
-            isStudying={selectedWordIds.has(selectedWord.id)}
-            isPending={pendingWordIds.has(selectedWord.id)}
-            onToggle={() => void handleToggleWord(selectedWord.id)}
-          />
-        </div>
-      )}
-
-      {/* Затемнение под шторкой */}
-      {selectedWord && (
-        <div
-          className="lg:hidden fixed inset-0 z-30 bg-black/20"
-          onClick={() => setSelectedWord(null)}
-        />
-      )}
-
+        </>
+      ) : null}
     </div>
   );
 }

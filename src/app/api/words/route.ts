@@ -78,6 +78,37 @@ function buildFilters(url: URL) {
     )`);
   }
 
+  // Поиск по лемме / переводу
+  const searchQuery = normalizeOptional(url.searchParams.get("q"));
+  if (searchQuery) {
+    const pattern = addParam(`%${searchQuery.toLowerCase()}%`);
+    where.push(`(LOWER(w.lemma) LIKE ${pattern} OR LOWER(w.translation) LIKE ${pattern})`);
+  }
+
+  // Навигация по первой букве (лакский/русский индекс)
+  const startsWith = normalizeOptional(url.searchParams.get("startsWith"));
+  if (startsWith) {
+    const prefix = addParam(`${startsWith.toLowerCase()}%`);
+    where.push(`LOWER(w.lemma) LIKE ${prefix}`);
+  }
+
+  // Явный список id (режим «Моё»)
+  const idsRaw = normalizeOptional(url.searchParams.get("ids"));
+  if (idsRaw) {
+    const ids = idsRaw
+      .split(",")
+      .map((item) => Number.parseInt(item.trim(), 10))
+      .filter((item) => Number.isInteger(item) && item > 0)
+      .slice(0, 500);
+
+    if (ids.length > 0) {
+      const refs = ids.map((id) => addParam(id));
+      where.push(`w.id IN (${refs.join(", ")})`);
+    } else {
+      where.push("FALSE");
+    }
+  }
+
   // Фильтр по типу записи: word | phrase
   const wordType = normalizeOptional(url.searchParams.get("wordType"));
   if (wordType === "word" || wordType === "phrase") {

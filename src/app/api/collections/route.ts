@@ -12,6 +12,7 @@ type PublicCollectionRow = {
   cover_url: string | null;
   sort_order: number;
   rule_tag_codes: string[];
+  kind: string;
   word_count: number;
 };
 
@@ -33,6 +34,7 @@ export async function GET(request: Request) {
         c.cover_url,
         c.sort_order,
         c.rule_tag_codes,
+        COALESCE(c.kind, 'topic') AS kind,
         COUNT(w.id)::int AS word_count
       FROM collections c
       LEFT JOIN words w
@@ -82,6 +84,7 @@ export async function GET(request: Request) {
         coverUrl: row.cover_url,
         sortOrder: row.sort_order,
         ruleTagCodes: row.rule_tag_codes ?? [],
+        kind: row.kind === "alphabet" ? "alphabet" : "topic",
         wordCount: row.word_count
       }))
     },
