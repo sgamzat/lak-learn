@@ -13,3 +13,5 @@ tsconfig.tsbuildinfo
 test.html
 words-*-export.*
 words-export.*
+parse/digiev_phrasebook.json
+parse/slovar_1958.json

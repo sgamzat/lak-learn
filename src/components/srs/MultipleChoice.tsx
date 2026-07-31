@@ -1,20 +1,24 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { Check, X } from "lucide-react";
 import type { FlashcardData, SRSRating } from "@/types/srs";
 
 interface MultipleChoiceProps {
   card: FlashcardData;
-  // Все слова очереди — берём из них дистракторы
+  /** Полный набор карточек сессии — для стабильных дистракторов */
   allCards: FlashcardData[];
-  // Этап 2: показываем русский, выбираем лакское
-  // Этап 3: показываем лакское, выбираем русский (reverse=true)
   reverse?: boolean;
   onRate: (rating: SRSRating) => void;
 }
 
 function shuffle<T>(arr: T[]): T[] {
-  return [...arr].sort(() => Math.random() - 0.5);
+  const copy = [...arr];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
 }
 
 export function MultipleChoice({
@@ -26,13 +30,11 @@ export function MultipleChoice({
   const [selected, setSelected] = useState<string | null>(null);
   const [options, setOptions] = useState<string[]>([]);
 
-  // Генерируем варианты при смене карточки
   useEffect(() => {
     setSelected(null);
 
     const correct = reverse ? card.translation : card.word;
 
-    // Берём 3 случайных дистрактора из других карточек
     const distractors = shuffle(
       allCards
         .filter((c) => c.id !== card.id)
@@ -43,94 +45,111 @@ export function MultipleChoice({
     setOptions(shuffle([correct, ...distractors]));
   }, [card.id, card.translation, card.word, allCards, reverse]);
 
-  const handleSelect = (option: string) => {
-    if (selected !== null) return; // уже ответили
+  const handleSelect = useCallback(
+    (option: string) => {
+      if (selected !== null) return;
 
-    setSelected(option);
-    const correct = reverse ? card.translation : card.word;
-    const isCorrect = option === correct;
+      setSelected(option);
+      const correctAnswer = reverse ? card.translation : card.word;
+      const isCorrect = option === correctAnswer;
 
-    // Небольшая задержка — пользователь видит результат
-    setTimeout(() => {
-      onRate(isCorrect ? "know" : "forgot");
-    }, 900);
-  };
+      window.setTimeout(() => {
+        onRate(isCorrect ? "know" : "forgot");
+      }, 900);
+    },
+    [selected, reverse, card.translation, card.word, onRate]
+  );
+
+  useEffect(() => {
+    if (selected !== null || options.length === 0) return;
+
+    const handler = (e: KeyboardEvent) => {
+      if (e.repeat) return;
+      const num = Number(e.key);
+      if (num >= 1 && num <= options.length) {
+        e.preventDefault();
+        const option = options[num - 1];
+        if (option) handleSelect(option);
+      }
+    };
+
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [selected, options, handleSelect]);
 
   const correct = reverse ? card.translation : card.word;
   const question = reverse ? card.word : card.translation;
 
   return (
     <div className="w-full max-w-sm space-y-5">
-
-      {/* Этап */}
-      <div className="text-center">
-        <span className="rounded-full bg-purple-50 px-3 py-1 text-xs font-semibold text-purple-600">
-          {reverse ? "Этап 3 — Вспомни перевод" : "Этап 2 — Выбери слово"}
-        </span>
-      </div>
-
-      {/* Вопрос */}
-      <div className="rounded-3xl bg-white p-8 text-center shadow-lg">
+      <div className="rounded-3xl border border-lk-line bg-lk-card p-8 text-center shadow-lk">
         {!reverse && card.partOfSpeech && (
-          <span className="mb-3 inline-block rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-600">
+          <span className="mb-3 inline-block rounded-full bg-lk-gold-dim px-3 py-1 text-xs font-medium text-lk-gold">
             {card.partOfSpeech}
           </span>
         )}
-        <p className="text-3xl font-bold text-gray-900">{question}</p>
+        <p className="font-serif text-3xl font-bold text-lk-text">{question}</p>
         {!reverse && card.transcription && (
-          <p className="mt-2 font-mono text-sm text-gray-400">[{card.transcription}]</p>
+          <p className="mt-2 font-mono text-sm text-lk-muted">[{card.transcription}]</p>
         )}
-        <p className="mt-3 text-sm text-gray-400">
+        <p className="mt-3 text-sm text-lk-muted">
           {reverse ? "Выберите правильный перевод" : "Выберите правильное слово на лакском"}
         </p>
       </div>
 
-      {/* Варианты */}
-      <div className="grid grid-cols-1 gap-3">
-        {options.map((option) => {
+      <div className="grid grid-cols-1 gap-3" role="listbox" aria-label="Варианты ответа">
+        {options.map((option, index) => {
           const isCorrect = option === correct;
           const isSelected = option === selected;
 
-          let style = "border-gray-200 bg-white text-gray-800 hover:border-blue-300 hover:bg-blue-50";
+          let style =
+            "border-lk-line bg-lk-card text-lk-text hover:border-lk-gold-border hover:bg-lk-card2";
           if (selected !== null) {
             if (isCorrect) {
-              style = "border-emerald-300 bg-emerald-50 text-emerald-800";
+              style = "border-lk-green/50 bg-lk-green-dim text-lk-green";
             } else if (isSelected) {
-              style = "border-red-300 bg-red-50 text-red-800";
+              style = "border-lk-red/50 bg-lk-red-dim text-lk-red";
             } else {
-              style = "border-gray-100 bg-gray-50 text-gray-400";
+              style = "border-lk-line/50 bg-lk-card2 text-lk-faint";
             }
           }
 
           return (
             <button
-              key={option}
+              key={`${option}-${index}`}
               type="button"
+              role="option"
+              aria-selected={isSelected}
               onClick={() => handleSelect(option)}
               disabled={selected !== null}
               className={[
-                "flex w-full items-center justify-between rounded-2xl border-2 px-5 py-4 text-left text-sm font-medium transition-all",
+                "flex min-h-[48px] w-full items-center justify-between rounded-2xl border-2 px-5 py-4 text-left text-sm font-medium transition-all",
                 "disabled:cursor-default active:scale-[0.98]",
                 style,
               ].join(" ")}
             >
-              <span className="text-base">{option}</span>
+              <span className="flex items-center gap-3">
+                <span className="font-mono text-[10px] text-lk-faint">{index + 1}</span>
+                <span className="text-base">{option}</span>
+              </span>
               {selected !== null && isCorrect && (
-                <span className="text-lg text-emerald-500">✓</span>
+                <Check className="h-5 w-5 text-lk-green" aria-hidden />
               )}
               {selected !== null && isSelected && !isCorrect && (
-                <span className="text-lg text-red-500">✕</span>
+                <X className="h-5 w-5 text-lk-red" aria-hidden />
               )}
             </button>
           );
         })}
       </div>
 
-      {/* Объяснение после ответа */}
       {selected !== null && selected !== correct && (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-center">
-          <p className="text-xs text-emerald-600">Правильный ответ:</p>
-          <p className="mt-1 text-lg font-bold text-emerald-800">{correct}</p>
+        <div
+          className="rounded-2xl border border-lk-green/40 bg-lk-green-dim p-4 text-center"
+          aria-live="polite"
+        >
+          <p className="text-xs text-lk-green">Правильный ответ</p>
+          <p className="mt-1 text-lg font-bold text-lk-text">{correct}</p>
         </div>
       )}
     </div>

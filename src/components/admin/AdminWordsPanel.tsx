@@ -1,39 +1,226 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
-import { Search, Pencil, Trash2, Check, X } from "lucide-react";
+import { Search, Pencil, Trash2, Check, X, Plus } from "lucide-react";
 
-// ── Типы ─────────────────────────────────────────────────────────────────────
 type Word = {
-  id:            number;
-  lemma:         string;
-  translation:   string;
+  id: number;
+  lemma: string;
+  translation: string;
   transcription: string | null;
-  partOfSpeech:  string | null;
+  partOfSpeech: string | null;
+  gender: string | null;
+  verbAspect: string | null;
+  wordType: string;
+  notes: string | null;
+  translationPriority: number;
+  synonymGroupId: string | null;
 };
 
 type EditState = {
-  lemma:         string;
-  translation:   string;
+  lemma: string;
+  translation: string;
   transcription: string;
-  partOfSpeech:  string;
+  partOfSpeech: string;
+  gender: string;
+  verbAspect: string;
+  wordType: string;
+  notes: string;
+  translationPriority: string;
+  synonymGroupId: string;
 };
 
 type StatusState =
   | { type: "idle" }
   | { type: "success"; message: string }
-  | { type: "error";   message: string };
+  | { type: "error"; message: string };
 
-// ── Вспомогательный компонент: модалка подтверждения удаления ────────────────
+const emptyEdit = (): EditState => ({
+  lemma: "",
+  translation: "",
+  transcription: "",
+  partOfSpeech: "",
+  gender: "",
+  verbAspect: "",
+  wordType: "word",
+  notes: "",
+  translationPriority: "1",
+  synonymGroupId: ""
+});
+
+function wordToEdit(word: Word): EditState {
+  return {
+    lemma: word.lemma,
+    translation: word.translation,
+    transcription: word.transcription ?? "",
+    partOfSpeech: word.partOfSpeech ?? "",
+    gender: word.gender ?? "",
+    verbAspect: word.verbAspect ?? "",
+    wordType: word.wordType || "word",
+    notes: word.notes ?? "",
+    translationPriority: String(word.translationPriority ?? 1),
+    synonymGroupId: word.synonymGroupId ?? ""
+  };
+}
+
+function editToPayload(draft: EditState) {
+  const priority = Number.parseInt(draft.translationPriority, 10);
+  return {
+    lemma: draft.lemma.trim(),
+    translation: draft.translation.trim(),
+    transcription: draft.transcription.trim() || null,
+    partOfSpeech: draft.partOfSpeech.trim() || null,
+    gender: draft.gender || null,
+    verbAspect: draft.verbAspect || null,
+    wordType: draft.wordType === "phrase" ? "phrase" : "word",
+    notes: draft.notes.trim() || null,
+    translationPriority: Number.isInteger(priority) && priority >= 1 ? priority : 1,
+    synonymGroupId: draft.synonymGroupId.trim() || null
+  };
+}
+
+const inputCls =
+  "w-full rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-blue-500";
+const labelCls = "space-y-0.5";
+const hintCls = "text-xs text-gray-500";
+
+function WordFields({
+  draft,
+  setDraft,
+  autoFocus
+}: {
+  draft: EditState;
+  setDraft: (fn: (d: EditState) => EditState) => void;
+  autoFocus?: boolean;
+}) {
+  return (
+    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+      <label className={labelCls}>
+        <span className={hintCls}>Лакское слово *</span>
+        <input
+          className={inputCls}
+          value={draft.lemma}
+          onChange={(e) => setDraft((d) => ({ ...d, lemma: e.target.value }))}
+          autoFocus={autoFocus}
+          required
+        />
+      </label>
+      <label className={labelCls}>
+        <span className={hintCls}>Русский перевод *</span>
+        <input
+          className={inputCls}
+          value={draft.translation}
+          onChange={(e) => setDraft((d) => ({ ...d, translation: e.target.value }))}
+          required
+        />
+      </label>
+      <label className={labelCls}>
+        <span className={hintCls}>Транскрипция</span>
+        <input
+          className={inputCls}
+          value={draft.transcription}
+          onChange={(e) => setDraft((d) => ({ ...d, transcription: e.target.value }))}
+        />
+      </label>
+      <label className={labelCls}>
+        <span className={hintCls}>Часть речи</span>
+        <select
+          className={inputCls}
+          value={draft.partOfSpeech}
+          onChange={(e) => setDraft((d) => ({ ...d, partOfSpeech: e.target.value }))}
+        >
+          <option value="">—</option>
+          <option value="Сущ.">Сущ.</option>
+          <option value="Глаг.">Глаг.</option>
+          <option value="Прил.">Прил.</option>
+          <option value="Нареч.">Нареч.</option>
+          <option value="Предл.">Предл.</option>
+          <option value="Союз">Союз</option>
+          <option value="Мест.">Мест.</option>
+          <option value="Межд.">Межд.</option>
+          <option value="Частица">Частица</option>
+          <option value="Фраза">Фраза</option>
+          <option value="Числ.">Числ.</option>
+        </select>
+      </label>
+      <label className={labelCls}>
+        <span className={hintCls}>Род</span>
+        <select
+          className={inputCls}
+          value={draft.gender}
+          onChange={(e) => setDraft((d) => ({ ...d, gender: e.target.value }))}
+        >
+          <option value="">—</option>
+          <option value="м">м</option>
+          <option value="ж">ж</option>
+          <option value="ср">ср</option>
+        </select>
+      </label>
+      <label className={labelCls}>
+        <span className={hintCls}>Вид глагола</span>
+        <select
+          className={inputCls}
+          value={draft.verbAspect}
+          onChange={(e) => setDraft((d) => ({ ...d, verbAspect: e.target.value }))}
+        >
+          <option value="">—</option>
+          <option value="сов.">сов.</option>
+          <option value="несов.">несов.</option>
+          <option value="однокр.">однокр.</option>
+        </select>
+      </label>
+      <label className={labelCls}>
+        <span className={hintCls}>Тип</span>
+        <select
+          className={inputCls}
+          value={draft.wordType}
+          onChange={(e) => setDraft((d) => ({ ...d, wordType: e.target.value }))}
+        >
+          <option value="word">слово</option>
+          <option value="phrase">фраза</option>
+        </select>
+      </label>
+      <label className={labelCls}>
+        <span className={hintCls}>Приоритет (1 = в SRS)</span>
+        <input
+          className={inputCls}
+          type="number"
+          min={1}
+          value={draft.translationPriority}
+          onChange={(e) => setDraft((d) => ({ ...d, translationPriority: e.target.value }))}
+        />
+      </label>
+      <label className={`${labelCls} sm:col-span-2`}>
+        <span className={hintCls}>Группа синонимов (напр. грязь#1)</span>
+        <input
+          className={inputCls}
+          value={draft.synonymGroupId}
+          onChange={(e) => setDraft((d) => ({ ...d, synonymGroupId: e.target.value }))}
+          placeholder="пусто = без группы"
+        />
+      </label>
+      <label className={`${labelCls} sm:col-span-2`}>
+        <span className={hintCls}>Пометы / notes</span>
+        <input
+          className={inputCls}
+          value={draft.notes}
+          onChange={(e) => setDraft((d) => ({ ...d, notes: e.target.value }))}
+          placeholder="перен., устар., тж. …"
+        />
+      </label>
+    </div>
+  );
+}
+
 function ConfirmDeleteModal({
   word,
   onConfirm,
   onCancel,
-  isDeleting,
+  isDeleting
 }: {
-  word:       Word;
-  onConfirm:  () => void;
-  onCancel:   () => void;
+  word: Word;
+  onConfirm: () => void;
+  onCancel: () => void;
   isDeleting: boolean;
 }) {
   return (
@@ -44,7 +231,7 @@ function ConfirmDeleteModal({
           <span className="font-medium">{word.lemma}</span> — {word.translation}
         </p>
         <p className="mt-1 text-xs text-gray-400">
-          Слово будет деактивировано (soft delete). Его история SRS сохранится.
+          Soft delete: слово скроется из словаря, история SRS сохранится.
         </p>
         <div className="mt-5 flex gap-2">
           <button
@@ -69,42 +256,31 @@ function ConfirmDeleteModal({
   );
 }
 
-// ── Строка слова ──────────────────────────────────────────────────────────────
 function WordRow({
   word,
   onUpdated,
-  onDeleted,
+  onDeleted
 }: {
-  word:      Word;
+  word: Word;
   onUpdated: (w: Word) => void;
   onDeleted: (id: number) => void;
 }) {
-  const [editing, setEditing]     = useState(false);
-  const [saving,  setSaving]      = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [deleting, setDeleting]   = useState(false);
-  const [rowError, setRowError]   = useState<string | null>(null);
-
-  const [draft, setDraft] = useState<EditState>({
-    lemma:         word.lemma,
-    translation:   word.translation,
-    transcription: word.transcription ?? "",
-    partOfSpeech:  word.partOfSpeech  ?? "",
-  });
+  const [deleting, setDeleting] = useState(false);
+  const [rowError, setRowError] = useState<string | null>(null);
+  const [draft, setDraft] = useState<EditState>(() => wordToEdit(word));
 
   function startEdit() {
-    setDraft({
-      lemma:         word.lemma,
-      translation:   word.translation,
-      transcription: word.transcription ?? "",
-      partOfSpeech:  word.partOfSpeech  ?? "",
-    });
+    setDraft(wordToEdit(word));
     setRowError(null);
     setEditing(true);
   }
 
   async function saveEdit() {
-    if (!draft.lemma.trim() || !draft.translation.trim()) {
+    const payload = editToPayload(draft);
+    if (!payload.lemma || !payload.translation) {
       setRowError("Слово и перевод обязательны");
       return;
     }
@@ -114,24 +290,21 @@ function WordRow({
 
     try {
       const res = await fetch(`/api/admin/words/${word.id}`, {
-        method:  "PATCH",
+        method: "PATCH",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({
-          lemma:         draft.lemma.trim(),
-          translation:   draft.translation.trim(),
-          transcription: draft.transcription.trim() || null,
-          partOfSpeech:  draft.partOfSpeech.trim()  || null,
-        }),
+        body: JSON.stringify(payload)
       });
 
-      const payload = (await res.json().catch(() => ({}))) as { error?: string; word?: Word };
+      const body = (await res.json().catch(() => ({}))) as { error?: string; word?: Word };
 
       if (!res.ok) {
-        setRowError(payload.error ?? "Не удалось сохранить");
+        setRowError(body.error ?? "Не удалось сохранить");
         return;
       }
 
-      if (payload.word) onUpdated(payload.word);
+      if (body.word) {
+        onUpdated(body.word);
+      }
       setEditing(false);
     } catch {
       setRowError("Сетевая ошибка");
@@ -144,13 +317,13 @@ function WordRow({
     setDeleting(true);
     try {
       const res = await fetch(`/api/admin/words/${word.id}`, {
-        method:  "DELETE",
-        headers: { Accept: "application/json" },
+        method: "DELETE",
+        headers: { Accept: "application/json" }
       });
 
       if (!res.ok) {
-        const payload = (await res.json().catch(() => ({}))) as { error?: string };
-        setRowError(payload.error ?? "Не удалось удалить");
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        setRowError(body.error ?? "Не удалось удалить");
         setConfirmDelete(false);
         return;
       }
@@ -164,8 +337,15 @@ function WordRow({
     }
   }
 
-  const inputCls =
-    "w-full rounded-lg border border-blue-300 bg-white px-2 py-1 text-sm outline-none focus:border-blue-500";
+  const meta = [
+    word.partOfSpeech,
+    word.gender,
+    word.verbAspect,
+    word.wordType === "phrase" ? "фраза" : null,
+    word.translationPriority > 1 ? `p${word.translationPriority}` : null,
+    word.synonymGroupId,
+    word.notes
+  ].filter(Boolean);
 
   return (
     <>
@@ -180,46 +360,9 @@ function WordRow({
 
       <article className="rounded-xl border border-gray-200 bg-white p-3">
         {editing ? (
-          // ── Режим редактирования ───────────────────────────────────────────
-          <div className="space-y-2">
-            <div className="grid grid-cols-2 gap-2">
-              <label className="space-y-0.5">
-                <span className="text-xs text-gray-500">Слово *</span>
-                <input
-                  className={inputCls}
-                  value={draft.lemma}
-                  onChange={(e) => setDraft((d) => ({ ...d, lemma: e.target.value }))}
-                  autoFocus
-                />
-              </label>
-              <label className="space-y-0.5">
-                <span className="text-xs text-gray-500">Перевод *</span>
-                <input
-                  className={inputCls}
-                  value={draft.translation}
-                  onChange={(e) => setDraft((d) => ({ ...d, translation: e.target.value }))}
-                />
-              </label>
-              <label className="space-y-0.5">
-                <span className="text-xs text-gray-500">Транскрипция</span>
-                <input
-                  className={inputCls}
-                  value={draft.transcription}
-                  onChange={(e) => setDraft((d) => ({ ...d, transcription: e.target.value }))}
-                />
-              </label>
-              <label className="space-y-0.5">
-                <span className="text-xs text-gray-500">Часть речи</span>
-                <input
-                  className={inputCls}
-                  value={draft.partOfSpeech}
-                  onChange={(e) => setDraft((d) => ({ ...d, partOfSpeech: e.target.value }))}
-                />
-              </label>
-            </div>
-
+          <div className="space-y-3">
+            <WordFields draft={draft} setDraft={setDraft} autoFocus />
             {rowError && <p className="text-xs text-red-600">{rowError}</p>}
-
             <div className="flex gap-2">
               <button
                 type="button"
@@ -232,7 +375,10 @@ function WordRow({
               </button>
               <button
                 type="button"
-                onClick={() => { setEditing(false); setRowError(null); }}
+                onClick={() => {
+                  setEditing(false);
+                  setRowError(null);
+                }}
                 disabled={saving}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600 transition hover:bg-gray-50 disabled:opacity-60"
               >
@@ -242,22 +388,28 @@ function WordRow({
             </div>
           </div>
         ) : (
-          // ── Режим просмотра ────────────────────────────────────────────────
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="truncate font-medium text-gray-900">
                 {word.lemma}
                 {word.transcription && (
-                  <span className="ml-1.5 font-normal text-gray-400 font-mono text-sm">
+                  <span className="ml-1.5 font-mono text-sm font-normal text-gray-400">
                     [{word.transcription}]
                   </span>
                 )}
               </p>
               <p className="mt-0.5 truncate text-sm text-gray-600">{word.translation}</p>
-              {word.partOfSpeech && (
-                <span className="mt-1 inline-block rounded-md bg-blue-50 px-1.5 py-0.5 text-xs text-blue-700">
-                  {word.partOfSpeech}
-                </span>
+              {meta.length > 0 && (
+                <div className="mt-1.5 flex flex-wrap gap-1">
+                  {meta.map((item) => (
+                    <span
+                      key={String(item)}
+                      className="inline-block rounded-md bg-gray-100 px-1.5 py-0.5 text-xs text-gray-600"
+                    >
+                      {item}
+                    </span>
+                  ))}
+                </div>
               )}
               {rowError && <p className="mt-1 text-xs text-red-600">{rowError}</p>}
             </div>
@@ -287,17 +439,14 @@ function WordRow({
   );
 }
 
-// ── Основной компонент ────────────────────────────────────────────────────────
 export function AdminWordsPanel() {
-  const [query,    setQuery]    = useState("");
-  const [words,    setWords]    = useState<Word[]>([]);
-  const [loading,  setLoading]  = useState(false);
-  const [status,   setStatus]   = useState<StatusState>({ type: "idle" });
+  const [query, setQuery] = useState("");
+  const [words, setWords] = useState<Word[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [status, setStatus] = useState<StatusState>({ type: "idle" });
   const [searched, setSearched] = useState(false);
-  const [newLemma, setNewLemma] = useState("");
-  const [newTranslation, setNewTranslation] = useState("");
-  const [newTranscription, setNewTranscription] = useState("");
-  const [newPartOfSpeech, setNewPartOfSpeech] = useState("");
+  const [showCreate, setShowCreate] = useState(false);
+  const [createDraft, setCreateDraft] = useState<EditState>(emptyEdit);
   const [isCreating, setIsCreating] = useState(false);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -314,10 +463,9 @@ export function AdminWordsPanel() {
     setStatus({ type: "idle" });
 
     try {
-      const res = await fetch(
-        `/api/admin/words?q=${encodeURIComponent(trimmed)}&limit=30`,
-        { headers: { Accept: "application/json" } }
-      );
+      const res = await fetch(`/api/admin/words?q=${encodeURIComponent(trimmed)}&limit=40`, {
+        headers: { Accept: "application/json" }
+      });
 
       const payload = (await res.json().catch(() => ({}))) as {
         error?: string;
@@ -339,11 +487,16 @@ export function AdminWordsPanel() {
     }
   }, []);
 
-  // Debounce 350ms
   useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
     debounceRef.current = setTimeout(() => void search(query), 350);
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+    };
   }, [query, search]);
 
   function handleUpdated(updated: Word) {
@@ -360,6 +513,12 @@ export function AdminWordsPanel() {
 
   async function createWord(event: FormEvent) {
     event.preventDefault();
+    const payload = editToPayload(createDraft);
+    if (!payload.lemma || !payload.translation) {
+      setStatus({ type: "error", message: "Слово и перевод обязательны" });
+      return;
+    }
+
     setIsCreating(true);
     setStatus({ type: "idle" });
 
@@ -367,44 +526,28 @@ export function AdminWordsPanel() {
       const res = await fetch("/api/admin/words", {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({
-          lemma: newLemma,
-          translation: newTranslation,
-          transcription: newTranscription || undefined,
-          partOfSpeech: newPartOfSpeech || undefined,
-        }),
+        body: JSON.stringify(payload)
       });
 
-      const payload = (await res.json().catch(() => ({}))) as {
+      const body = (await res.json().catch(() => ({}))) as {
         error?: string;
-        id?: number;
-        lemma?: string;
-        translation?: string;
-        transcription?: string | null;
-        partOfSpeech?: string | null;
+        word?: Word;
       };
 
       if (!res.ok) {
-        setStatus({ type: "error", message: payload.error ?? "Не удалось добавить слово" });
+        setStatus({ type: "error", message: body.error ?? "Не удалось добавить слово" });
         return;
       }
 
-      const created: Word = {
-        id: payload.id ?? Date.now(),
-        lemma: payload.lemma ?? newLemma.trim(),
-        translation: payload.translation ?? newTranslation.trim(),
-        transcription: payload.transcription ?? (newTranscription.trim() || null),
-        partOfSpeech: payload.partOfSpeech ?? (newPartOfSpeech.trim() || null),
-      };
-
-      setWords((prev) => [created, ...prev]);
+      const created = body.word;
+      if (created) {
+        setWords((prev) => [created, ...prev.filter((w) => w.id !== created.id)]);
+        setQuery(created.lemma);
+      }
+      setCreateDraft(emptyEdit());
+      setShowCreate(false);
       setSearched(true);
-      setQuery(created.lemma);
-      setNewLemma("");
-      setNewTranslation("");
-      setNewTranscription("");
-      setNewPartOfSpeech("");
-      setStatus({ type: "success", message: `«${created.lemma}» добавлено` });
+      setStatus({ type: "success", message: `«${payload.lemma}» добавлено` });
       setTimeout(() => setStatus({ type: "idle" }), 3000);
     } catch {
       setStatus({ type: "error", message: "Сетевая ошибка при создании" });
@@ -415,95 +558,72 @@ export function AdminWordsPanel() {
 
   return (
     <section className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-      <h2 className="text-lg font-semibold">Все слова</h2>
-      <p className="mt-0.5 text-sm text-gray-500">
-        Создание, поиск, инлайн-редактирование и удаление.
-      </p>
-
-      <form onSubmit={(e) => void createWord(e)} className="mt-4 grid grid-cols-1 gap-2 rounded-xl border border-blue-200 bg-blue-50 p-3 sm:grid-cols-5">
-        <input
-          value={newLemma}
-          onChange={(e) => setNewLemma(e.target.value)}
-          required
-          placeholder="Лакское слово"
-          className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm"
-        />
-        <input
-          value={newTranslation}
-          onChange={(e) => setNewTranslation(e.target.value)}
-          required
-          placeholder="Перевод"
-          className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm"
-        />
-        <input
-          value={newTranscription}
-          onChange={(e) => setNewTranscription(e.target.value)}
-          placeholder="Транскрипция"
-          className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm"
-        />
-        <input
-          value={newPartOfSpeech}
-          onChange={(e) => setNewPartOfSpeech(e.target.value)}
-          placeholder="Часть речи"
-          className="rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm"
-        />
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold">Слова</h2>
+          <p className="mt-0.5 text-sm text-gray-500">
+            Поиск, правка ошибок импорта, добавление новых слов.
+          </p>
+        </div>
         <button
-          type="submit"
-          disabled={isCreating}
-          className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white disabled:opacity-60"
+          type="button"
+          onClick={() => setShowCreate((v) => !v)}
+          className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-blue-700"
         >
-          {isCreating ? "Добавление…" : "Добавить"}
+          <Plus className="h-4 w-4" />
+          {showCreate ? "Скрыть форму" : "Добавить слово"}
         </button>
-      </form>
+      </div>
 
-      {/* Поиск */}
+      {showCreate && (
+        <form
+          onSubmit={(e) => void createWord(e)}
+          className="mt-4 space-y-3 rounded-xl border border-blue-200 bg-blue-50/60 p-4"
+        >
+          <p className="text-sm font-medium text-blue-900">Новое слово</p>
+          <WordFields draft={createDraft} setDraft={setCreateDraft} autoFocus />
+          <button
+            type="submit"
+            disabled={isCreating}
+            className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-700 disabled:opacity-60"
+          >
+            {isCreating ? "Добавляю..." : "Создать"}
+          </button>
+        </form>
+      )}
+
       <div className="relative mt-4">
-        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 pointer-events-none" />
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
         <input
-          type="search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Введите слово на лакском или по-русски…"
-          className="w-full rounded-xl border border-gray-300 py-2.5 pl-9 pr-4 text-sm outline-none transition focus:border-blue-500"
+          placeholder="Поиск по лакскому, русскому или группе синонимов…"
+          className="w-full rounded-xl border border-gray-200 py-2.5 pl-9 pr-3 text-sm outline-none focus:border-blue-500"
         />
       </div>
 
-      {/* Статус */}
-      {status.type === "error" && (
-        <p className="mt-3 text-sm text-red-600">{status.message}</p>
-      )}
-      {status.type === "success" && (
-        <p className="mt-3 text-sm text-green-700">{status.message}</p>
+      {status.type !== "idle" && (
+        <p
+          className={`mt-3 text-sm ${status.type === "error" ? "text-red-600" : "text-green-700"}`}
+        >
+          {status.message}
+        </p>
       )}
 
-      {/* Результаты */}
       <div className="mt-4 space-y-2">
-        {loading && (
-          <>
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-16 animate-pulse rounded-xl bg-gray-100" />
-            ))}
-          </>
-        )}
-
+        {loading && <p className="text-sm text-gray-500">Ищу…</p>}
         {!loading && searched && words.length === 0 && (
-          <p className="py-6 text-center text-sm text-gray-400">Ничего не найдено</p>
+          <p className="text-sm text-gray-500">Ничего не найдено</p>
         )}
-
-        {!loading && words.map((word) => (
-          <WordRow
-            key={word.id}
-            word={word}
-            onUpdated={handleUpdated}
-            onDeleted={handleDeleted}
-          />
-        ))}
-
-        {!loading && !searched && (
-          <p className="py-6 text-center text-sm text-gray-400">
-            Начните вводить запрос для поиска
-          </p>
-        )}
+        {!loading &&
+          words.map((word) => (
+            <WordRow
+              key={word.id}
+              word={word}
+              onUpdated={handleUpdated}
+              onDeleted={handleDeleted}
+            />
+          ))}
       </div>
     </section>
   );

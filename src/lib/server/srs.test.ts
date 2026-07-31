@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildSessionQueue,
   clampEasinessFactor,
+  computeNextStreakDays,
   getNextCardState,
   getXPByRating,
   isValidSRSRating,
   normalizeWordId,
   ratingToQuality,
+  SRS_NEW_PER_SESSION,
+  SRS_SESSION_LIMIT,
   type ExistingCardRow
 } from "@/lib/server/srs";
 
@@ -45,6 +49,41 @@ describe("SRS helpers", () => {
     expect(getXPByRating("know")).toBe(10);
     expect(getXPByRating("unsure")).toBe(5);
     expect(getXPByRating("forgot")).toBe(2);
+  });
+
+  it("buildSessionQueue caps session and new cards", () => {
+    const reviews = Array.from({ length: 8 }, (_, i) => ({
+      id: `r${i}`,
+      due_at: "2026-01-01T00:00:00.000Z",
+    }));
+    const news = Array.from({ length: 40 }, (_, i) => ({
+      id: `n${i}`,
+      due_at: null,
+    }));
+    const { session, remaining, totalAvailable } = buildSessionQueue([...reviews, ...news]);
+
+    expect(totalAvailable).toBe(48);
+    expect(session).toHaveLength(SRS_SESSION_LIMIT);
+    expect(session.filter((c) => c.due_at === null)).toHaveLength(
+      Math.min(SRS_NEW_PER_SESSION, SRS_SESSION_LIMIT - reviews.length)
+    );
+    expect(remaining).toBe(48 - SRS_SESSION_LIMIT);
+  });
+
+  it("buildSessionQueue prefers reviews when backlog is large", () => {
+    const reviews = Array.from({ length: 30 }, (_, i) => ({
+      id: `r${i}`,
+      due_at: "2026-01-01T00:00:00.000Z",
+    }));
+    const news = Array.from({ length: 20 }, (_, i) => ({
+      id: `n${i}`,
+      due_at: null,
+    }));
+    const { session, remaining } = buildSessionQueue([...reviews, ...news]);
+
+    expect(session).toHaveLength(SRS_SESSION_LIMIT);
+    expect(session.every((c) => c.due_at !== null)).toBe(true);
+    expect(remaining).toBe(50 - SRS_SESSION_LIMIT);
   });
 });
 
@@ -121,5 +160,49 @@ describe("SM-2 getNextCardState", () => {
     expect(next.repetition).toBe(1);
     expect(next.intervalDays).toBe(1);
     expect(next.lapses).toBe(0);
+  });
+});
+
+describe("computeNextStreakDays", () => {
+  const day = (iso: string) => new Date(`${iso}T12:00:00.000Z`);
+
+  it("starts at 1 on first review", () => {
+    expect(
+      computeNextStreakDays({
+        currentStreak: 0,
+        lastReviewedAt: null,
+        now: day("2026-07-31"),
+      })
+    ).toBe(1);
+  });
+
+  it("keeps streak on same calendar day", () => {
+    expect(
+      computeNextStreakDays({
+        currentStreak: 4,
+        lastReviewedAt: day("2026-07-31"),
+        now: day("2026-07-31"),
+      })
+    ).toBe(4);
+  });
+
+  it("increments after yesterday activity", () => {
+    expect(
+      computeNextStreakDays({
+        currentStreak: 4,
+        lastReviewedAt: day("2026-07-30"),
+        now: day("2026-07-31"),
+      })
+    ).toBe(5);
+  });
+
+  it("resets after a gap", () => {
+    expect(
+      computeNextStreakDays({
+        currentStreak: 10,
+        lastReviewedAt: day("2026-07-28"),
+        now: day("2026-07-31"),
+      })
+    ).toBe(1);
   });
 });

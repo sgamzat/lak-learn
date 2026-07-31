@@ -105,11 +105,73 @@ export function getXPByRating(rating: SRSRating): number {
   return 2;
 }
 
+/** Календарная дата YYYY-MM-DD в UTC — для стабильного streak без TZ-сюрпризов. */
+export function toUtcDateKey(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+/**
+ * Streak: +1 если вчера была активность, без изменений если уже сегодня,
+ * иначе сброс в 1. Первый review → 1.
+ */
+export function computeNextStreakDays(params: {
+  currentStreak: number;
+  lastReviewedAt: Date | null;
+  now?: Date;
+}): number {
+  const now = params.now ?? new Date();
+  const today = toUtcDateKey(now);
+  if (!params.lastReviewedAt) return 1;
+
+  const last = toUtcDateKey(params.lastReviewedAt);
+  if (last === today) return Math.max(1, params.currentStreak);
+
+  const yesterdayDate = new Date(Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate() - 1
+  ));
+  const yesterday = toUtcDateKey(yesterdayDate);
+  if (last === yesterday) return Math.max(1, params.currentStreak) + 1;
+  return 1;
+}
+
+/** Короткий урок: как Duo ~15 упражнений, new-cap как Anki-friendly. */
+export const SRS_SESSION_LIMIT = 15;
+export const SRS_NEW_PER_SESSION = 10;
+/** Пул кандидатов для подсчёта remaining (не вся БД). */
+export const SRS_CANDIDATE_FETCH_LIMIT = 200;
+
+/**
+ * Reviews (due_at != null) first, then new up to NEW_PER_SESSION,
+ * total capped at SESSION_LIMIT.
+ */
+export function buildSessionQueue<T extends { due_at: string | null }>(
+  candidates: T[]
+): { session: T[]; remaining: number; totalAvailable: number } {
+  const reviews = candidates.filter((c) => c.due_at !== null);
+  const news = candidates.filter((c) => c.due_at === null);
+
+  const sessionReviews = reviews.slice(0, SRS_SESSION_LIMIT);
+  const newSlots = Math.min(
+    SRS_NEW_PER_SESSION,
+    SRS_SESSION_LIMIT - sessionReviews.length
+  );
+  const sessionNews = news.slice(0, newSlots);
+  const session = [...sessionReviews, ...sessionNews];
+  const totalAvailable = candidates.length;
+  const remaining = Math.max(0, totalAvailable - session.length);
+
+  return { session, remaining, totalAvailable };
+}
+
 export async function submitSRSReview(params: {
   userId: string;
   wordId: number;
   rating: SRSRating;
+  now?: Date;
 }): Promise<{ ok: true; result: ReviewResult } | { ok: false; error: string; status: number }> {
+  const now = params.now ?? new Date();
   const existsWord = await query<{ id: number }>(
     `
       SELECT id
@@ -138,10 +200,32 @@ export async function submitSRSReview(params: {
 
   const nextCardState = getNextCardState({
     rating: params.rating,
-    existingCard: existingCardResult.rows[0] ?? null
+    existingCard: existingCardResult.rows[0] ?? null,
+    now,
   });
 
   await withTransaction(async (client) => {
+    const streakState = await client.query<{
+      last_reviewed_at: Date | string | null;
+      streak_days: number | null;
+    }>(
+      `
+        SELECT
+          (SELECT MAX(rh.reviewed_at) FROM review_history rh WHERE rh.user_id = $1) AS last_reviewed_at,
+          (SELECT up.streak_days FROM user_progress up WHERE up.user_id = $1 LIMIT 1) AS streak_days
+      `,
+      [params.userId]
+    );
+
+    const lastRaw = streakState.rows[0]?.last_reviewed_at ?? null;
+    const lastReviewedAt =
+      lastRaw == null ? null : lastRaw instanceof Date ? lastRaw : new Date(lastRaw);
+    const nextStreak = computeNextStreakDays({
+      currentStreak: streakState.rows[0]?.streak_days ?? 0,
+      lastReviewedAt,
+      now,
+    });
+
     await client.query(
       `
         INSERT INTO user_srs_cards (
@@ -191,11 +275,14 @@ export async function submitSRSReview(params: {
     await client.query(
       `
         INSERT INTO user_progress (user_id, xp, streak_days, learned_words, updated_at)
-        VALUES ($1, $2, 0, 0, NOW())
+        VALUES ($1, $2, $3, 0, NOW())
         ON CONFLICT (user_id)
-        DO UPDATE SET xp = user_progress.xp + EXCLUDED.xp, updated_at = NOW()
+        DO UPDATE SET
+          xp = user_progress.xp + EXCLUDED.xp,
+          streak_days = EXCLUDED.streak_days,
+          updated_at = NOW()
       `,
-      [params.userId, getXPByRating(params.rating)]
+      [params.userId, getXPByRating(params.rating), nextStreak]
     );
   });
 

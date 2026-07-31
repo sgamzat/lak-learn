@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   BookMarked, Check, ChevronRight, Plus, RefreshCw, Search, Sparkles, Type, X,
 } from "lucide-react";
@@ -211,7 +212,27 @@ function WordRow({
 }
 
 export default function DictionaryPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-[50vh] items-center justify-center bg-lk-bg font-sans text-lk-faint">
+          Загрузка…
+        </div>
+      }
+    >
+      <DictionaryPageContent />
+    </Suspense>
+  );
+}
+
+function DictionaryPageContent() {
   const { tokens: T } = useTheme();
+  const searchParams = useSearchParams();
+  const deepLinkCollectionId = useMemo(() => {
+    const raw = searchParams.get("collection");
+    const id = raw ? Number.parseInt(raw, 10) : Number.NaN;
+    return Number.isInteger(id) && id > 0 ? id : null;
+  }, [searchParams]);
 
   const [mode, setMode] = useState<DictMode>("start");
   const [alphaMode, setAlphaMode] = useState<AlphaMode>("lak");
@@ -442,6 +463,19 @@ export default function DictionaryPage() {
     },
     [loadList]
   );
+
+  const openedDeepLinkRef = useRef<number | null>(null);
+  // Deep-link: /dictionary?collection=<id> → открыть тематический набор
+  useEffect(() => {
+    if (!bootstrapped || deepLinkCollectionId == null || collections.length === 0) return;
+    if (openedDeepLinkRef.current === deepLinkCollectionId) return;
+    const col = collections.find((c) => c.id === deepLinkCollectionId);
+    if (!col) return;
+    openedDeepLinkRef.current = deepLinkCollectionId;
+    void openPack(col.title, () =>
+      fetchWords({ collectionId: String(col.id), limit: "2000" })
+    );
+  }, [bootstrapped, deepLinkCollectionId, collections, openPack]);
 
   const activeLetterCollection = activeLetter ? letterCollections.get(activeLetter) ?? null : null;
   const letterInStudy = activeLetterCollection

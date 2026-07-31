@@ -4,11 +4,8 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { Flame, Target, ArrowRight } from "lucide-react";
 import { getDashboardData } from "@/lib/api/client";
-import type { DashboardData } from "@/types/dashboard";
+import type { CollectionProgress, DashboardData, TopicStatus } from "@/types/dashboard";
 import { useTheme } from "@/components/ThemeProvider";
-
-const COLLECTION_COLORS_DARK  = ["#D4A537","#3E86C9","#C2503F","#3FA06B","#D4A537","#3E86C9","#C2503F","#3FA06B"];
-const COLLECTION_COLORS_LIGHT = ["#9A6E00","#1A5288","#B03030","#1E6E3A","#9A6E00","#1A5288","#B03030","#1E6E3A"];
 
 function getInitials(name: string) {
   return name.split(" ").map((w) => w[0] ?? "").join("").toUpperCase().slice(0, 2);
@@ -40,14 +37,115 @@ function Mountains({ T }: { T: ReturnType<typeof useTheme>["tokens"] }) {
   );
 }
 
-function heroCta(data: DashboardData, totalSRS: number): { href: string; label: string } {
+function heroCta(data: DashboardData, totalSRS: number): {
+  href: string;
+  label: string;
+  secondary?: { href: string; label: string };
+} {
   if (data.progress.lessonsCompleted === 0) {
     return { href: "/letters", label: "К алфавиту →" };
   }
   if (totalSRS > 0) {
     return { href: "/review", label: "Начать повторение →" };
   }
-  return { href: "/dictionary", label: "Открыть словарь →" };
+  if (data.srsSummary.newAvailable > 0) {
+    return { href: "/review", label: "Учить новые →" };
+  }
+  if (!data.srsSummary.hasStudySelection) {
+    return {
+      href: "/phrasebook",
+      label: "Открыть разговорник →",
+      secondary: { href: "/dictionary", label: "Словарь" },
+    };
+  }
+  return {
+    href: "/dictionary",
+    label: "Открыть словарь →",
+    secondary: { href: "/phrasebook", label: "Разговорник" },
+  };
+}
+
+function formatRelativeReviewedAt(iso: string | null, now = Date.now()): string | null {
+  if (!iso) return null;
+  const ts = Date.parse(iso);
+  if (!Number.isFinite(ts)) return null;
+  const diffMs = Math.max(0, now - ts);
+  const mins = Math.floor(diffMs / 60_000);
+  if (mins < 1) return "только что";
+  if (mins < 60) return `${mins} мин. назад`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours} ч. назад`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return "вчера";
+  if (days < 7) return `${days} дн. назад`;
+  if (days < 30) return `${Math.floor(days / 7)} нед. назад`;
+  return new Date(ts).toLocaleDateString("ru-RU", { day: "numeric", month: "short" });
+}
+
+function topicStatusLabel(status: TopicStatus): string {
+  switch (status) {
+    case "needs_review":
+      return "Нужно повторить";
+    case "in_progress":
+      return "В процессе";
+    case "mastered":
+      return "Освоено";
+    default:
+      return "Не начато";
+  }
+}
+
+function topicHref(col: CollectionProgress): string {
+  return `/review?collectionId=${col.id}&from=dashboard`;
+}
+
+function topicCtaLabel(col: CollectionProgress): string {
+  if (col.dueWords > 0) return `Повторить ${col.dueWords}`;
+  if (col.newWords > 0 && col.knownWords + col.learningWords + col.weakWords === 0) {
+    return "Начать";
+  }
+  if (col.newWords > 0) return "Учить новые";
+  if (col.status === "mastered") return "Повторить";
+  return "Продолжить";
+}
+
+function topicsSummary(collections: CollectionProgress[]): string | null {
+  if (collections.length === 0) return null;
+  const inWork = collections.filter(
+    (c) => c.status === "in_progress" || c.status === "needs_review"
+  ).length;
+  const dueTotal = collections.reduce((sum, c) => sum + c.dueWords, 0);
+  const weakest = [...collections]
+    .filter((c) => c.weakWords > 0 || c.status === "needs_review")
+    .sort((a, b) => b.weakWords - a.weakWords || b.dueWords - a.dueWords)[0];
+
+  const parts: string[] = [];
+  if (inWork > 0) {
+    parts.push(`${inWork} ${inWork === 1 ? "тема" : inWork < 5 ? "темы" : "тем"} в работе`);
+  } else {
+    const started = collections.filter((c) => c.status !== "not_started").length;
+    if (started === 0) parts.push("Выберите тему в разговорнике, чтобы начать");
+    else parts.push("Все активные темы в порядке");
+  }
+  if (dueTotal > 0) {
+    parts.push(`${dueTotal} ${dueTotal === 1 ? "карточка ждёт" : "карточек ждут"}`);
+  }
+  if (weakest && (weakest.weakWords > 0 || weakest.dueWords > 0)) {
+    parts.push(`слабее всего «${weakest.title}»`);
+  }
+  return parts.join(" · ");
+}
+
+function dueSplitLabel(dueWords: number, duePhrases: number): string | null {
+  if (dueWords <= 0 && duePhrases <= 0) return null;
+  const parts: string[] = [];
+  if (duePhrases > 0) {
+    parts.push(`${duePhrases} ${duePhrases === 1 ? "фраза" : duePhrases < 5 ? "фразы" : "фраз"}`);
+  }
+  if (dueWords > 0) {
+    parts.push(`${dueWords} ${dueWords === 1 ? "слово" : dueWords < 5 ? "слова" : "слов"}`);
+  }
+  return parts.join(" · ");
 }
 
 export function DashboardShell() {
@@ -108,13 +206,24 @@ export function DashboardShell() {
   const greetingSubtitle = useMemo(() => {
     if (!data) return "";
     if (data.progress.lessonsCompleted === 0) return "Марха бур! Начните с алфавита — это займёт 5 минут.";
+    if (totalSRS === 0 && data.srsSummary.newAvailable > 0) {
+      return `${data.srsSummary.newAvailable} новых карточек готовы к изучению.`;
+    }
     if (totalSRS === 0) return "Сегодня всё повторено. Отличная работа!";
-    if (data.srsSummary.overdue > 0) return `${data.srsSummary.overdue} карточек просрочено — освежи, пока помнишь.`;
-    return `${totalSRS} карточек ждут повторения — один присест, пять минут.`;
+    const split = dueSplitLabel(data.srsSummary.dueWords, data.srsSummary.duePhrases);
+    if (data.srsSummary.overdue > 0) {
+      return split
+        ? `${data.srsSummary.overdue} просрочено (${split}) — освежи, пока помнишь.`
+        : `${data.srsSummary.overdue} карточек просрочено — освежи, пока помнишь.`;
+    }
+    return split
+      ? `${totalSRS} карточек ждут: ${split}.`
+      : `${totalSRS} карточек ждут повторения — один присест, пять минут.`;
   }, [data, totalSRS]);
 
-  const COLL_COLORS = isDark ? COLLECTION_COLORS_DARK : COLLECTION_COLORS_LIGHT;
   const card: React.CSSProperties = { background: T.navy2, border: `1px solid ${T.line}`, borderRadius: 18 };
+  const topics = data?.collections.slice(0, 6) ?? [];
+  const topicsLine = data ? topicsSummary(data.collections) : null;
 
   const finishOnboarding = async () => {
     setOnboardingSaving(true);
@@ -168,6 +277,7 @@ export function DashboardShell() {
   }
 
   const cta = heroCta(data, totalSRS);
+  const dueSplit = dueSplitLabel(data.srsSummary.dueWords, data.srsSummary.duePhrases);
 
   return (
     <div className="w-full font-sans text-lk-text">
@@ -366,22 +476,35 @@ export function DashboardShell() {
                         fontFamily: T.sans, fontSize: 12.5, fontWeight: 600,
                       }}
                     >
-                      {totalSRS} карточек ждут
+                      {totalSRS} ждут{dueSplit ? ` · ${dueSplit}` : ""}
                     </span>
                   )}
                 </div>
               </div>
-              <Link
-                href={cta.href}
-                className="lk-btn-gold lk-lift"
-                style={{
-                  display: "inline-flex", alignItems: "center", gap: 10, padding: "16px 28px", borderRadius: 14,
-                  background: "#D4A537", color: "#0E1B2E", fontFamily: T.sans, fontSize: 15, fontWeight: 700,
-                  textDecoration: "none", flexShrink: 0, whiteSpace: "nowrap",
-                }}
-              >
-                {cta.label}
-              </Link>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "stretch", gap: 8, flexShrink: 0 }}>
+                <Link
+                  href={cta.href}
+                  className="lk-btn-gold lk-lift"
+                  style={{
+                    display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 10, padding: "16px 28px", borderRadius: 14,
+                    background: "#D4A537", color: "#0E1B2E", fontFamily: T.sans, fontSize: 15, fontWeight: 700,
+                    textDecoration: "none", whiteSpace: "nowrap",
+                  }}
+                >
+                  {cta.label}
+                </Link>
+                {cta.secondary && (
+                  <Link
+                    href={cta.secondary.href}
+                    style={{
+                      display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 12px",
+                      color: "rgba(236,224,196,0.7)", fontFamily: T.sans, fontSize: 13, fontWeight: 600, textDecoration: "none",
+                    }}
+                  >
+                    {cta.secondary.label} →
+                  </Link>
+                )}
+              </div>
             </div>
             {data.srsSummary.nextReviewTime && totalSRS === 0 && (
               <div style={{ position: "relative", borderTop: "1px solid rgba(212,165,55,0.2)", padding: "10px 28px", fontSize: 12.5, color: "rgba(236,224,196,0.5)" }}>
@@ -395,37 +518,93 @@ export function DashboardShell() {
         </div>
 
         <div style={{ ...card, padding: 24, marginBottom: 18 }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: topicsLine ? 10 : 16 }}>
             <div style={{ fontFamily: T.sans, fontSize: 11, fontWeight: 700, letterSpacing: 1.4, textTransform: "uppercase", color: T.gold }}>
-              Прогресс по темам
+              Темы разговорника
             </div>
-            {data.collections.length > 0 && (
-              <Link href="/dictionary" style={{ display: "inline-flex", alignItems: "center", gap: 5, color: T.gold, fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
+            {topics.length > 0 && (
+              <Link href="/phrasebook" style={{ display: "inline-flex", alignItems: "center", gap: 5, color: T.gold, fontSize: 13, fontWeight: 600, textDecoration: "none" }}>
                 Все темы <ArrowRight size={14} style={{ color: T.gold, display: "block" }} />
               </Link>
             )}
           </div>
-          {data.collections.length > 0 ? (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
-              {data.collections.slice(0, 6).map((col, i) => {
-                const pct = col.totalWords > 0 ? Math.round((col.learnedWords / col.totalWords) * 100) : 0;
-                const color = pct === 100 ? T.green : pct > 0 ? T.gold : COLL_COLORS[i % COLL_COLORS.length] ?? T.gold;
+          {topicsLine && topics.length > 0 && (
+            <div style={{ fontSize: 13, color: T.textMut, lineHeight: 1.45, marginBottom: 16 }}>
+              {topicsLine}
+            </div>
+          )}
+          {topics.length > 0 ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              {topics.map((col) => {
+                const href = topicHref(col);
+                const relative = formatRelativeReviewedAt(col.lastReviewedAt);
+                const badgeBg =
+                  col.status === "needs_review" ? T.redDim
+                    : col.status === "mastered" ? T.greenDim
+                      : col.status === "in_progress" ? T.goldDim
+                        : (isDark ? "rgba(157,176,199,0.12)" : "rgba(0,0,0,0.06)");
+                const badgeFg =
+                  col.status === "needs_review" ? T.red
+                    : col.status === "mastered" ? T.green
+                      : col.status === "in_progress" ? T.gold
+                        : T.textMut;
+                const knownPct = col.totalWords > 0 ? (col.knownWords / col.totalWords) * 100 : 0;
+                const learningPct = col.totalWords > 0 ? (col.learningWords / col.totalWords) * 100 : 0;
+                const weakPct = col.totalWords > 0 ? (col.weakWords / col.totalWords) * 100 : 0;
+                const newPct = Math.max(0, 100 - knownPct - learningPct - weakPct);
+
                 return (
                   <Link
                     key={col.id}
-                    href="/dictionary"
-                    style={{ display: "flex", flexDirection: "column", gap: 8, textDecoration: "none" }}
+                    href={href}
+                    style={{ display: "flex", flexDirection: "column", gap: 8, textDecoration: "none", padding: "4px 0" }}
                   >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 130 }}>
-                        {col.title}
-                      </span>
-                      <span style={{ fontSize: 11.5, color: T.textMut, whiteSpace: "nowrap", marginLeft: 6 }}>
-                        {col.learnedWords}/{col.totalWords}
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
+                        <span style={{ fontSize: 14, fontWeight: 600, color: T.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {col.title}
+                        </span>
+                        <span
+                          style={{
+                            flexShrink: 0,
+                            fontSize: 10.5,
+                            fontWeight: 700,
+                            letterSpacing: 0.2,
+                            padding: "2px 7px",
+                            borderRadius: 999,
+                            background: badgeBg,
+                            color: badgeFg,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {col.dueWords > 0 ? `${col.dueWords} к повторению` : topicStatusLabel(col.status)}
+                        </span>
+                      </div>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: T.textMut, whiteSpace: "nowrap" }}>
+                        {col.masteryPercent}%
                       </span>
                     </div>
-                    <div style={{ height: 6, borderRadius: 6, background: isDark ? "rgba(157,176,199,0.16)" : "rgba(0,0,0,0.08)", overflow: "hidden" }}>
-                      <div style={{ height: "100%", width: `${pct}%`, background: color, borderRadius: 6 }} />
+
+                    <div style={{ height: 7, borderRadius: 7, background: isDark ? "rgba(157,176,199,0.14)" : "rgba(0,0,0,0.07)", overflow: "hidden", display: "flex" }}>
+                      {knownPct > 0 && <div style={{ width: `${knownPct}%`, background: T.green, height: "100%" }} />}
+                      {learningPct > 0 && <div style={{ width: `${learningPct}%`, background: T.blue, height: "100%" }} />}
+                      {weakPct > 0 && <div style={{ width: `${weakPct}%`, background: T.red, height: "100%" }} />}
+                      {newPct > 0 && col.status !== "not_started" && (
+                        <div style={{ width: `${newPct}%`, background: "transparent", height: "100%" }} />
+                      )}
+                    </div>
+
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+                      <span style={{ fontSize: 11.5, color: T.textMut, lineHeight: 1.4 }}>
+                        {col.knownWords} знаю · {col.learningWords} учу
+                        {col.weakWords > 0 ? ` · ${col.weakWords} слабо` : ""}
+                        {col.newWords > 0 ? ` · ${col.newWords} новых` : ""}
+                        {col.accuracy != null ? ` · ${col.accuracy}% точн.` : ""}
+                        {relative ? ` · ${relative}` : ""}
+                      </span>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: T.gold, whiteSpace: "nowrap", flexShrink: 0 }}>
+                        {topicCtaLabel(col)} →
+                      </span>
                     </div>
                   </Link>
                 );
@@ -439,17 +618,17 @@ export function DashboardShell() {
                   Здесь появится ваш прогресс
                 </div>
                 <div style={{ color: T.textMut, fontSize: 14, lineHeight: 1.6, maxWidth: 360 }}>
-                  Добавьте слова из словаря чтобы начать отслеживать прогресс по темам
+                  Выберите тему в разговорнике — прогресс по фразам и повторениям появится здесь
                 </div>
               </div>
               <Link
-                href="/dictionary"
+                href="/phrasebook"
                 style={{
                   display: "inline-flex", alignItems: "center", gap: 6, padding: "10px 20px", borderRadius: 10,
                   border: `1px solid ${T.line}`, background: T.goldDim, color: T.gold, fontSize: 14, fontWeight: 600, textDecoration: "none",
                 }}
               >
-                Открыть словарь <ArrowRight size={14} style={{ display: "block" }} />
+                Открыть разговорник <ArrowRight size={14} style={{ display: "block" }} />
               </Link>
             </div>
           )}
@@ -486,10 +665,50 @@ export function DashboardShell() {
                     <span style={{ flex: 1, fontSize: 13, color: isMe ? T.gold : T.text }}>
                       {row.name}{isMe ? " (вы)" : ""}
                     </span>
+                    {row.streak > 0 && (
+                      <span style={{ fontSize: 11, color: T.textMut, display: "inline-flex", alignItems: "center", gap: 3 }}>
+                        <Flame size={11} color={T.gold} style={{ display: "block" }} />
+                        {row.streak}
+                      </span>
+                    )}
                     <span style={{ fontSize: 12, color: T.textMut }}>{row.xp} XP</span>
                   </div>
                 );
               })}
+              {data.myLeaderboardRow && data.myLeaderboardRow.rank > 5 && (
+                <>
+                  <div style={{ height: 1, background: T.line, margin: "6px 10px" }} />
+                  <div
+                    style={{
+                      display: "flex", alignItems: "center", gap: 12, padding: "8px 10px", borderRadius: 10,
+                      background: T.goldDim,
+                    }}
+                  >
+                    <span style={{ fontSize: 12, fontWeight: 700, color: T.gold, width: 20, textAlign: "center" }}>
+                      {data.myLeaderboardRow.rank}
+                    </span>
+                    <div
+                      style={{
+                        width: 28, height: 28, borderRadius: "50%", background: T.navy3, border: `1px solid ${T.line}`,
+                        display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700,
+                        color: T.gold, flexShrink: 0,
+                      }}
+                    >
+                      {getInitials(data.myLeaderboardRow.name)}
+                    </div>
+                    <span style={{ flex: 1, fontSize: 13, color: T.gold }}>
+                      {data.myLeaderboardRow.name} (вы)
+                    </span>
+                    {data.myLeaderboardRow.streak > 0 && (
+                      <span style={{ fontSize: 11, color: T.textMut, display: "inline-flex", alignItems: "center", gap: 3 }}>
+                        <Flame size={11} color={T.gold} style={{ display: "block" }} />
+                        {data.myLeaderboardRow.streak}
+                      </span>
+                    )}
+                    <span style={{ fontSize: 12, color: T.textMut }}>{data.myLeaderboardRow.xp} XP</span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}

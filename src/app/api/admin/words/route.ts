@@ -8,6 +8,12 @@ type CreateWordBody = {
   translation?: string;
   transcription?: string;
   partOfSpeech?: string;
+  gender?: string | null;
+  verbAspect?: string | null;
+  wordType?: string;
+  notes?: string | null;
+  translationPriority?: number;
+  synonymGroupId?: string | null;
 };
 
 type ImportWordsBody = {
@@ -23,6 +29,68 @@ type WordRow = {
   transcription: string | null;
   part_of_speech: string | null;
 };
+
+type AdminWordRow = WordRow & {
+  gender: string | null;
+  verb_aspect: string | null;
+  word_type: string;
+  notes: string | null;
+  translation_priority: number;
+  synonym_group_id: string | null;
+};
+
+function mapAdminWordRow(row: AdminWordRow) {
+  return {
+    id: row.id,
+    lemma: row.lemma,
+    translation: row.translation,
+    transcription: row.transcription,
+    partOfSpeech: row.part_of_speech,
+    gender: row.gender,
+    verbAspect: row.verb_aspect,
+    wordType: row.word_type,
+    notes: row.notes,
+    translationPriority: row.translation_priority,
+    synonymGroupId: row.synonym_group_id
+  };
+}
+
+function normalizeGender(value: unknown): "м" | "ж" | "ср" | null {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+  if (value === "м" || value === "ж" || value === "ср") {
+    return value;
+  }
+  return null;
+}
+
+function normalizeVerbAspect(value: unknown): "сов." | "несов." | "однокр." | null {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+  if (value === "сов." || value === "несов." || value === "однокр.") {
+    return value;
+  }
+  return null;
+}
+
+function normalizeWordType(value: unknown): "word" | "phrase" {
+  return value === "phrase" ? "phrase" : "word";
+}
+
+function normalizePriority(value: unknown): number {
+  if (typeof value === "number" && Number.isInteger(value) && value >= 1) {
+    return value;
+  }
+  if (typeof value === "string" && value.trim()) {
+    const n = Number.parseInt(value, 10);
+    if (Number.isInteger(n) && n >= 1) {
+      return n;
+    }
+  }
+  return 1;
+}
 
 type ExportWordRow = WordRow & {
   collection_slug: string | null;
@@ -578,25 +646,30 @@ export async function GET(request: Request) {
 
   if (searchQuery) {
     const limitRaw = normalizeOptional(url.searchParams.get("limit"));
-    const parsedLimit = limitRaw ? Number.parseInt(limitRaw, 10) : 10;
-    const safeLimit = Number.isInteger(parsedLimit) && parsedLimit > 0 ? Math.min(parsedLimit, 10) : 10;
+    const parsedLimit = limitRaw ? Number.parseInt(limitRaw, 10) : 30;
+    const safeLimit = Number.isInteger(parsedLimit) && parsedLimit > 0 ? Math.min(parsedLimit, 50) : 30;
     const loweredSearch = searchQuery.toLowerCase();
     const containsPattern = `%${loweredSearch}%`;
     const startsWithPattern = `${loweredSearch}%`;
 
     const wordsResult = await withTransaction(async (client) => {
-      const result = await client.query<WordRow>(
+      const result = await client.query<AdminWordRow>(
         `
-          SELECT id, lemma, translation, transcription, part_of_speech
+          SELECT
+            id, lemma, translation, transcription, part_of_speech,
+            gender, verb_aspect, word_type, notes,
+            translation_priority, synonym_group_id
           FROM words w
           WHERE w.is_active = TRUE
             AND (
               LOWER(w.lemma) LIKE $1
               OR LOWER(w.translation) LIKE $1
+              OR LOWER(COALESCE(w.synonym_group_id, '')) LIKE $1
             )
           ORDER BY
             CASE WHEN LOWER(w.lemma) LIKE $2 THEN 0 ELSE 1 END ASC,
             CASE WHEN LOWER(w.translation) LIKE $2 THEN 0 ELSE 1 END ASC,
+            w.translation_priority ASC,
             w.id ASC
           LIMIT $3
         `,
@@ -607,15 +680,7 @@ export async function GET(request: Request) {
     });
 
     const response = NextResponse.json(
-      {
-        words: wordsResult.map((row) => ({
-          id: row.id,
-          lemma: row.lemma,
-          translation: row.translation,
-          transcription: row.transcription,
-          partOfSpeech: row.part_of_speech
-        }))
-      },
+      { words: wordsResult.map(mapAdminWordRow) },
       { status: 200 }
     );
 
@@ -991,36 +1056,85 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "lemma и translation обязательны" }, { status: 400 });
   }
 
-  const created = await withTransaction(async (client) => {
-    const wordResult = await client.query<{ id: number }>(
-      `
-        INSERT INTO words (lemma, translation, transcription, part_of_speech, created_by, updated_by)
-        VALUES ($1, $2, $3, $4, $5, $5)
-        RETURNING id
-      `,
+  const gender = normalizeGender(body.gender);
+  const verbAspect = normalizeVerbAspect(body.verbAspect);
+  const wordType = normalizeWordType(body.wordType);
+  const notes = normalizeOptional(body.notes);
+  const translationPriority = normalizePriority(body.translationPriority);
+  const synonymGroupId = normalizeOptional(body.synonymGroupId);
+  const transcription = normalizeOptional(body.transcription);
+  const partOfSpeech = normalizeOptional(body.partOfSpeech);
+
+  if (body.gender !== undefined && body.gender !== null && body.gender !== "" && gender === null) {
+    return NextResponse.json({ error: "gender: м, ж или ср" }, { status: 400 });
+  }
+  if (body.verbAspect !== undefined && body.verbAspect !== null && body.verbAspect !== "" && verbAspect === null) {
+    return NextResponse.json({ error: "verbAspect: сов., несов. или однокр." }, { status: 400 });
+  }
+
+  let created: ReturnType<typeof mapAdminWordRow>;
+
+  try {
+    created = await withTransaction(async (client) => {
+      const wordResult = await client.query<AdminWordRow>(
+        `
+          INSERT INTO words (
+            lemma, translation, transcription, part_of_speech,
+            gender, verb_aspect, word_type, notes,
+            translation_priority, synonym_group_id,
+            created_by, updated_by
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $11)
+          RETURNING
+            id, lemma, translation, transcription, part_of_speech,
+            gender, verb_aspect, word_type, notes,
+            translation_priority, synonym_group_id
+        `,
         [
           lemma,
           translation,
-          normalizeOptional(body.transcription),
-          normalizeOptional(body.partOfSpeech),
+          transcription,
+          partOfSpeech,
+          gender,
+          verbAspect,
+          wordType,
+          notes,
+          translationPriority,
+          synonymGroupId,
           guard.auth.user.id
         ]
       );
 
-    const wordId = wordResult.rows[0].id;
+      const row = wordResult.rows[0];
 
-    await client.query(
-      `
-        INSERT INTO audit_log (actor_user_id, action, entity_type, entity_id, payload)
-        VALUES ($1, $2, $3, $4, $5)
-      `,
-      [guard.auth.user.id, "admin.word.create", "word", String(wordId), JSON.stringify({ lemma, translation })]
-    );
+      await client.query(
+        `
+          INSERT INTO audit_log (actor_user_id, action, entity_type, entity_id, payload)
+          VALUES ($1, $2, $3, $4, $5)
+        `,
+        [
+          guard.auth.user.id,
+          "admin.word.create",
+          "word",
+          String(row.id),
+          JSON.stringify(mapAdminWordRow(row))
+        ]
+      );
 
-    return wordId;
-  });
+      return mapAdminWordRow(row);
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "";
+    if (message.includes("words_lemma_translation_unique")) {
+      return NextResponse.json(
+        { error: "Такая пара «слово + перевод» уже есть" },
+        { status: 409 }
+      );
+    }
+    throw err;
+  }
 
-  const response = NextResponse.json({ id: created, ok: true }, { status: 201 });
+  const response = NextResponse.json({ id: created.id, ok: true, word: created }, { status: 201 });
 
   if (guard.auth.refreshedAccessToken) {
     setAccessCookie(response, guard.auth.refreshedAccessToken);

@@ -66,12 +66,52 @@ export async function getDashboardData(): Promise<DashboardData> {
   return requestJson<DashboardData>("/api/dashboard");
 }
 
-export async function getSRSQueue(): Promise<FlashcardData[]> {
-  return requestJson<FlashcardData[]>("/api/srs/queue");
+export type SRSQueueResult = {
+  queue: FlashcardData[];
+  remaining: number;
+  totalAvailable: number;
+  sessionLimit: number;
+  collectionId?: number;
+  collectionTitle?: string | null;
+};
+
+export async function getSRSQueue(collectionId?: number): Promise<SRSQueueResult> {
+  const qs =
+    collectionId && Number.isInteger(collectionId) && collectionId > 0
+      ? `?collectionId=${collectionId}`
+      : "";
+  const data = await requestJson<FlashcardData[] | SRSQueueResult>(`/api/srs/queue${qs}`);
+  if (Array.isArray(data)) {
+    return {
+      queue: data,
+      remaining: 0,
+      totalAvailable: data.length,
+      sessionLimit: data.length,
+    };
+  }
+  const queue = Array.isArray(data.queue) ? data.queue : [];
+  return {
+    queue,
+    remaining: typeof data.remaining === "number" ? data.remaining : 0,
+    totalAvailable:
+      typeof data.totalAvailable === "number" ? data.totalAvailable : queue.length,
+    sessionLimit:
+      typeof data.sessionLimit === "number" ? data.sessionLimit : queue.length,
+    collectionId: data.collectionId,
+    collectionTitle: data.collectionTitle ?? null,
+  };
 }
 
-export async function submitSRSReview(wordId: string, rating: SRSRating): Promise<{ ok: boolean; nextReviewAt: string }> {
-  return requestJsonPost<{ ok: boolean; nextReviewAt: string }>("/api/srs/review", { wordId, rating });
+export type SRSReviewResponse = {
+  ok: boolean;
+  nextReviewAt: string;
+  intervalDays: number;
+  easinessFactor: number;
+  repetition: number;
+};
+
+export async function submitSRSReview(wordId: string, rating: SRSRating): Promise<SRSReviewResponse> {
+  return requestJsonPost<SRSReviewResponse>("/api/srs/review", { wordId, rating });
 }
 
 export async function getStudySelection(): Promise<StudySelection> {
