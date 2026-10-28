@@ -11,7 +11,8 @@
     "test:watch": "vitest",
     "db:migrate": "sh ./db/migrate.sh ./db/migrations",
     "parse:1958": "node --experimental-strip-types parse/run_slovar_1958.ts",
-    "parse:digiev": "node --experimental-strip-types parse/run_digiev.ts"
+    "parse:digiev": "node --experimental-strip-types parse/run_digiev.ts",
+    "admin:create": "node scripts/create-admin.mjs"
   },
   "dependencies": {
     "cheerio": "^1.2.0",

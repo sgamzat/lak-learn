@@ -1,14 +1,14 @@
 services:
   postgres:
     image: postgres:16-alpine
-    ports:
-      - "5432:5432"
+    # Порт наружу НЕ публикуется: app и migrate ходят в базу по внутренней сети app_net.
+    # Для локальной разработки: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
     container_name: lak-learn-postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-lak_learn}
       POSTGRES_USER: ${POSTGRES_USER:-lak_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-lak_password}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Задайте POSTGRES_PASSWORD в .env}
     volumes:
       - pg_data:/var/lib/postgresql/data
     healthcheck:
@@ -27,7 +27,7 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      PGPASSWORD: ${POSTGRES_PASSWORD:-lak_password}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Задайте POSTGRES_PASSWORD в .env}
       POSTGRES_DB: ${POSTGRES_DB:-lak_learn}
       POSTGRES_USER: ${POSTGRES_USER:-lak_user}
       PGHOST: postgres
@@ -53,9 +53,9 @@ services:
       NEXT_TELEMETRY_DISABLED: "1"
       PORT: "3000"
       HOSTNAME: "0.0.0.0"
-      DATABASE_URL: postgresql://${POSTGRES_USER:-lak_user}:${POSTGRES_PASSWORD:-lak_password}@postgres:5432/${POSTGRES_DB:-lak_learn}
-      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:-change_me_access}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-change_me_refresh}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-lak_user}:${POSTGRES_PASSWORD:?Задайте POSTGRES_PASSWORD в .env}@postgres:5432/${POSTGRES_DB:-lak_learn}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?Задайте JWT_ACCESS_SECRET в .env (openssl rand -base64 48)}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?Задайте JWT_REFRESH_SECRET в .env (openssl rand -base64 48)}
       ACCESS_TOKEN_TTL: ${ACCESS_TOKEN_TTL:-15m}
       REFRESH_TOKEN_TTL: ${REFRESH_TOKEN_TTL:-30d}
       NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-}

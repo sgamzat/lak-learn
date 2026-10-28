@@ -11,12 +11,22 @@ function getPool(): Pool {
     return global.__lakLearnPool;
   }
 
-  const pool = new Pool({ connectionString: env.databaseUrl });
+  // Пул кешируется ВСЕГДА: и в dev (переживает hot reload), и в production.
+  // Раньше в production на каждый query() создавался новый Pool, соединения
+  // копились и Postgres упирался в лимит "too many clients".
+  const pool = new Pool({
+    connectionString: env.databaseUrl,
+    max: env.dbPoolMax,
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 5_000
+  });
 
-  if (process.env.NODE_ENV !== "production") {
-    global.__lakLearnPool = pool;
-  }
+  // Ошибка простаивающего соединения (например, рестарт Postgres) не должна ронять процесс
+  pool.on("error", (error) => {
+    console.error("[db] idle client error:", error.message);
+  });
 
+  global.__lakLearnPool = pool;
   return pool;
 }
 

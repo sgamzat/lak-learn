@@ -9,3 +9,12 @@ coverage
 dist
 DOCKER.md
 README.md
+
+# Секреты и локальные настройки не должны попадать в слои образа
+.env
+.env.*
+!.env.example
+.roo
+# Большие данные парсера — в рантайме не нужны
+parse/*.json
+parse/*.html

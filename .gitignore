@@ -15,3 +15,6 @@ words-*-export.*
 words-export.*
 parse/digiev_phrasebook.json
 parse/slovar_1958.json
+
+# Локальные настройки AI-агентов (могут содержать токены)
+.roo/
