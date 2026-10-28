@@ -50,12 +50,13 @@ docker compose run --rm migrate
 
 ### Стартовый админ
 
-После миграций создаётся пользователь с ролью `admin`:
+Администратор создаётся скриптом, пароль в репозитории не хранится:
 
-- email: `admin@laklearn.local`
-- password: `Admin123!`
+```bash
+docker compose exec -e ADMIN_EMAIL=you@example.com -e ADMIN_PASSWORD='длинный-пароль' app node scripts/create-admin.mjs
+```
 
-В проде сразу смените пароль (или удалите пользователя).
+Повторный запуск с тем же email меняет пароль и отзывает все сессии этого пользователя.
 
 ## 4) Проверка статуса
 
