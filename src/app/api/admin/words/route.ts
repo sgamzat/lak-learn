@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/server/auth";
 import { withTransaction } from "@/lib/server/db";
 import { setAccessCookie } from "@/lib/server/session";
+import { lakSearchKey } from "@/lib/lak/alphabet";
 
 type CreateWordBody = {
   lemma?: string;
@@ -662,18 +663,19 @@ export async function GET(request: Request) {
           FROM words w
           WHERE w.is_active = TRUE
             AND (
-              LOWER(w.lemma) LIKE $1
+              w.lemma_key LIKE $4
               OR LOWER(w.translation) LIKE $1
               OR LOWER(COALESCE(w.synonym_group_id, '')) LIKE $1
             )
           ORDER BY
-            CASE WHEN LOWER(w.lemma) LIKE $2 THEN 0 ELSE 1 END ASC,
+            CASE WHEN w.lemma_key LIKE $5 THEN 0 ELSE 1 END ASC,
             CASE WHEN LOWER(w.translation) LIKE $2 THEN 0 ELSE 1 END ASC,
             w.translation_priority ASC,
             w.id ASC
           LIMIT $3
         `,
-        [containsPattern, startsWithPattern, safeLimit]
+        // Лемма сравнивается по lemma_key: любой вариант палочки (I, 1, Ӏ) находит слово
+        [containsPattern, startsWithPattern, safeLimit, `%${lakSearchKey(searchQuery)}%`, `${lakSearchKey(searchQuery)}%`]
       );
 
       return result.rows;

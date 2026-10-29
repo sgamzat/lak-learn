@@ -5,6 +5,12 @@ import { query } from "@/lib/server/db";
 import { setAccessCookie } from "@/lib/server/session";
 import type { DictionaryWord } from "@/types/word";
 import { wordInCollectionSql } from "@/lib/server/membership";
+import { LAK_ALPHABET, lakSearchKey } from "@/lib/lak/alphabet";
+
+/** Экранирование % и _ в пользовательском вводе для LIKE */
+function escapeLike(value: string): string {
+  return value.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+}
 
 // ─── Тип строки из БД ────────────────────────────────────────────────────────
 
@@ -59,18 +65,36 @@ function buildFilters(url: URL) {
     where.push(wordInCollectionSql(colRef));
   }
 
-  // Поиск по лемме / переводу
+  // Поиск по лемме / переводу. Лемма ищется по lemma_key (миграция 011):
+  // «кIа», «к1а», «КӀа» находят одно и то же.
   const searchQuery = normalizeOptional(url.searchParams.get("q"));
   if (searchQuery) {
-    const pattern = addParam(`%${searchQuery.toLowerCase()}%`);
-    where.push(`(LOWER(w.lemma) LIKE ${pattern} OR LOWER(w.translation) LIKE ${pattern})`);
+    const lakPattern = addParam(`%${escapeLike(lakSearchKey(searchQuery))}%`);
+    const ruPattern = addParam(`%${escapeLike(searchQuery.toLowerCase())}%`);
+    where.push(`(w.lemma_key LIKE ${lakPattern} OR LOWER(w.translation) LIKE ${ruPattern})`);
   }
 
-  // Навигация по первой букве (лакский/русский индекс)
+  // Буква лакского алфавита: «кь» — только слова на кь, без къ/кк/кӏ
+  const lakLetterRaw = normalizeOptional(url.searchParams.get("lakLetter"));
+  if (lakLetterRaw) {
+    const letter = lakSearchKey(lakLetterRaw);
+    if ((LAK_ALPHABET as readonly string[]).includes(letter)) {
+      where.push(`w.first_letter = ${addParam(letter)}`);
+    } else {
+      where.push("FALSE");
+    }
+  }
+
+  // Начало лакского слова (произвольный префикс)
   const startsWith = normalizeOptional(url.searchParams.get("startsWith"));
   if (startsWith) {
-    const prefix = addParam(`${startsWith.toLowerCase()}%`);
-    where.push(`LOWER(w.lemma) LIKE ${prefix}`);
+    where.push(`w.lemma_key LIKE ${addParam(`${escapeLike(lakSearchKey(startsWith))}%`)}`);
+  }
+
+  // Начало русского перевода (русский алфавитный указатель)
+  const translationStartsWith = normalizeOptional(url.searchParams.get("translationStartsWith"));
+  if (translationStartsWith) {
+    where.push(`LOWER(w.translation) LIKE ${addParam(`${escapeLike(translationStartsWith.toLowerCase())}%`)}`);
   }
 
   // Явный список id (режим «Моё»)
@@ -138,6 +162,15 @@ export async function GET(request: Request) {
   const limit     = limitRaw ? Number.parseInt(limitRaw, 10) : 500;
   const safeLimit = Number.isInteger(limit) && limit > 0 ? Math.min(limit, 30000) : 500;
 
+  // sort=lak — по лакскому алфавиту; по букве алфавита — всегда так
+  const orderBy =
+    url.searchParams.get("sort") === "lak" || url.searchParams.has("lakLetter")
+      ? "w.sort_key ASC, w.translation_priority ASC, w.id ASC"
+      : `CASE WHEN w.popularity_score IS NULL THEN 1 ELSE 0 END ASC,
+        w.popularity_score ASC,
+        w.translation_priority ASC,
+        w.id ASC`;
+
   const result = await query<WordRow>(
     `
       SELECT
@@ -156,11 +189,7 @@ export async function GET(request: Request) {
         w.popularity_score
       FROM words w
       WHERE ${filters.where.join(" AND ")}
-      ORDER BY
-        CASE WHEN w.popularity_score IS NULL THEN 1 ELSE 0 END ASC,
-        w.popularity_score ASC,
-        w.translation_priority ASC,
-        w.id ASC
+      ORDER BY ${orderBy}
       LIMIT $${filters.params.length + 1}
     `,
     [...filters.params, safeLimit]

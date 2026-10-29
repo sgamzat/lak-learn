@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useReducedMotion } from "framer-motion";
 import type { FlashcardData, SRSRating } from "@/types/srs";
+import { lakLooseKey } from "@/lib/lak/alphabet";
 
 interface RecallInputProps {
   card: FlashcardData;
@@ -10,12 +11,11 @@ interface RecallInputProps {
   onRate: (rating: SRSRating) => void;
 }
 
+// Любой вариант палочки (I, l, 1, |, Ӏ, ӏ) засчитывается как палочка.
+// Раньше настоящая Ӏ (U+04C0) не распознавалась: после нормализации слов
+// в БД правильный ответ с латинской I считался бы ошибкой.
 function normalize(str: string): string {
-  return str
-    .trim()
-    .toLowerCase()
-    .replace(/[1iIlL|]/g, "I")
-    .replace(/\s+/g, " ");
+  return lakLooseKey(str);
 }
 
 type CheckResult =
