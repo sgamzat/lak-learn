@@ -1,0 +1,35 @@
+# РАЗОВЫЙ workflow: сохраняет снимок страницы словаря 1958 в parse/slovar_1958.html,
+# чтобы парсер работал с локальной копией (как parse/lak.html для Дигиева).
+# Удаляется следующим коммитом.
+name: Fetch 1958 source
+
+on:
+  push:
+    branches: [chore/fetch-1958-source]
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Скачать страницу
+        run: |
+          set -euo pipefail
+          url="https://lakkumaz.narod.ru/orus_mazral_va_lakku_mazral_shkolalul_slovar.html"
+          curl -fsSL --retry 3 -A "lak-learn-parser/1.0" "$url" -o /tmp/page.html
+          file -bi /tmp/page.html
+          # narod.ru вставляет IP посетителя в страницу — не сохраняем
+          sed -E 's/user_ip:"[0-9.]+"/user_ip:""/g' /tmp/page.html > parse/slovar_1958.html
+          ls -la parse/slovar_1958.html
+          head -c 300 parse/slovar_1958.html | iconv -f utf-8 -t utf-8 >/dev/null && echo "utf-8 ok"
+      - name: Коммит
+        run: |
+          git config user.name "Claude"
+          git config user.email "noreply@anthropic.com"
+          git add parse/slovar_1958.html
+          git commit -m "chore: снимок страницы словаря 1958 (parse/slovar_1958.html)"
+          git push
