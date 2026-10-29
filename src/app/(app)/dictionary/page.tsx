@@ -22,6 +22,8 @@ type CollectionCard = {
   title: string;
   description: string | null;
   wordCount: number;
+  /** Основные слова без синонимов и фраз — столько откроется в словаре */
+  dictionaryWordCount: number;
   sortOrder: number;
   kind: CollectionKind;
 };
@@ -263,7 +265,9 @@ function DictionaryPageContent() {
   }, [collections]);
 
   const topicCollections = useMemo(
-    () => collections.filter((c) => c.kind === "topic" && c.wordCount > 0),
+    // Темы только из фраз (например, «Обращение») живут в разговорнике:
+    // словарь показывает слова, и раньше такие темы открывались пустыми
+    () => collections.filter((c) => c.kind === "topic" && (c.dictionaryWordCount ?? 0) > 0),
     [collections]
   );
 
@@ -654,7 +658,7 @@ function DictionaryPageContent() {
                           >
                             <span className="block truncate font-semibold text-lk-text">{col.title}</span>
                             <span className="text-xs text-lk-muted">
-                              {col.wordCount} слов
+                              {col.dictionaryWordCount} слов
                               {col.description ? ` · ${col.description}` : ""}
                             </span>
                           </button>

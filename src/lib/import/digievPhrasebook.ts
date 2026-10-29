@@ -1,14 +1,39 @@
 /**
  * Парсер «Русско-лакского разговорника» Л. А. Дигиева (HTML).
- * Источник: parse/lak.html / lakkumaz.narod.ru
+ * Источник: parse/lak.html (сохранённая копия lakkumaz.narod.ru).
+ *
+ * Структура книги:
+ *   гл. 0       — предисловие (пропускается)
+ *   гл. 1–90    — разговорник по темам: фразы и тематические слова
+ *   гл. 91–98   — «Краткий русско-лакский словарь»: существительные, глаголы,
+ *                 прилагательные, антонимы, цвета, наречия, местоимения, числительные
+ *   гл. 99–100  — списки лакских имён (не пары перевода — пропускаются)
  */
 
-export type DigievPhrase = {
+import { toLakCanonical } from "../lak/alphabet.ts";
+import { extractLeafTables, decodeEntities, type HtmlRow } from "./htmlTables.ts";
+
+export type DigievWordType = "word" | "phrase";
+
+export type DigievEntry = {
   lemma: string;
   translation: string;
   notes: string | null;
-  wordType: "phrase";
-  translationPriority: 1;
+  wordType: DigievWordType;
+  /** 1 — основной вариант; 2+ — другие значения из «1. … 2. …» */
+  translationPriority: number;
+  synonymGroupId: string | null;
+};
+
+export type DigievChapter = {
+  chapter: number;
+  slug: string;
+  titleRu: string;
+  titleLak: string | null;
+  phrases: DigievEntry[];
+};
+
+export type DigievRecord = DigievEntry & {
   collectionSlug: string;
   collectionTitle: string;
   collectionTitleLak: string | null;
@@ -18,351 +43,327 @@ export type DigievPhrase = {
   chapter: number;
 };
 
-export type DigievChapter = {
-  chapter: number;
-  slug: string;
-  titleRu: string;
-  titleLak: string | null;
-  phrases: Array<{ lemma: string; translation: string; notes: string | null }>;
-};
+/** Главы «Краткого словаря» — отдельные слова, а не фразы */
+export const DIGIEV_DICTIONARY_CHAPTERS = { from: 91, to: 98 } as const;
+/** Списки имён: в строке по 6 имён, это не пары «русский — лакский» */
+const NAME_LIST_CHAPTERS = new Set([99, 100]);
+const NUMERALS_CHAPTER = 98;
+
+// ─── Слаг коллекции ──────────────────────────────────────────────────────────
 
 const CYR_TO_LAT: Record<string, string> = {
-  а: "a",
-  б: "b",
-  в: "v",
-  г: "g",
-  д: "d",
-  е: "e",
-  ё: "e",
-  ж: "zh",
-  з: "z",
-  и: "i",
-  й: "y",
-  к: "k",
-  л: "l",
-  м: "m",
-  н: "n",
-  о: "o",
-  п: "p",
-  р: "r",
-  с: "s",
-  т: "t",
-  у: "u",
-  ф: "f",
-  х: "h",
-  ц: "ts",
-  ч: "ch",
-  ш: "sh",
-  щ: "sch",
-  ъ: "",
-  ы: "y",
-  ь: "",
-  э: "e",
-  ю: "yu",
-  я: "ya",
-  і: "i",
-  ӏ: "i",
-  Ӏ: "i"
+  а: "a", б: "b", в: "v", г: "g", д: "d", е: "e", ё: "e", ж: "zh", з: "z", и: "i", й: "y",
+  к: "k", л: "l", м: "m", н: "n", о: "o", п: "p", р: "r", с: "s", т: "t", у: "u", ф: "f",
+  х: "h", ц: "ts", ч: "ch", ш: "sh", щ: "sch", ъ: "", ы: "y", ь: "", э: "e", ю: "yu", я: "ya",
+  і: "i", ӏ: "i", Ӏ: "i"
 };
 
-function cleanText(raw: string): string {
-  return raw
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
-    .replace(/&quot;/gi, '"')
-    .replace(/\u00a0/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
 function translitSlug(value: string): string {
-  const lower = value.toLowerCase();
   let out = "";
-  for (const ch of lower) {
-    if (CYR_TO_LAT[ch] !== undefined) {
-      out += CYR_TO_LAT[ch];
-    } else if (/[a-z0-9]/.test(ch)) {
-      out += ch;
-    } else if (/[\s._—–−-]+/.test(ch)) {
-      out += "-";
-    }
+  for (const ch of value.toLowerCase()) {
+    if (CYR_TO_LAT[ch] !== undefined) out += CYR_TO_LAT[ch];
+    else if (/[a-z0-9]/.test(ch)) out += ch;
+    else if (/[\s._—–−-]/.test(ch)) out += "-";
   }
-  return out
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 60);
+  return out.replace(/-+/g, "-").replace(/^-|-$/g, "").slice(0, 60);
 }
 
 export function digievCollectionSlug(chapter: number, titleRu: string): string {
-  const base = translitSlug(titleRu) || "tema";
-  return `digiev-${String(chapter).padStart(2, "0")}-${base}`;
+  return `digiev-${String(chapter).padStart(2, "0")}-${translitSlug(titleRu) || "tema"}`;
 }
 
-type RawCell = { text: string; alignRight: boolean };
+// ─── Оглавление: названия глав (у гл. 94 в тексте вместо заголовка «* * *») ───
 
-type RawRow = { cells: RawCell[]; alignRight: boolean };
+function stripTags(html: string): string {
+  return decodeEntities(html.replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim();
+}
 
-function extractRowsFromTableHtml(tableHtml: string): RawRow[] {
-  const rows: RawRow[] = [];
-  const trRe = /<tr\b([^>]*)>([\s\S]*?)<\/tr>/gi;
-  let trMatch: RegExpExecArray | null;
-  while ((trMatch = trRe.exec(tableHtml))) {
-    const trAttrs = trMatch[1] ?? "";
-    const trBody = trMatch[2] ?? "";
-    const rowAlignRight = /align\s*=\s*["']?right/i.test(trAttrs);
-
-    if (/<th\b/i.test(trBody)) {
-      continue;
-    }
-
-    const cells: RawCell[] = [];
-    const tdRe = /<td\b([^>]*)>([\s\S]*?)(?=<td\b|<\/tr>|$)/gi;
-    let tdMatch: RegExpExecArray | null;
-    while ((tdMatch = tdRe.exec(trBody))) {
-      const attrs = tdMatch[1] ?? "";
-      const inner = tdMatch[2] ?? "";
-      // Skip nested tables' outer wrapper cells that only contain another table
-      if (/<table\b/i.test(inner)) {
-        continue;
-      }
-      cells.push({
-        text: cleanText(inner),
-        alignRight: rowAlignRight || /align\s*=\s*["']?right/i.test(attrs)
-      });
-    }
-
-    if (cells.length >= 2) {
-      rows.push({ cells: cells.slice(0, 2), alignRight: rowAlignRight });
-    } else if (cells.length === 1 && cells[0].text) {
-      rows.push({
-        cells: [cells[0], { text: "", alignRight: false }],
-        alignRight: rowAlignRight
-      });
-    }
+export function parseTableOfContents(html: string): Map<number, { ru: string; lak: string | null }> {
+  const toc = new Map<number, { ru: string; lak: string | null }>();
+  const re = /<a\s+href="#glava(\d+)"[^>]*>([\s\S]*?)<\/a>/gi;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(html))) {
+    const n = Number.parseInt(m[1], 10);
+    if (toc.has(n)) continue; // первое вхождение — основное оглавление
+    const text = stripTags(m[2]);
+    const [ru, lak] = text.split(/\s*(?:\.\s){3,}\.?\s*|\s+—\s+/);
+    if (ru) toc.set(n, { ru: ru.trim(), lak: lak?.trim() || null });
   }
-  return rows;
+  return toc;
 }
 
-function combineParentChild(parentRu: string, childRu: string): string {
+// ─── Очистка текста ──────────────────────────────────────────────────────────
+
+const ELLIPSIS_START = /^\s*(?:\.{2,}|…)\s*/;
+const ELLIPSIS_END = /\s*(?:\.{2,}|…)\s*$/;
+
+function startsWithEllipsis(s: string): boolean {
+  return ELLIPSIS_START.test(s);
+}
+function endsWithEllipsis(s: string): boolean {
+  return ELLIPSIS_END.test(s);
+}
+function stripEllipses(s: string): string {
+  return s.replace(ELLIPSIS_START, "").replace(ELLIPSIS_END, "").trim();
+}
+function oneLine(s: string): string {
+  return s
+    .replace(/\s*\n\s*/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(/\s*[;:,]+$/, "") // «бюхълан;»
+    .trim();
+}
+
+/** «Как это будет по-лакски?Лакку мазрай…» — русский и лакский в одной ячейке */
+const LAK_MARKERS = /[гкптхцчГКПТХЦЧ][IӀӏ]|аь|оь|[гкх][ъь]|кк|сс|тт|чч|хх|цц|пп/i;
+export function splitMergedCell(text: string): { ru: string; lak: string } | null {
+  const m = text.match(/^(.+?[?!.])\s*([А-ЯЁ].+)$/);
+  if (!m) return null;
+  const [, ru, lak] = m;
+  if (!LAK_MARKERS.test(lak) || LAK_MARKERS.test(ru)) return null;
+  return { ru: ru.trim(), lak: lak.trim() };
+}
+
+/** «1. ласун 2. дугьан» → ["ласун", "дугьан"] */
+export function splitNumberedSenses(text: string): string[] {
+  const flat = oneLine(text);
+  if (!/^1\.\s/.test(flat) || !/\s2\.\s/.test(flat)) return [flat];
+  return flat
+    .split(/(?:^|\s)\d+\.\s+/)
+    .map((s) => oneLine(s)) // «1. бюхълан; 2. …» → без «;»
+    .filter(Boolean);
+}
+
+// ─── Классификация ───────────────────────────────────────────────────────────
+
+/**
+ * Слово или фраза. Главы словаря (91–98) — всегда слова. В тематических главах
+ * слово — это «Воробей → ЧӀелму, шярлу», «Головастик → Магъду кӀичӀала»:
+ * не больше двух слов с каждой стороны (варианты через запятую и скобки не считаются)
+ * и без знаков предложения. «Желаю вам (тебе) успехов» — уже фраза.
+ */
+export function classifyWordType(chapter: number, ru: string, lak: string): DigievWordType {
+  if (chapter >= DIGIEV_DICTIONARY_CHAPTERS.from && chapter <= DIGIEV_DICTIONARY_CHAPTERS.to) return "word";
+  if (/[.!?]/.test(ru) || /[.!?]/.test(lak)) return "phrase";
+  const words = (s: string) =>
+    s.replace(/\([^)]*\)/g, " ").split(",")[0].trim().split(/\s+/).filter(Boolean).length;
+  return words(ru) > 2 || words(lak) > 2 ? "phrase" : "word";
+}
+
+// ─── Строки таблиц → пары ────────────────────────────────────────────────────
+
+type Pair = { ru: string; lak: string };
+
+/**
+ * «НацIу мечI КРАТКИЙ РУССКО-ЛАКСКИЙ СЛОВАРЬ» — к последней строке главы
+ * приклеился заголовок следующего раздела. Отрезаем хвост из 2+ слов
+ * заглавными, если до него текст в обычном регистре.
+ */
+export function stripTrailingHeading(text: string): string {
+  const m = text.match(/^(.*[а-яё].*?)\s+((?:[А-ЯЁ][А-ЯЁӀ-]+\s*){2,})$/);
+  return m ? m[1].trim() : text;
+}
+
+function rowPair(row: HtmlRow): Pair | null {
+  const cells = row.cells.filter((c) => !c.isHeader);
+  if (cells.length === 0) return null;
+  const ru = stripTrailingHeading(cells[0]?.text ?? "");
+  const lak = stripTrailingHeading(cells[1]?.text ?? "");
+  if (ru && !lak) {
+    const merged = splitMergedCell(oneLine(ru));
+    if (merged) return merged;
+  }
+  return { ru, lak };
+}
+
+function isChildRow(row: HtmlRow): boolean {
+  return row.alignRight || row.cells[0]?.alignRight === true;
+}
+
+function combine(stem: string, tail: string): string {
+  return oneLine(`${stripEllipses(stem)} ${stripEllipses(tail)}`);
+}
+
+function combineHeading(parentRu: string, childRu: string): string {
   const p = parentRu.replace(/:\s*$/, "").trim();
-  const c = childRu.replace(/^\.+/, "").trim();
+  const c = stripEllipses(childRu);
   if (!p) return c;
   if (!c) return p;
-  if (p.includes("...") || p.endsWith("…")) {
-    return `${p.replace(/\.{3}|…/g, "").trim()} ${c}`.replace(/\s+/g, " ").trim();
-  }
-  if (c.startsWith("(") && c.endsWith(")")) {
-    return `${p} ${c}`;
-  }
+  if (endsWithEllipsis(p)) return combine(p, c);
+  if (c.startsWith("(") && c.endsWith(")")) return `${p} ${c}`;
   return `${p} (${c})`;
 }
 
-function rowsToPhrases(
-  rows: RawRow[]
-): Array<{ lemma: string; translation: string; notes: string | null }> {
-  const phrases: Array<{ lemma: string; translation: string; notes: string | null }> = [];
-  let i = 0;
+/**
+ * Правила склейки (проверены на всех 90 главах разговорника):
+ *  1. «Тетя:» без перевода + строки с отступом «по отцу | Бутталссу!» →
+ *     «Тетя (по отцу) → Бутталссу!».
+ *  2. Основа с многоточием «Желаю вам (тебе)... | Зун (вин)...» + продолжения
+ *     «...успехов | ...тIайлабацIу хьуннав» → склеиваются ОБЕ стороны:
+ *     «Желаю вам (тебе) успехов → Зун (вин) тIайлабацIу хьуннав».
+ *     Сама основа отдельной записью не сохраняется — это неполная фраза.
+ *  3. Продолжение «...это не моя вина...» без основы (предыдущая фраза полная) —
+ *     самостоятельная фраза, многоточия убираются.
+ */
+export function rowsToPairs(rows: HtmlRow[]): Pair[] {
+  const out: Pair[] = [];
+  let heading: string | null = null; // «Тетя:» — русский заголовок без перевода
+  let stem: Pair | null = null; // основа с многоточием
+  let stemUsed = false;
+  let lastRu: string | null = null; // русская часть последней полной фразы — для «(жен.)»
 
-  while (i < rows.length) {
-    const row = rows[i];
-    const ru = row.cells[0]?.text ?? "";
-    const lak = row.cells[1]?.text ?? "";
-    const isChild = row.alignRight || row.cells[0]?.alignRight;
+  // Основа без продолжений — всё-таки полная фраза, не теряем её
+  const flushStem = () => {
+    if (stem && !stemUsed) out.push({ ru: oneLine(stripEllipses(stem.ru)), lak: oneLine(stripEllipses(stem.lak)) });
+    stem = null;
+    stemUsed = false;
+  };
 
-    // Parent with empty Lak followed by indented children
-    if (!isChild && ru && !lak) {
-      const children: RawRow[] = [];
-      let j = i + 1;
-      while (j < rows.length) {
-        const next = rows[j];
-        const nextChild =
-          next.alignRight || next.cells[0]?.alignRight;
-        const nextRu = next.cells[0]?.text ?? "";
-        const nextLak = next.cells[1]?.text ?? "";
-        if (!nextChild) break;
-        if (!nextRu && !nextLak) {
-          j += 1;
-          continue;
-        }
-        children.push(next);
-        j += 1;
-      }
+  for (const row of rows) {
+    const pair = rowPair(row);
+    if (!pair) continue;
+    const { ru, lak } = pair;
+    if (!ru && !lak) continue;
+    if (/©/.test(ru) || /©/.test(lak)) continue; // подвал страницы
 
-      if (children.length) {
-        for (const child of children) {
-          const childRu = child.cells[0]?.text ?? "";
-          const childLak = child.cells[1]?.text ?? "";
-          if (!childLak) continue;
-          phrases.push({
-            translation: combineParentChild(ru, childRu),
-            lemma: childLak,
-            notes: null
-          });
-        }
-        i = j;
-        continue;
-      }
+    const child = isChildRow(row);
 
-      i += 1;
+    // Заголовок без перевода — ждём строки с отступом
+    if (!child && ru && !lak) {
+      flushStem();
+      heading = ru;
+      lastRu = null;
+      continue;
+    }
+    if (!ru || !lak) continue; // одна сторона пустая — пропуск
+
+    const continuation = startsWithEllipsis(ru) && startsWithEllipsis(lak);
+
+    if (stem && (continuation || child)) {
+      out.push({ ru: combine(stem.ru, ru), lak: combine(stem.lak, lak) });
+      stemUsed = true;
+      continue;
+    }
+    if (heading && child) {
+      out.push({ ru: combineHeading(heading, ru), lak: oneLine(stripEllipses(lak)) });
       continue;
     }
 
-    // Parent with both sides + indented continuations (...друг)
-    if (!isChild && ru && lak) {
-      const children: RawRow[] = [];
-      let j = i + 1;
-      while (j < rows.length) {
-        const next = rows[j];
-        const nextChild =
-          next.alignRight || next.cells[0]?.alignRight;
-        if (!nextChild) break;
-        children.push(next);
-        j += 1;
-      }
-
-      if (children.length) {
-        phrases.push({ translation: ru, lemma: lak, notes: null });
-        for (const child of children) {
-          const childRu = child.cells[0]?.text ?? "";
-          const childLak = child.cells[1]?.text ?? "";
-          if (!childLak && !childRu) continue;
-          phrases.push({
-            translation: combineParentChild(ru, childRu),
-            lemma: childLak || lak,
-            notes: childRu || null
-          });
-        }
-        i = j;
-        continue;
-      }
-
-      phrases.push({ translation: ru, lemma: lak, notes: null });
-      i += 1;
+    // «Я согласен → Ттун рязи ур», затем «(жен.) → Ттун рязи бур»
+    if (/^\(.*\)$/.test(ru) && lastRu) {
+      out.push({ ru: `${lastRu} ${ru}`, lak: oneLine(stripEllipses(lak)) });
       continue;
     }
 
-    // Standalone child without parent context — keep as-is if both present
-    if (ru && lak) {
-      phrases.push({ translation: ru, lemma: lak, notes: null });
+    heading = null;
+    flushStem();
+
+    const isStem =
+      !startsWithEllipsis(ru) && !startsWithEllipsis(lak) && endsWithEllipsis(ru) && endsWithEllipsis(lak);
+    if (isStem) {
+      stem = { ru, lak };
+      continue;
     }
 
-    i += 1;
+    const full = { ru: oneLine(stripEllipses(ru)), lak: oneLine(stripEllipses(lak)) };
+    out.push(full);
+    lastRu = full.ru.replace(/\s*\((?:муж|м)\.?\)\s*$/, "");
   }
 
-  // Deduplicate within chapter
+  flushStem();
+  return out;
+}
+
+function pairsToEntries(chapter: number, pairs: Pair[]): DigievEntry[] {
+  const entries: DigievEntry[] = [];
   const seen = new Set<string>();
-  const unique: typeof phrases = [];
-  for (const p of phrases) {
-    const lemma = p.lemma.trim();
-    const translation = p.translation.trim();
-    if (!lemma || !translation) continue;
-    if (lemma.length < 1 || translation.length < 1) continue;
-    const key = `${lemma.toLowerCase()}\0${translation.toLowerCase()}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    unique.push({ lemma, translation, notes: p.notes });
+
+  for (const { ru: rawRu, lak: rawLak } of pairs) {
+    let ru = rawRu;
+
+    // «1 один» → «один (1)»; строку «| 0 ноль» без русской стороны отсекли раньше
+    if (chapter === NUMERALS_CHAPTER) {
+      const m = ru.match(/^(\d+)\s+(.+)$/);
+      if (m) ru = `${m[2]} (${m[1]})`;
+    }
+
+    const senses = splitNumberedSenses(rawLak).map((s) => toLakCanonical(s));
+    const translation = oneLine(ru);
+    if (!translation) continue;
+    const groupId = senses.length > 1 ? translation.toLowerCase() : null;
+
+    senses.forEach((lemma, index) => {
+      if (!lemma) return;
+      const key = `${lemma.toLowerCase()}\0${translation.toLowerCase()}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      entries.push({
+        lemma,
+        translation,
+        notes: null,
+        wordType: classifyWordType(chapter, translation, lemma),
+        translationPriority: index + 1,
+        synonymGroupId: groupId
+      });
+    });
   }
-  return unique;
+  return entries;
 }
 
-function extractTitleFromSection(sectionHtml: string): { ru: string; lak: string | null } {
-  const ths: string[] = [];
-  const thRe = /<th\b[^>]*>([\s\S]*?)<\/th>/gi;
-  let m: RegExpExecArray | null;
-  while ((m = thRe.exec(sectionHtml)) && ths.length < 2) {
-    const t = cleanText(m[1] ?? "");
-    if (t) ths.push(t);
-  }
-  if (ths.length >= 1) {
-    return { ru: ths[0], lak: ths[1] ?? null };
-  }
+// ─── Главы ───────────────────────────────────────────────────────────────────
 
-  const h4 = sectionHtml.match(/<h4\b[^>]*>([\s\S]*?)<\/h4>/i);
-  const h3 = sectionHtml.match(/<h3\b[^>]*>([\s\S]*?)<\/h3>/i);
-  const ru = h4 ? cleanText(h4[1]) : "";
-  const lak = h3 ? cleanText(h3[1]) : null;
-  return { ru: ru || "Без названия", lak };
-}
-
-function collectTableHtmls(sectionHtml: string): string[] {
-  const tables: string[] = [];
-  const re = /<table\b[^>]*>[\s\S]*?<\/table>/gi;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(sectionHtml))) {
-    tables.push(m[0]);
+function sectionTitle(rows: HtmlRow[]): { ru: string; lak: string | null } | null {
+  for (const row of rows) {
+    const headers = row.cells.filter((c) => c.isHeader).map((c) => oneLine(c.text)).filter(Boolean);
+    if (headers.length) return { ru: headers[0], lak: headers[1] ?? null };
   }
-  // Prefer leaf tables (with td pairs, without nested table) when nested layout exists
-  const leaf = tables.filter((t) => !/<table\b/i.test(t.replace(/^<table\b[^>]*>/i, "")));
-  if (leaf.length) return leaf;
-  return tables;
+  return null;
 }
 
 /**
- * Разбирает HTML разговорника Дигиева на главы и пары RU|Лак.
- * Пропускает glava00 (предисловие).
+ * Разбирает HTML разговорника на главы и пары RU|Лак.
+ * Лакская сторона приводится к канону (палочка → Ӏ).
  */
 export function parseDigievHtml(html: string): DigievChapter[] {
-  const chapters: DigievChapter[] = [];
+  const toc = parseTableOfContents(html);
   const parts = html.split(/<a\s+name="(glava\d+)"\s*>\s*<\/a>/i);
+  const chapters: DigievChapter[] = [];
 
   for (let i = 1; i < parts.length; i += 2) {
-    const anchor = parts[i] ?? "";
-    const sectionHtml = parts[i + 1] ?? "";
-    const numMatch = anchor.match(/glava(\d+)/i);
-    if (!numMatch) continue;
-    const chapter = Number.parseInt(numMatch[1], 10);
-    if (!Number.isFinite(chapter) || chapter < 1) continue;
+    const chapter = Number.parseInt((parts[i] ?? "").replace(/\D/g, ""), 10);
+    if (!Number.isFinite(chapter) || chapter < 1 || NAME_LIST_CHAPTERS.has(chapter)) continue;
 
-    const { ru, lak } = extractTitleFromSection(sectionHtml);
-    const tableHtmls = collectTableHtmls(sectionHtml);
-    const allRows: RawRow[] = [];
-    for (const tableHtml of tableHtmls) {
-      allRows.push(...extractRowsFromTableHtml(tableHtml));
-    }
-
-    const phrases = rowsToPhrases(allRows);
-    if (!phrases.length) continue;
+    const tables = extractLeafTables(parts[i + 1] ?? "");
+    const rows = tables.flatMap((t) => t.rows);
+    const title = sectionTitle(rows) ?? toc.get(chapter) ?? { ru: "Без названия", lak: null };
+    const entries = pairsToEntries(chapter, rowsToPairs(rows));
+    if (!entries.length) continue;
 
     chapters.push({
       chapter,
-      slug: digievCollectionSlug(chapter, ru),
-      titleRu: ru,
-      titleLak: lak,
-      phrases
+      slug: digievCollectionSlug(chapter, title.ru),
+      titleRu: title.ru,
+      titleLak: title.lak ? toLakCanonical(title.lak) : null,
+      phrases: entries
     });
   }
 
-  chapters.sort((a, b) => a.chapter - b.chapter);
-  return chapters;
+  return chapters.sort((a, b) => a.chapter - b.chapter);
 }
 
 /** Плоский список записей для импорта в БД. */
-export function chaptersToImportRecords(chapters: DigievChapter[]): DigievPhrase[] {
-  const records: DigievPhrase[] = [];
-  for (const ch of chapters) {
-    const description = ch.titleLak
-      ? `${ch.titleLak} · Дигиев, гл. ${ch.chapter}`
-      : `Дигиев, гл. ${ch.chapter}`;
-
-    for (const p of ch.phrases) {
-      records.push({
-        lemma: p.lemma,
-        translation: p.translation,
-        notes: p.notes,
-        wordType: "phrase",
-        translationPriority: 1,
-        collectionSlug: ch.slug,
-        collectionTitle: ch.titleRu,
-        collectionTitleLak: ch.titleLak,
-        collectionDescription: description,
-        collectionSortOrder: ch.chapter,
-        collectionKind: "topic",
-        chapter: ch.chapter
-      });
-    }
-  }
-  return records;
+export function chaptersToImportRecords(chapters: DigievChapter[]): DigievRecord[] {
+  return chapters.flatMap((ch) => {
+    const description = ch.titleLak ? `${ch.titleLak} · Дигиев, гл. ${ch.chapter}` : `Дигиев, гл. ${ch.chapter}`;
+    return ch.phrases.map((p) => ({
+      ...p,
+      collectionSlug: ch.slug,
+      collectionTitle: ch.titleRu,
+      collectionTitleLak: ch.titleLak,
+      collectionDescription: description,
+      collectionSortOrder: ch.chapter,
+      collectionKind: "topic" as const,
+      chapter: ch.chapter
+    }));
+  });
 }

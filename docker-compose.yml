@@ -34,8 +34,9 @@ services:
       PGPORT: "5432"
     volumes:
       - ./db/migrations:/migrations:ro
+      - ./db/seeds:/seeds:ro
       - ./db/migrate.sh:/migrate.sh:ro
-    command: ["sh", "/migrate.sh", "/migrations"]
+    command: ["sh", "/migrate.sh", "/migrations", "/seeds"]
     restart: "no"
     networks:
       - app_net
