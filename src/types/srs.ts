@@ -32,6 +32,10 @@ export interface FlashcardData {
   // Синонимы — показываем на карточке, не изучаются отдельно
   synonyms:        { id: number; lemma: string }[];
 
+  // Другие значения того же лакского слова и источник записи
+  otherMeanings:   string[];
+  source:          string | null;
+
   // SRS-метаданные
   intervalState:   IntervalState;
   nextReviewDate:  string;            // ISO дата следующего повторения
