@@ -66,14 +66,14 @@ function normalizeWordIds(value: unknown): number[] {
   );
 }
 
-export async function GET(request: Request, { params }: { params: { collectionId: string } }) {
+export async function GET(request: Request, { params }: { params: Promise<{ collectionId: string }> }) {
   const guard = await requireAdmin(request);
 
   if (!guard.auth || guard.response) {
     return guard.response;
   }
 
-  const collectionId = Number.parseInt(params.collectionId, 10);
+  const collectionId = Number.parseInt((await params).collectionId, 10);
 
   if (!Number.isInteger(collectionId) || collectionId <= 0) {
     return NextResponse.json({ error: "Некорректный collectionId" }, { status: 400 });
@@ -165,14 +165,14 @@ export async function GET(request: Request, { params }: { params: { collectionId
   return response;
 }
 
-export async function PATCH(request: Request, { params }: { params: { collectionId: string } }) {
+export async function PATCH(request: Request, { params }: { params: Promise<{ collectionId: string }> }) {
   const guard = await requireAdmin(request);
 
   if (!guard.auth || guard.response) {
     return guard.response;
   }
 
-  const collectionId = Number.parseInt(params.collectionId, 10);
+  const collectionId = Number.parseInt((await params).collectionId, 10);
 
   if (!Number.isInteger(collectionId) || collectionId <= 0) {
     return NextResponse.json({ error: "Некорректный collectionId" }, { status: 400 });
@@ -306,14 +306,14 @@ export async function PATCH(request: Request, { params }: { params: { collection
   return response;
 }
 
-export async function DELETE(request: Request, { params }: { params: { collectionId: string } }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ collectionId: string }> }) {
   const guard = await requireAdmin(request);
 
   if (!guard.auth || guard.response) {
     return guard.response;
   }
 
-  const collectionId = Number.parseInt(params.collectionId, 10);
+  const collectionId = Number.parseInt((await params).collectionId, 10);
 
   if (!Number.isInteger(collectionId) || collectionId <= 0) {
     return NextResponse.json({ error: "Некорректный collectionId" }, { status: 400 });

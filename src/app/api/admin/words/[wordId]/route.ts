@@ -116,14 +116,14 @@ function mapWord(row: ExistingWordRow) {
 // ── PATCH /api/admin/words/:wordId ────────────────────────────────────────────
 export async function PATCH(
   request: Request,
-  { params }: { params: { wordId: string } }
+  { params }: { params: Promise<{ wordId: string }> }
 ) {
   const guard = await requireAdmin(request);
   if (!guard.auth || guard.response) {
     return guard.response;
   }
 
-  const wordId = Number.parseInt(params.wordId, 10);
+  const wordId = Number.parseInt((await params).wordId, 10);
   if (!Number.isInteger(wordId) || wordId <= 0) {
     return NextResponse.json({ error: "Некорректный wordId" }, { status: 400 });
   }
@@ -243,14 +243,14 @@ export async function PATCH(
 // ── DELETE /api/admin/words/:wordId (soft delete) ─────────────────────────────
 export async function DELETE(
   request: Request,
-  { params }: { params: { wordId: string } }
+  { params }: { params: Promise<{ wordId: string }> }
 ) {
   const guard = await requireAdmin(request);
   if (!guard.auth || guard.response) {
     return guard.response;
   }
 
-  const wordId = Number.parseInt(params.wordId, 10);
+  const wordId = Number.parseInt((await params).wordId, 10);
   if (!Number.isInteger(wordId) || wordId <= 0) {
     return NextResponse.json({ error: "Некорректный wordId" }, { status: 400 });
   }
