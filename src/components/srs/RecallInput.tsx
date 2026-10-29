@@ -5,6 +5,9 @@ import { useReducedMotion } from "framer-motion";
 import type { FlashcardData, RateDetails, SRSRating } from "@/types/srs";
 import { lakLooseKey } from "@/lib/lak/alphabet";
 import { lakAnswerKey, lakAnswerVariants } from "@/lib/lak/variants";
+import { displayLetter, splitLakLetters } from "@/lib/lak/alphabet";
+import { makeCloze } from "@/lib/lak/cloze";
+import { LakKeyboardBar } from "@/components/srs/LakKeyboardBar";
 
 interface RecallInputProps {
   card: FlashcardData;
@@ -215,6 +218,33 @@ function findCardByWord(word: string, cards: FlashcardData[]): FlashcardData | n
 
 type Phase = "input" | "wrong" | "correct-exact" | "correct-typo";
 
+function pluralLetters(n: number): string {
+  const mod10 = n % 10;
+  const mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return "буква";
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "буквы";
+  return "букв";
+}
+
+/** После ответа: пример целиком, другие значения слова, источник */
+export function CardExtras({ card }: { card: FlashcardData }) {
+  if (!card.exampleSentence && !card.otherMeanings?.length && !card.source) return null;
+  return (
+    <div className="mt-3 space-y-1.5 border-t border-lk-line pt-3 text-left">
+      {card.exampleSentence && (
+        <p className="text-sm italic leading-relaxed text-lk-muted">«{card.exampleSentence}»</p>
+      )}
+      {card.otherMeanings?.length > 0 && (
+        <p className="text-xs text-lk-muted">
+          <span className="text-lk-faint">Ещё значения: </span>
+          {card.otherMeanings.join(", ")}
+        </p>
+      )}
+      {card.source && <p className="text-[11px] text-lk-faint">{card.source}</p>}
+    </div>
+  );
+}
+
 export function RecallInput({ card, allCards, onRate }: RecallInputProps) {
   const [input, setInput] = useState("");
   const [phase, setPhase] = useState<Phase>("input");
@@ -229,6 +259,14 @@ export function RecallInput({ card, allCards, onRate }: RecallInputProps) {
     [card.word, card.wordType, card.translation]
   );
   const otherVariants = variants.filter((v) => lakAnswerKey(v) !== lakAnswerKey(matched));
+
+  // Пример в задании — с пропуском на месте слова, иначе он подсказывает ответ
+  const cloze = useMemo(
+    () => (card.exampleSentence ? makeCloze(card.exampleSentence, variants) : null),
+    [card.exampleSentence, variants]
+  );
+  // Подсказка по лакским буквам: «кӀула» начинается на «КӀ», а не на «к»
+  const hintLetters = useMemo(() => splitLakLetters(variants[0] ?? card.word).filter((l) => l.trim()), [variants, card.word]);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const continueRef = useRef<HTMLButtonElement>(null);
@@ -315,9 +353,11 @@ export function RecallInput({ card, allCards, onRate }: RecallInputProps) {
       <div className="rounded-3xl border border-lk-line bg-lk-card p-7 text-center shadow-lk">
         <p className="mb-2 text-xs font-medium text-lk-muted">Как по-лакски?</p>
         <p className="font-serif text-3xl font-bold text-lk-text">{card.translation}</p>
-        {card.exampleSentence && (
+        {phase === "input" && cloze && (cloze.lak || cloze.translation) && (
           <p className="mt-3 text-sm italic leading-relaxed text-lk-muted">
-            «{card.exampleSentence}»
+            {cloze.lak ? <span className="font-medium not-italic text-lk-text">«{cloze.lak}»</span> : null}
+            {cloze.lak && cloze.translation ? " — " : null}
+            {cloze.translation}
           </p>
         )}
       </div>
@@ -348,6 +388,8 @@ export function RecallInput({ card, allCards, onRate }: RecallInputProps) {
             </button>
           </div>
 
+          <LakKeyboardBar inputRef={inputRef} value={input} onChange={setInput} />
+
           <p className="text-center text-xs text-lk-faint">
             Вместо Ӏ можно писать I, 1, l или |
           </p>
@@ -363,9 +405,9 @@ export function RecallInput({ card, allCards, onRate }: RecallInputProps) {
               </button>
             ) : (
               <p className="text-sm text-lk-muted">
-                Начинается на <span className="font-bold text-lk-text">{card.word[0]}</span>
-                {card.word.length > 1 && (
-                  <span className="text-lk-faint"> · {card.word.length} букв</span>
+                Начинается на <span className="font-bold text-lk-text">{displayLetter(hintLetters[0] ?? "")}</span>
+                {hintLetters.length > 1 && (
+                  <span className="text-lk-faint"> · {hintLetters.length} {pluralLetters(hintLetters.length)}</span>
                 )}
               </p>
             )}
@@ -400,6 +442,7 @@ export function RecallInput({ card, allCards, onRate }: RecallInputProps) {
             {otherVariants.length > 0 && (
               <p className="mt-1 text-xs text-lk-muted">Также верно: {otherVariants.join(" · ")}</p>
             )}
+            <CardExtras card={card} />
             {card.transcription && (
               <p className="mt-0.5 font-mono text-xs text-lk-muted">[{card.transcription}]</p>
             )}
@@ -428,6 +471,7 @@ export function RecallInput({ card, allCards, onRate }: RecallInputProps) {
             {otherVariants.length > 0 && (
               <p className="mt-1 text-xs text-lk-muted">Также верно: {otherVariants.join(" · ")}</p>
             )}
+            <CardExtras card={card} />
             {card.transcription && (
               <p className="mt-0.5 font-mono text-xs text-lk-muted">[{card.transcription}]</p>
             )}

@@ -234,6 +234,60 @@ export async function GET(request: Request) {
     }
   }
 
+  // Другие значения и источник — только для карточек сессии (15), а не для всех
+  // 200 кандидатов: иначе запрос очереди занимал ~2 с
+  const extrasById = new Map<string, { other_meanings: string[] | null; source: string | null }>();
+  if (sessionRows.length > 0) {
+    const extrasResult = await query<{ id: string; other_meanings: string[] | null; source: string | null }>(
+      `
+        SELECT
+          w.id::text AS id,
+          -- Другие значения того же лакского слова: «ласун — брать; также: получать»
+          (
+            SELECT array_agg(x.translation ORDER BY x.rank)
+            FROM (
+              -- Сначала значения из разговорника, затем основные и короткие
+              SELECT o.translation,
+                     ROW_NUMBER() OVER (ORDER BY
+                       EXISTS (
+                         SELECT 1 FROM word_sources ows JOIN sources os ON os.id = ows.source_id
+                         WHERE ows.word_id = o.id AND os.kind = 'phrasebook'
+                       ) DESC,
+                       o.translation_priority,
+                       char_length(o.translation),
+                       o.translation
+                     ) AS rank
+              FROM (
+                SELECT DISTINCT ON (lower(o2.translation)) o2.*
+                FROM words o2
+                WHERE o2.lexeme_id = w.lexeme_id
+                  AND o2.id <> w.id
+                  AND o2.is_active
+                  AND lower(o2.translation) <> lower(w.translation)
+                ORDER BY lower(o2.translation), o2.translation_priority
+              ) o
+              ORDER BY rank
+              LIMIT 4
+            ) x
+          ) AS other_meanings,
+          -- Откуда слово: «Дигиев, гл. 95 · ЦВЕТА» (разговорник — первым)
+          (
+            SELECT s.author || ', ' || CASE WHEN s.kind = 'phrasebook' THEN 'разговорник' ELSE 'словарь ' || s.year END
+                   || COALESCE(NULLIF(' · ' || ws.locator, ' · '), '')
+            FROM word_sources ws
+            JOIN sources s ON s.id = ws.source_id
+            WHERE ws.word_id = w.id AND s.kind <> 'manual'
+            ORDER BY (s.kind = 'phrasebook') DESC, ws.locator
+            LIMIT 1
+          ) AS source
+        FROM words w
+        WHERE w.id = ANY($1::bigint[])
+      `,
+      [sessionRows.map((row) => row.id)]
+    );
+    for (const row of extrasResult.rows) extrasById.set(row.id, row);
+  }
+
   const queue: FlashcardData[] = sessionRows.map((row) => ({
     id: row.id,
     word: row.word,
@@ -245,6 +299,8 @@ export async function GET(request: Request) {
     notes: row.notes ?? null,
     translation: row.translation,
     exampleSentence: row.example_sentence ?? "",
+    otherMeanings: extrasById.get(row.id)?.other_meanings ?? [],
+    source: extrasById.get(row.id)?.source ?? null,
     synonyms: row.synonym_group_id
       ? (synonymMap.get(row.synonym_group_id) ?? [])
       : [],

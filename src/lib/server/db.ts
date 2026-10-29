@@ -18,7 +18,10 @@ function getPool(): Pool {
     connectionString: env.databaseUrl,
     max: env.dbPoolMax,
     idleTimeoutMillis: 30_000,
-    connectionTimeoutMillis: 5_000
+    connectionTimeoutMillis: 5_000,
+    // JIT-компиляция Postgres для коротких запросов приложения только мешает:
+    // очередь повторения выполнялась 1,17 с, из них 1,09 с — JIT; без него 54 мс
+    options: "-c jit=off"
   });
 
   // Ошибка простаивающего соединения (например, рестарт Postgres) не должна ронять процесс

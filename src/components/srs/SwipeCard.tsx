@@ -169,6 +169,13 @@ export function SwipeCard({ card, isRevealed, onReveal, onRate, reduceMotion }: 
             </p>
           )}
 
+          {card.otherMeanings?.length > 0 && (
+            <p className="mt-2 text-xs text-lk-muted">
+              <span className="text-lk-faint">Ещё значения: </span>
+              {card.otherMeanings.join(", ")}
+            </p>
+          )}
+
           {card.synonyms && card.synonyms.length > 0 && (
             <div className="mt-4 rounded-2xl border border-lk-line bg-lk-card2 px-4 py-3 text-left">
               <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-lk-faint">
@@ -186,6 +193,8 @@ export function SwipeCard({ card, isRevealed, onReveal, onRate, reduceMotion }: 
               </div>
             </div>
           )}
+
+          {card.source && <p className="mt-3 text-[11px] text-lk-faint">{card.source}</p>}
         </div>
       </motion.div>
     </div>
