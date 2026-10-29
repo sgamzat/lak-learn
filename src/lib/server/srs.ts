@@ -165,6 +165,16 @@ export function buildSessionQueue<T extends { due_at: string | null }>(
   return { session, remaining, totalAvailable };
 }
 
+/**
+ * Повторный ответ на ту же карточку в течение этого окна считается дублем
+ * (двойной клик, повтор запроса при плохой сети) и не применяется второй раз.
+ * Внутри одной сессии карточка не показывается снова быстрее, чем за пару секунд.
+ */
+export const SRS_DUPLICATE_WINDOW_MS = 3_000;
+
+// Пространство имён для pg_advisory_xact_lock(int, int): «SRS-ответы пользователя»
+const SRS_LOCK_NAMESPACE = 7301;
+
 export async function submitSRSReview(params: {
   userId: string;
   wordId: number;
@@ -187,24 +197,52 @@ export async function submitSRSReview(params: {
     return { ok: false, error: "Слово не найдено", status: 404 };
   }
 
-  const existingCardResult = await query<ExistingCardRow>(
-    `
-      SELECT easiness_factor::text, repetition, interval_days, lapses, total_reviews
-      FROM user_srs_cards
-      WHERE user_id = $1
-        AND word_id = $2
-      LIMIT 1
-    `,
-    [params.userId, params.wordId]
-  );
+  const result = await withTransaction(async (client): Promise<ReviewResult> => {
+    // Сериализуем ответы одного пользователя. Раньше карточка читалась ВНЕ
+    // транзакции: два одновременных запроса (двойной клик) читали одно и то же
+    // состояние и оба записывали результат; streak и XP тоже считались дважды.
+    // FOR UPDATE не помогает для новой карточки (строки ещё нет), поэтому
+    // advisory-lock на пользователя; снимается автоматически по COMMIT/ROLLBACK.
+    await client.query("SELECT pg_advisory_xact_lock($1, hashtext($2))", [
+      SRS_LOCK_NAMESPACE,
+      params.userId
+    ]);
 
-  const nextCardState = getNextCardState({
-    rating: params.rating,
-    existingCard: existingCardResult.rows[0] ?? null,
-    now,
-  });
+    const existingCardResult = await client.query<
+      ExistingCardRow & { last_reviewed_at: Date | string | null; due_at: Date | string | null }
+    >(
+      `
+        SELECT easiness_factor::text, repetition, interval_days, lapses, total_reviews,
+               last_reviewed_at, due_at
+        FROM user_srs_cards
+        WHERE user_id = $1
+          AND word_id = $2
+        LIMIT 1
+      `,
+      [params.userId, params.wordId]
+    );
 
-  await withTransaction(async (client) => {
+    const existingCard = existingCardResult.rows[0] ?? null;
+
+    // Дубль ответа: возвращаем текущее состояние, ничего не меняя
+    if (existingCard?.last_reviewed_at && existingCard.due_at) {
+      const lastReviewedMs = new Date(existingCard.last_reviewed_at).getTime();
+      if (now.getTime() - lastReviewedMs < SRS_DUPLICATE_WINDOW_MS) {
+        return {
+          nextReviewAt: new Date(existingCard.due_at).toISOString(),
+          intervalDays: existingCard.interval_days,
+          easinessFactor: Number(existingCard.easiness_factor),
+          repetition: existingCard.repetition
+        };
+      }
+    }
+
+    const nextCardState = getNextCardState({
+      rating: params.rating,
+      existingCard,
+      now,
+    });
+
     const streakState = await client.query<{
       last_reviewed_at: Date | string | null;
       streak_days: number | null;
@@ -226,6 +264,7 @@ export async function submitSRSReview(params: {
       now,
     });
 
+    // Время ответа берём из now (а не NOW() базы): по нему же проверяется дубль
     await client.query(
       `
         INSERT INTO user_srs_cards (
@@ -240,14 +279,14 @@ export async function submitSRSReview(params: {
           total_reviews,
           updated_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, NOW(), $7, $8, NOW())
+        VALUES ($1, $2, $3, $4, $5, $6, $9, $7, $8, NOW())
         ON CONFLICT (user_id, word_id)
         DO UPDATE SET
           easiness_factor = EXCLUDED.easiness_factor,
           repetition = EXCLUDED.repetition,
           interval_days = EXCLUDED.interval_days,
           due_at = EXCLUDED.due_at,
-          last_reviewed_at = NOW(),
+          last_reviewed_at = EXCLUDED.last_reviewed_at,
           lapses = EXCLUDED.lapses,
           total_reviews = EXCLUDED.total_reviews,
           updated_at = NOW()
@@ -260,16 +299,17 @@ export async function submitSRSReview(params: {
         nextCardState.intervalDays,
         nextCardState.dueAt,
         nextCardState.lapses,
-        nextCardState.totalReviews
+        nextCardState.totalReviews,
+        now
       ]
     );
 
     await client.query(
       `
         INSERT INTO review_history (user_id, word_id, rating, reviewed_at, next_review_at)
-        VALUES ($1, $2, $3, NOW(), $4)
+        VALUES ($1, $2, $3, $5, $4)
       `,
-      [params.userId, params.wordId, params.rating, nextCardState.dueAt]
+      [params.userId, params.wordId, params.rating, nextCardState.dueAt, now]
     );
 
     await client.query(
@@ -284,15 +324,14 @@ export async function submitSRSReview(params: {
       `,
       [params.userId, getXPByRating(params.rating), nextStreak]
     );
-  });
 
-  return {
-    ok: true,
-    result: {
+    return {
       nextReviewAt: nextCardState.dueAt.toISOString(),
       intervalDays: nextCardState.intervalDays,
       easinessFactor: nextCardState.easinessFactor,
       repetition: nextCardState.repetition
-    }
-  };
+    };
+  });
+
+  return { ok: true, result };
 }

@@ -4,6 +4,7 @@ import { getAuthContextFromRequest } from "@/lib/server/auth";
 import { query } from "@/lib/server/db";
 import { setAccessCookie } from "@/lib/server/session";
 import type { DictionaryWord } from "@/types/word";
+import { wordInCollectionSql } from "@/lib/server/membership";
 
 // ─── Тип строки из БД ────────────────────────────────────────────────────────
 
@@ -55,27 +56,7 @@ function buildFilters(url: URL) {
     where.push(
       `EXISTS (SELECT 1 FROM collections c WHERE c.id = ${colRef} AND c.is_active = TRUE AND c.is_public = TRUE)`
     );
-    where.push(`(
-      EXISTS (
-        SELECT 1
-        FROM collections c
-        JOIN tags t ON LOWER(t.code) = ANY (
-          SELECT LOWER(value) FROM unnest(c.rule_tag_codes) AS value
-        )
-        JOIN word_tags wt ON wt.tag_id = t.id
-        WHERE c.id = ${colRef} AND wt.word_id = w.id
-      )
-      OR EXISTS (
-        SELECT 1 FROM collection_words cw
-        WHERE cw.collection_id = ${colRef}
-          AND cw.word_id = w.id
-          AND cw.is_excluded = FALSE
-      )
-    )`);
-    where.push(`NOT EXISTS (
-      SELECT 1 FROM collection_words cw
-      WHERE cw.collection_id = ${colRef} AND cw.word_id = w.id AND cw.is_excluded = TRUE
-    )`);
+    where.push(wordInCollectionSql(colRef));
   }
 
   // Поиск по лемме / переводу

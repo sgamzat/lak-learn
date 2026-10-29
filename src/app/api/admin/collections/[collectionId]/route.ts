@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/server/auth";
 import { withTransaction } from "@/lib/server/db";
 import { setAccessCookie } from "@/lib/server/session";
 import { normalizeCollectionKind, type CollectionKind } from "@/types/collection";
+import { wordInCollectionSql } from "@/lib/server/membership";
 
 type UpdateCollectionBody = {
   slug?: string;
@@ -108,38 +109,7 @@ export async function GET(request: Request, { params }: { params: { collectionId
 
     const whereParts = [
       "w.is_active = TRUE",
-      `(
-        (
-          EXISTS (
-            SELECT 1
-            FROM collections c
-            JOIN tags t ON LOWER(t.code) = ANY (
-              SELECT LOWER(value)
-              FROM unnest(c.rule_tag_codes) AS value
-            )
-            JOIN word_tags wt ON wt.tag_id = t.id
-            WHERE c.id = $1
-              AND wt.word_id = w.id
-          )
-        )
-        OR (
-          EXISTS (
-            SELECT 1
-            FROM collection_words cw
-            WHERE cw.collection_id = $1
-              AND cw.word_id = w.id
-              AND cw.is_manual = TRUE
-              AND cw.is_excluded = FALSE
-          )
-        )
-      )`,
-      `NOT EXISTS (
-        SELECT 1
-        FROM collection_words cw
-        WHERE cw.collection_id = $1
-          AND cw.word_id = w.id
-          AND cw.is_excluded = TRUE
-      )`
+      wordInCollectionSql("$1")
     ];
 
     let startsWithRef = "$1";

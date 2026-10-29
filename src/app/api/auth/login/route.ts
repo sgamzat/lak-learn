@@ -17,7 +17,8 @@ export async function POST(request: Request) {
   }
 
   const email = body.email?.trim().toLowerCase();
-  const password = body.password?.trim();
+  // Пароль не обрезаем: пробелы по краям — часть пароля пользователя
+  const password = typeof body.password === "string" ? body.password : undefined;
 
   if (!email || !password) {
     return NextResponse.json({ error: "email и password обязательны" }, { status: 400 });

@@ -9,6 +9,7 @@ import {
   SRS_SESSION_LIMIT,
 } from "@/lib/server/srs";
 import type { FlashcardData, IntervalState } from "@/types/srs";
+import { wordInCollectionSql } from "@/lib/server/membership";
 
 // ─── Тип строки из БД ────────────────────────────────────────────────────────
 
@@ -39,34 +40,6 @@ type CollectionMetaRow = {
   id: number;
   title: string;
 };
-
-function collectionMembershipSql(colRef: string): string {
-  return `
-    (
-      EXISTS (
-        SELECT 1
-        FROM tags t
-        JOIN word_tags wt ON wt.tag_id = t.id
-        WHERE wt.word_id = w.id
-          AND LOWER(t.code) = ANY (
-            SELECT LOWER(value) FROM unnest(c.rule_tag_codes) AS value
-          )
-      )
-      OR EXISTS (
-        SELECT 1 FROM collection_words cw
-        WHERE cw.collection_id = c.id
-          AND cw.word_id = w.id
-          AND cw.is_excluded = FALSE
-      )
-    )
-    AND NOT EXISTS (
-      SELECT 1 FROM collection_words cw
-      WHERE cw.collection_id = c.id
-        AND cw.word_id = w.id
-        AND cw.is_excluded = TRUE
-    )
-  `;
-}
 
 const selectCardFields = `
   w.id::text                                                        AS id,
@@ -137,7 +110,7 @@ export async function GET(request: Request) {
               AND c.is_active = TRUE
               AND c.is_public = TRUE
               AND w.translation_priority = 1
-              AND ${collectionMembershipSql("c")}
+              AND ${wordInCollectionSql("c.id")}
           ),
           card_state AS (
             SELECT usc.word_id, usc.due_at, usc.repetition
@@ -172,7 +145,7 @@ export async function GET(request: Request) {
               AND c.is_active = TRUE
               AND c.is_public = TRUE
               AND w.translation_priority = 1
-              AND ${collectionMembershipSql("c")}
+              AND ${wordInCollectionSql("c.id")}
           ),
           selected_words AS (
             SELECT usw.word_id

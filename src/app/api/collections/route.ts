@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAuthContextFromRequest } from "@/lib/server/auth";
 import { query } from "@/lib/server/db";
 import { setAccessCookie } from "@/lib/server/session";
+import { wordInCollectionSql } from "@/lib/server/membership";
 
 type PublicCollectionRow = {
   id: number;
@@ -39,33 +40,7 @@ export async function GET(request: Request) {
       FROM collections c
       LEFT JOIN words w
         ON w.is_active = TRUE
-        AND (
-          EXISTS (
-            SELECT 1
-            FROM tags t
-            JOIN word_tags wt ON wt.tag_id = t.id
-            WHERE wt.word_id = w.id
-              AND LOWER(t.code) = ANY (
-                SELECT LOWER(value)
-                FROM unnest(c.rule_tag_codes) AS value
-              )
-          )
-          OR EXISTS (
-            SELECT 1
-            FROM collection_words cw
-            WHERE cw.collection_id = c.id
-              AND cw.word_id = w.id
-              AND cw.is_manual = TRUE
-              AND cw.is_excluded = FALSE
-          )
-        )
-        AND NOT EXISTS (
-          SELECT 1
-          FROM collection_words cw
-          WHERE cw.collection_id = c.id
-            AND cw.word_id = w.id
-            AND cw.is_excluded = TRUE
-        )
+        AND ${wordInCollectionSql("c.id")}
       WHERE c.is_active = TRUE
         AND c.is_public = TRUE
       GROUP BY c.id

@@ -22,7 +22,8 @@ export async function POST(request: Request) {
   }
 
   const email = body.email?.trim().toLowerCase();
-  const password = body.password?.trim();
+  // Пароль не обрезаем: пробелы по краям — часть пароля пользователя
+  const password = typeof body.password === "string" ? body.password : undefined;
   const displayName = body.displayName?.trim() || null;
 
   if (!email || !password) {
@@ -31,6 +32,10 @@ export async function POST(request: Request) {
 
   if (!isValidEmail(email)) {
     return NextResponse.json({ error: "Некорректный email" }, { status: 400 });
+  }
+
+  if (password.trim().length === 0) {
+    return NextResponse.json({ error: "Пароль не может состоять из одних пробелов" }, { status: 400 });
   }
 
   if (password.length < 8) {
