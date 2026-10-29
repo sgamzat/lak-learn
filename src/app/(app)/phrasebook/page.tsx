@@ -294,7 +294,8 @@ export default function PhrasebookPage() {
         };
 
         const phrasebookCollections = (colData.collections ?? [])
-          .filter((c) => c.kind === "topic" && c.wordCount > 0)
+          // «Базовый курс» (course-*) — учебный план слов, не тема разговорника
+          .filter((c) => c.kind === "topic" && c.wordCount > 0 && !c.slug.startsWith("course-"))
           .map((c) => ({
             id: c.id, slug: c.slug, title: c.title, description: c.description,
             level: c.level, wordCount: c.wordCount, sortOrder: c.sortOrder, kind: c.kind,

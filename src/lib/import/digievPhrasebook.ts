@@ -145,9 +145,54 @@ export function splitNumberedSenses(text: string): string[] {
 export function classifyWordType(chapter: number, ru: string, lak: string): DigievWordType {
   if (chapter >= DIGIEV_DICTIONARY_CHAPTERS.from && chapter <= DIGIEV_DICTIONARY_CHAPTERS.to) return "word";
   if (/[.!?]/.test(ru) || /[.!?]/.test(lak)) return "phrase";
-  const words = (s: string) =>
-    s.replace(/\([^)]*\)/g, " ").split(",")[0].trim().split(/\s+/).filter(Boolean).length;
-  return words(ru) > 2 || words(lak) > 2 ? "phrase" : "word";
+  const noParens = (s: string) => s.replace(/\([^)]*\)/g, " ");
+  const count = (s: string) => s.replace(/,/g, " ").trim().split(/\s+/).filter(Boolean).length;
+  // «К сожалению, я не могу» — фраза, хотя до запятой два слова
+  if (count(noParens(ru)) > 3 || count(noParens(lak)) > 3) return "phrase";
+  // «Воробей → ЧӀелму, шярлу»: запятая разделяет варианты — считаем первый
+  const first = (s: string) => count(noParens(s).split(",")[0]);
+  return first(ru) > 2 || first(lak) > 2 ? "phrase" : "word";
+}
+
+/**
+ * Лакские слова, которые во фразах разговорника пишутся с заглавной НЕ в начале
+ * предложения: «…Гъумучиву…» — имена собственные. Остальные слова тематических
+ * глав («Най → Пчела») — обычные, просто записаны с заглавной как элемент списка.
+ */
+export function collectProperNouns(phrases: ReadonlyArray<{ lemma: string }>): Set<string> {
+  // Сколько раз слово встретилось не в начале предложения с заглавной и со строчной.
+  // «Ттун» после запятой — ещё не имя: со строчной оно встречается намного чаще.
+  const upper = new Map<string, number>();
+  const lower = new Map<string, number>();
+  for (const { lemma } of phrases) {
+    const tokens = lemma.split(/\s+/);
+    tokens.forEach((raw, index) => {
+      const prev = tokens[index - 1] ?? "";
+      if (index === 0 || /[.!?…]$/.test(prev)) return; // начало предложения
+      const token = raw.replace(/^[^А-ЯЁа-яёӀ]+|[^А-ЯЁа-яёӀ]+$/g, "");
+      if (!token) return;
+      const key = token.toLowerCase();
+      const map = /^[А-ЯЁ]/.test(token) ? upper : lower;
+      map.set(key, (map.get(key) ?? 0) + 1);
+    });
+  }
+  return new Set([...upper].filter(([key, n]) => n > (lower.get(key) ?? 0)).map(([key]) => key));
+}
+
+function lowerFirst(value: string): string {
+  // «СССР», «КӀ…» в верхнем регистре целиком — аббревиатура, не трогаем
+  if (value.length > 1 && value.charAt(1) === value.charAt(1).toUpperCase() && /[А-ЯЁ]/.test(value.charAt(1))) return value;
+  return value.charAt(0).toLowerCase() + value.slice(1);
+}
+
+/** «Най → Пчела» → «най → пчела»; имена собственные («Гъумучи → Кумух») — как есть */
+export function normalizeWordCase(
+  entry: { lemma: string; translation: string },
+  properNouns: ReadonlySet<string>
+): { lemma: string; translation: string } {
+  const firstLak = (entry.lemma.split(/[\s,]+/)[0] ?? "").toLowerCase();
+  if (properNouns.has(firstLak)) return entry;
+  return { lemma: lowerFirst(entry.lemma), translation: lowerFirst(entry.translation) };
 }
 
 // ─── Строки таблиц → пары ────────────────────────────────────────────────────

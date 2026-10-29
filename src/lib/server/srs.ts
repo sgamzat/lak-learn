@@ -146,7 +146,7 @@ export const SRS_CANDIDATE_FETCH_LIMIT = 200;
  * Reviews (due_at != null) first, then new up to NEW_PER_SESSION,
  * total capped at SESSION_LIMIT.
  */
-export function buildSessionQueue<T extends { due_at: string | null }>(
+export function buildSessionQueue<T extends { due_at: string | null; lexeme_id?: string | null }>(
   candidates: T[]
 ): { session: T[]; remaining: number; totalAvailable: number } {
   const reviews = candidates.filter((c) => c.due_at !== null);
@@ -157,7 +157,21 @@ export function buildSessionQueue<T extends { due_at: string | null }>(
     SRS_NEW_PER_SESSION,
     SRS_SESSION_LIMIT - sessionReviews.length
   );
-  const sessionNews = news.slice(0, newSlots);
+
+  // Одно лакское слово — одна карточка за сессию: два значения «ласун»
+  // (брать / получать) подряд путают, второе придёт в следующих сессиях.
+  const lexemesInSession = new Set(
+    sessionReviews.map((c) => c.lexeme_id).filter((id): id is string => Boolean(id))
+  );
+  const sessionNews: T[] = [];
+  for (const card of news) {
+    if (sessionNews.length >= newSlots) break;
+    if (card.lexeme_id) {
+      if (lexemesInSession.has(card.lexeme_id)) continue;
+      lexemesInSession.add(card.lexeme_id);
+    }
+    sessionNews.push(card);
+  }
   const session = [...sessionReviews, ...sessionNews];
   const totalAvailable = candidates.length;
   const remaining = Math.max(0, totalAvailable - session.length);

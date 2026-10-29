@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   chaptersToImportRecords,
   classifyWordType,
+  collectProperNouns,
   digievCollectionSlug,
+  normalizeWordCase,
   parseDigievHtml,
   splitMergedCell,
   splitNumberedSenses,
@@ -130,6 +132,27 @@ describe("вспомогательные функции", () => {
   it("classifyWordType", () => {
     expect(classifyWordType(5, "Желаю вам (тебе) успехов", "Зун (вин) тӀайлабацӀу хьуннав")).toBe("phrase");
     expect(classifyWordType(88, "Головастик", "Магъду кӀичӀала")).toBe("word");
+    expect(classifyWordType(7, "К сожалению, я не могу", "ХӀайп, ттуща къахьунссар")).toBe("phrase");
+    expect(classifyWordType(88, "Воробей", "ЧӀелму, шярлу")).toBe("word");
+  });
+
+  it("имена собственные — по фразам, где слово с заглавной не в начале предложения", () => {
+    const proper = collectProperNouns([
+      { lemma: "На Гъумучиву ура" },
+      { lemma: "Ттул шагьру Гъумучи бур" },
+      { lemma: "Мяйжанни, Ттун ччай." }, // «Ттун» после запятой…
+      { lemma: "Му ттун ххуй бизлай бур" }, // …но со строчной встречается чаще
+      { lemma: "Цума ттун кумаг бувна?" }
+    ]);
+    expect(proper.has("гъумучи")).toBe(true);
+    expect(proper.has("ттун")).toBe(false);
+  });
+
+  it("регистр слов тематических глав: обычные — со строчной, имена — как есть", () => {
+    const proper = new Set(["гъумучи"]);
+    expect(normalizeWordCase({ lemma: "Най", translation: "Пчела" }, proper)).toEqual({ lemma: "най", translation: "пчела" });
+    expect(normalizeWordCase({ lemma: "Гъумучи", translation: "Кумух" }, proper)).toEqual({ lemma: "Гъумучи", translation: "Кумух" });
+    expect(normalizeWordCase({ lemma: "Москав", translation: "СССР" }, proper).translation).toBe("СССР");
   });
 
   it("splitMergedCell не режет обычную русскую фразу", () => {

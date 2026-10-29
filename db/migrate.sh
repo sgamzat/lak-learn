@@ -59,7 +59,18 @@ echo "Migrations done. Applied: $applied_count, skipped: $skipped_count"
 # Сид применяется заново, только если изменилось его содержимое (sha256).
 # Сиды идемпотентны: повторное применение не создаёт дублей.
 
+# Пересчёт источников и учебного плана (миграция 013). Быстрый и идемпотентный:
+# выполняется на каждом запуске, чтобы учесть сиды и правки в админке.
+refresh_lexicon() {
+  has_fn=$(psql_base -Atc "SELECT 1 FROM pg_proc WHERE proname = 'refresh_lexicon' LIMIT 1" || true)
+  if [ "$has_fn" = "1" ]; then
+    echo "Refreshing lexicon and curriculum..."
+    psql_base -Atc "SELECT 'ranked=' || ranked || ', course=' || course_words FROM refresh_lexicon()"
+  fi
+}
+
 if [ -z "$SEEDS_DIR" ] || [ ! -d "$SEEDS_DIR" ]; then
+  refresh_lexicon
   exit 0
 fi
 
@@ -96,3 +107,5 @@ for file in $(find "$SEEDS_DIR" -maxdepth 1 -type f -name '*.sql' | sort); do
 done
 
 echo "Seeds done."
+
+refresh_lexicon

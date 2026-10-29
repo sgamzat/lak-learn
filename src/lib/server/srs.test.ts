@@ -51,6 +51,17 @@ describe("SRS helpers", () => {
     expect(getXPByRating("forgot")).toBe(2);
   });
 
+  it("buildSessionQueue: одно лакское слово — одна новая карточка за сессию", () => {
+    const { session } = buildSessionQueue([
+      { id: "review-lasun", due_at: "2026-01-01T00:00:00.000Z", lexeme_id: "1" },
+      { id: "new-lasun-2", due_at: null, lexeme_id: "1" }, // другое значение того же слова
+      { id: "new-na-1", due_at: null, lexeme_id: "2" },
+      { id: "new-na-2", due_at: null, lexeme_id: "2" },
+      { id: "new-other", due_at: null, lexeme_id: null }
+    ]);
+    expect(session.map((c) => c.id)).toEqual(["review-lasun", "new-na-1", "new-other"]);
+  });
+
   it("buildSessionQueue caps session and new cards", () => {
     const reviews = Array.from({ length: 8 }, (_, i) => ({
       id: `r${i}`,
