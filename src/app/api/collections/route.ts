@@ -15,6 +15,8 @@ type PublicCollectionRow = {
   rule_tag_codes: string[];
   kind: string;
   word_count: number;
+  dictionary_word_count: number;
+  phrase_count: number;
 };
 
 export async function GET(request: Request) {
@@ -36,7 +38,10 @@ export async function GET(request: Request) {
         c.sort_order,
         c.rule_tag_codes,
         COALESCE(c.kind, 'topic') AS kind,
-        COUNT(w.id)::int AS word_count
+        COUNT(w.id)::int AS word_count,
+        -- То, что откроется в словаре: основные слова (без синонимов и фраз)
+        COUNT(w.id) FILTER (WHERE w.word_type = 'word' AND w.translation_priority = 1)::int AS dictionary_word_count,
+        COUNT(w.id) FILTER (WHERE w.word_type = 'phrase')::int AS phrase_count
       FROM collections c
       LEFT JOIN words w
         ON w.is_active = TRUE
@@ -60,7 +65,9 @@ export async function GET(request: Request) {
         sortOrder: row.sort_order,
         ruleTagCodes: row.rule_tag_codes ?? [],
         kind: row.kind === "alphabet" ? "alphabet" : "topic",
-        wordCount: row.word_count
+        wordCount: row.word_count,
+        dictionaryWordCount: row.dictionary_word_count,
+        phraseCount: row.phrase_count
       }))
     },
     { status: 200 }
