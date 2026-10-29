@@ -32,8 +32,20 @@ jobs:
         if: steps.check.outputs.needed == 'true'
         run: |
           set -o pipefail
-          npm i --no-audit --no-fund next@16 eslint-config-next@16 react@19 react-dom@19 lucide-react@latest framer-motion@latest 2>&1 | tee -a ci.log
-          npm i --no-audit --no-fund -D @types/react@19 @types/react-dom@19 eslint@9 2>&1 | tee -a ci.log
+          # Все версии прописываем сразу и ставим ОДНОЙ установкой: при пошаговом
+          # npm i возникает конфликт (eslint-config-next@16 требует eslint 9,
+          # а в дереве ещё eslint 8).
+          npm pkg set \
+            dependencies.next="^16.0.0" \
+            dependencies.react="^19.0.0" \
+            dependencies.react-dom="^19.0.0" \
+            dependencies.lucide-react="^$(npm view lucide-react version)" \
+            dependencies.framer-motion="^$(npm view framer-motion version)" \
+            devDependencies.eslint-config-next="^16.0.0" \
+            devDependencies.eslint="^9.0.0" \
+            devDependencies.@types/react="^19.0.0" \
+            devDependencies.@types/react-dom="^19.0.0"
+          npm install --no-audit --no-fund 2>&1 | tee -a ci.log
 
       - name: Коммит lockfile
         if: steps.check.outputs.needed == 'true'
