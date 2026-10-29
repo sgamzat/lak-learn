@@ -229,7 +229,14 @@ export async function loginWithEmail(email: string, password: string): Promise<A
     return null;
   }
 
-  const isValid = await verifyPassword(password, row.password_hash);
+  // Пароль проверяется как есть. Раньше login/register делали password.trim(),
+  // поэтому у части пользователей хеш посчитан от пароля без краевых пробелов —
+  // для них пробуем обрезанный вариант, чтобы не отрезать им вход.
+  let isValid = await verifyPassword(password, row.password_hash);
+  if (!isValid && password.trim() !== password && password.trim().length > 0) {
+    isValid = await verifyPassword(password.trim(), row.password_hash);
+  }
+
   if (!isValid) {
     return null;
   }

@@ -1,11 +1,11 @@
 import { query } from "@/lib/server/db";
+import { KNOWN_INTERVAL_DAYS, primaryTranslationSql, wordInCollectionSql } from "@/lib/server/membership";
 import type { AuthUser } from "@/types/auth";
 import type { CollectionProgress, DashboardData, TopicStatus } from "@/types/dashboard";
 
 type ProgressRow = {
   xp: number;
   streak_days: number;
-  learned_words: number;
 };
 
 type LessonsRow = {
@@ -50,38 +50,6 @@ type CollectionRow = {
   last_reviewed_at: string | null;
   in_study: boolean;
 };
-
-/** Membership: tag rules + manual includes − exclusions (как /api/collections). */
-function collectionMembershipSql(collectionAlias: string, wordAlias: string): string {
-  return `
-    (
-      EXISTS (
-        SELECT 1
-        FROM tags t
-        JOIN word_tags wt ON wt.tag_id = t.id
-        WHERE wt.word_id = ${wordAlias}.id
-          AND LOWER(t.code) = ANY (
-            SELECT LOWER(value) FROM unnest(${collectionAlias}.rule_tag_codes) AS value
-          )
-      )
-      OR EXISTS (
-        SELECT 1
-        FROM collection_words cw
-        WHERE cw.collection_id = ${collectionAlias}.id
-          AND cw.word_id = ${wordAlias}.id
-          AND cw.is_manual = TRUE
-          AND cw.is_excluded = FALSE
-      )
-    )
-    AND NOT EXISTS (
-      SELECT 1
-      FROM collection_words cw
-      WHERE cw.collection_id = ${collectionAlias}.id
-        AND cw.word_id = ${wordAlias}.id
-        AND cw.is_excluded = TRUE
-    )
-  `;
-}
 
 export function deriveTopicStatus(input: {
   totalWords: number;
@@ -159,7 +127,7 @@ function mapCollectionRow(row: CollectionRow): CollectionProgress {
 }
 
 export async function getDashboardData(user: AuthUser): Promise<DashboardData> {
-  const membership = collectionMembershipSql("c", "w");
+  const membership = wordInCollectionSql("c.id", "w");
 
   const [
     progressResult,
@@ -172,7 +140,7 @@ export async function getDashboardData(user: AuthUser): Promise<DashboardData> {
     collectionsResult,
   ] = await Promise.all([
     query<ProgressRow>(
-      `SELECT xp, streak_days, learned_words
+      `SELECT xp, streak_days
        FROM user_progress WHERE user_id = $1 LIMIT 1`,
       [user.id]
     ),
@@ -331,6 +299,9 @@ export async function getDashboardData(user: AuthUser): Promise<DashboardData> {
         FROM scoped_collections sc
         JOIN collections c ON c.id = sc.id
         JOIN words w ON w.is_active = TRUE
+          -- Синонимы (priority >= 2) не попадают в SRS-очередь, поэтому
+          -- не учитываются и в прогрессе темы: иначе 100% недостижимо.
+          AND ${primaryTranslationSql("w")}
           AND ${membership}
       ),
       word_stage AS (
@@ -340,7 +311,7 @@ export async function getDashboardData(user: AuthUser): Promise<DashboardData> {
           CASE
             WHEN s.word_id IS NULL OR COALESCE(s.total_reviews, 0) = 0 THEN 'new'
             WHEN s.lapses >= 2 OR s.easiness_factor < 1.80 THEN 'weak'
-            WHEN s.interval_days >= 6 THEN 'known'
+            WHEN s.interval_days >= ${KNOWN_INTERVAL_DAYS} THEN 'known'
             ELSE 'learning'
           END AS stage,
           CASE
@@ -388,7 +359,7 @@ export async function getDashboardData(user: AuthUser): Promise<DashboardData> {
     ),
   ]);
 
-  const progress = progressResult.rows[0] ?? { xp: 0, streak_days: 0, learned_words: 0 };
+  const progress = progressResult.rows[0] ?? { xp: 0, streak_days: 0 };
   const lessonsCompleted = lessonsResult.rows[0]?.lessons_completed ?? 0;
   const totalReviews = accuracyResult.rows[0]?.total_reviews ?? 0;
   const successReviews = accuracyResult.rows[0]?.success_reviews ?? 0;

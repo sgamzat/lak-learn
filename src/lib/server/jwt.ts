@@ -1,4 +1,4 @@
-import { createHmac } from "node:crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 
 type JwtPayload = Record<string, unknown> & {
   exp: number;
@@ -72,8 +72,11 @@ export function verifyJwt<T extends Record<string, unknown>>(token: string, secr
     return null;
   }
 
-  const expected = sign(`${header}.${payload}`, secret);
-  if (expected !== signature) {
+  // Сравнение за постоянное время: обычный !== прерывается на первом
+  // несовпавшем символе, и по времени ответа можно подбирать подпись.
+  const expected = Buffer.from(sign(`${header}.${payload}`, secret));
+  const actual = Buffer.from(signature);
+  if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) {
     return null;
   }
 
