@@ -1,0 +1,76 @@
+# Проверка каждого PR и каждого пуша в main: установка, тесты, сборка.
+# Итог (успех или хвост лога ошибки) пишется комментарием в PR.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    # Ветку chore/next-16 проверяет update-deps-next16.yml (после npm install).
+    # Условие удаляется вместе с тем workflow после мержа.
+    if: github.head_ref != 'chore/next-16'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Установка зависимостей
+        run: npm ci --no-audit --no-fund 2>&1 | tee -a ci.log
+
+      - name: Тесты
+        run: npm test 2>&1 | tee -a ci.log; exit ${PIPESTATUS[0]}
+
+      - name: Сборка
+        run: npm run build 2>&1 | tee -a ci.log; exit ${PIPESTATUS[0]}
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+
+      # Линтер информативный: новые правила React Hooks не должны блокировать мерж
+      - name: Линтер (не блокирует)
+        continue-on-error: true
+        run: npm run lint 2>&1 | tee lint.log; exit ${PIPESTATUS[0]}
+
+      - name: Аудит зависимостей прода (не блокирует)
+        continue-on-error: true
+        run: npm audit --omit=dev 2>&1 | tail -20 | tee audit.log
+
+      - name: Итог в PR
+        if: always() && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          STATUS: ${{ job.status }}
+        run: |
+          {
+            if [ "$STATUS" = "success" ]; then echo "### ✅ CI: тесты и сборка прошли"; else echo "### ❌ CI: ошибка"; fi
+            echo
+            echo "Коммит: \`${{ github.event.pull_request.head.sha }}\`"
+            if [ "$STATUS" != "success" ]; then
+              echo; echo "<details open><summary>Последние строки лога</summary>"; echo; echo '```'
+              tail -80 ci.log 2>/dev/null; echo '```'; echo "</details>"
+            fi
+            if [ -f lint.log ]; then
+              echo; echo "<details><summary>Линтер (не блокирует)</summary>"; echo; echo '```'
+              tail -40 lint.log; echo '```'; echo "</details>"
+            fi
+            if [ -f audit.log ]; then
+              echo; echo "<details><summary>npm audit --omit=dev</summary>"; echo; echo '```'
+              cat audit.log; echo '```'; echo "</details>"
+            fi
+          } > summary.md
+          gh pr comment ${{ github.event.pull_request.number }} --body-file summary.md
