@@ -65,7 +65,7 @@ refresh_lexicon() {
   has_fn=$(psql_base -Atc "SELECT 1 FROM pg_proc WHERE proname = 'refresh_lexicon' LIMIT 1" || true)
   if [ "$has_fn" = "1" ]; then
     echo "Refreshing lexicon and curriculum..."
-    psql_base -Atc "SELECT 'ranked=' || ranked || ', course=' || course_words FROM refresh_lexicon()"
+    psql_base -Atc "SELECT row_to_json(r)::text FROM refresh_lexicon() r"
   fi
 }
 

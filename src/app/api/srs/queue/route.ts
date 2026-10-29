@@ -58,6 +58,9 @@ const selectCardFields = `
     SELECT we.sentence_src || COALESCE(' — ' || we.sentence_translation, '')
     FROM word_examples we
     WHERE we.word_id = w.id
+    -- Сначала примеры, добавленные вручную; из автоматических — каждый раз другой,
+    -- чтобы слово встречалось в разных контекстах
+    ORDER BY we.is_auto ASC, random()
     LIMIT 1
   )                                                                 AS example_sentence,
   cs.due_at,
