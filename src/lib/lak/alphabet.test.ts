@@ -20,6 +20,7 @@ describe("toLakCanonical", () => {
     expect(toLakCanonical("танмих1")).toBe("танмихӀ");
     expect(toLakCanonical("ХIакин")).toBe("ХӀакин");
     expect(toLakCanonical("цӏу")).toBe("цӀу"); // строчная ӏ → каноническая Ӏ
+    expect(toLakCanonical("пiяй чIапiи")).toBe("пӀяй чӀапӀи"); // строчная латинская i (Дигиев)
   });
 
   it("отдельно стоящие числа не трогает", () => {
@@ -50,6 +51,7 @@ describe("lakSearchKey", () => {
 describe("lakLooseKey (проверка ответа)", () => {
   it("палочка засчитывается в любом виде, даже отдельным символом", () => {
     expect(lakLooseKey("кIа")).toBe(lakLooseKey("кӀа"));
+    expect(lakLooseKey("кiа")).toBe(lakLooseKey("кӀа")); // строчная i с телефона
     expect(lakLooseKey("l")).toBe(lakLooseKey("Ӏ"));
     expect(lakLooseKey("|")).toBe("ӏ");
   });

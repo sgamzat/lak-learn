@@ -31,8 +31,9 @@ const LETTER_INDEX = new Map<string, number>(LAK_ALPHABET.map((l, i) => [l, i]))
 const LETTERS_LONGEST_FIRST = [...LAK_ALPHABET].sort((a, b) => b.length - a.length);
 
 // Символы, которыми на практике набирают палочку:
-// латинские I и l, цифра 1, вертикальная черта, украинские І/і, строчная и прописная Ӏ/ӏ
-const PALOCHKA_VARIANTS = "Il1|ІіӏӀ";
+// латинские I, i, L, l, цифра 1, вертикальная черта, украинские І/і, строчная и прописная Ӏ/ӏ.
+// Строчная i встречается в разговорнике Дигиева («пIяй, чIапIи») и на клавиатуре телефона.
+const PALOCHKA_VARIANTS = "IiLl1|ІіӏӀ";
 const CYRILLIC_LETTER = "А-Яа-яЁё";
 
 // Палочка — только сразу после кириллической буквы: «кIа», «танмих1».

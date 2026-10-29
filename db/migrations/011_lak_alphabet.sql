@@ -18,11 +18,11 @@
 
 -- ── 1. Функции ──────────────────────────────────────────────────────────────
 
--- Палочка: I, l, 1, |, І, і, ӏ, Ӏ сразу после кириллической буквы → Ӏ (U+04C0).
+-- Палочка: I, i, L, l, 1, |, І, і, ӏ, Ӏ сразу после кириллической буквы → Ӏ (U+04C0).
 -- Отдельно стоящие числа («1000 ват») не меняются.
 CREATE OR REPLACE FUNCTION lak_canonical(t text) RETURNS text
 LANGUAGE sql IMMUTABLE PARALLEL SAFE STRICT AS $$
-  SELECT regexp_replace(normalize(t, NFC), '([А-Яа-яЁё])[Il1|ІіӏӀ]', '\1Ӏ', 'g')
+  SELECT regexp_replace(normalize(t, NFC), '([А-Яа-яЁё])[IiLl1|ІіӏӀ]', '\1Ӏ', 'g')
 $$;
 
 -- Ключ поиска: канон, без ударений, нижний регистр (палочка → ӏ U+04CF),
