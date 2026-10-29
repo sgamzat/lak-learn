@@ -17,6 +17,7 @@ import {
   parseEntry,
   type ImportWordRecord
 } from "../src/lib/import/slovar1958.ts";
+import { isJunkEntry } from "../src/lib/import/junk.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SOURCE_URL = "https://lakkumaz.narod.ru/orus_mazral_va_lakku_mazral_shkolalul_slovar.html";
@@ -503,10 +504,15 @@ async function main(): Promise<void> {
   console.log("══════════════════════════════════════════════════════════");
 
   const html = await fetchHtml(fromFile);
-  const words = parseHtml(html);
-  if (!words.length) {
+  const parsed = parseHtml(html);
+  if (!parsed.length) {
     throw new Error("Ничего не найдено");
   }
+
+  // Отсев ошибок парсера: помета вместо слова («несов», «Союз»),
+  // обрезок вместо перевода («п»). Правила — src/lib/import/junk.ts
+  const words = parsed.filter((w) => !isJunkEntry(w));
+  console.log(`🗑️  Отброшено ошибочных записей: ${parsed.length - words.length}`);
 
   printStats(words);
   fs.writeFileSync(OUTPUT_FILE, JSON.stringify(words, null, 2), "utf8");

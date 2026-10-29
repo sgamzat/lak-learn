@@ -10,6 +10,7 @@ import { getStudySelection, setStudySelection } from "@/lib/api/client";
 import { useTheme } from "@/components/ThemeProvider";
 import type { DictionaryWord } from "@/types/word";
 import type { CollectionKind } from "@/types/collection";
+import { LAK_ALPHABET, displayLetter } from "@/lib/lak/alphabet";
 
 type DictMode = "search" | "start" | "alphabet" | "mine";
 type AlphaMode = "lak" | "ru";
@@ -27,13 +28,8 @@ type CollectionCard = {
 
 const RU_ALPHABET = "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ".split("");
 
-/** Лакский алфавитный индекс (как на /letters), удобный для навигации по леммам */
-const LAK_ALPHABET = [
-  "А", "Аь", "Б", "В", "Г", "Гъ", "Гь", "Д", "Е", "Ж", "З", "И",
-  "К", "Кк", "Кь", "Къ", "КI", "Л", "М", "Н", "О", "Оь", "П", "Пп", "ПI",
-  "Р", "С", "Сс", "Т", "Тт", "ТI", "У", "Х", "Хх", "Хъ", "Хь", "Хьхь", "ХI",
-  "Ц", "Цц", "ЦI", "Ч", "Чч", "ЧI", "Ш", "Щ", "Ю", "Я",
-];
+// Лакский алфавит — общий для БД, словаря и /letters (src/lib/lak/alphabet.ts).
+// Буквы хранятся в форме ключа («кӏ»), показываются через displayLetter («КӀ»).
 
 const MODES: { id: DictMode; label: string; hint: string }[] = [
   { id: "start", label: "Начать", hint: "Готовые наборы" },
@@ -271,7 +267,23 @@ function DictionaryPageContent() {
     [collections]
   );
 
-  const alphabetLetters = alphaMode === "lak" ? LAK_ALPHABET : RU_ALPHABET;
+  const alphabetLetters: readonly string[] = alphaMode === "lak" ? LAK_ALPHABET : RU_ALPHABET;
+
+  // Сколько слов на каждую лакскую букву — пустые буквы (ъ, ы, ь…) неактивны
+  const [lakLetterCounts, setLakLetterCounts] = useState<Map<string, number> | null>(null);
+  useEffect(() => {
+    if (mode !== "alphabet" || alphaMode !== "lak" || lakLetterCounts) return;
+    let mounted = true;
+    fetch("/api/letters", { headers: { Accept: "application/json" }, cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((data: { letters?: Array<{ letter: string; count: number }> }) => {
+        if (mounted) setLakLetterCounts(new Map((data.letters ?? []).map((l) => [l.letter, l.count])));
+      })
+      .catch(() => undefined);
+    return () => {
+      mounted = false;
+    };
+  }, [mode, alphaMode, lakLetterCounts]);
 
   const loadList = useCallback(async (loader: () => Promise<DictionaryWord[]>) => {
     setState("loading");
@@ -341,11 +353,17 @@ function DictionaryPageContent() {
         setState("idle");
         return;
       }
+      // Лакская буква — по первой букве лакского слова (кь ≠ къ ≠ кк ≠ кӏ).
+      // Русская буква — набор словаря 1958 (он собран по русскому переводу).
+      if (alphaMode === "lak") {
+        void loadList(() => fetchWords({ lakLetter: activeLetter, limit: "2000" }));
+        return;
+      }
       const col = letterCollections.get(activeLetter);
       void loadList(() =>
         col
           ? fetchWords({ collectionId: String(col.id), limit: "2000" })
-          : fetchWords({ startsWith: activeLetter.toLowerCase(), limit: "500" })
+          : fetchWords({ translationStartsWith: activeLetter.toLowerCase(), limit: "500" })
       );
       return;
     }
@@ -359,7 +377,7 @@ function DictionaryPageContent() {
       }
       void loadList(() => fetchWords({ ids: ids.slice(0, 500).join(","), limit: "500" }));
     }
-  }, [bootstrapped, mode, searchQuery, activeLetter, letterCollections, loadList, selectedWordIds]);
+  }, [bootstrapped, mode, alphaMode, searchQuery, activeLetter, letterCollections, loadList, selectedWordIds]);
 
   const partsOfSpeech = useMemo(() => {
     const s = new Set<string>();
@@ -477,7 +495,9 @@ function DictionaryPageContent() {
     );
   }, [bootstrapped, deepLinkCollectionId, collections, openPack]);
 
-  const activeLetterCollection = activeLetter ? letterCollections.get(activeLetter) ?? null : null;
+  // Наборы slovar-1958-* собраны по русской букве — только для русского указателя
+  const activeLetterCollection =
+    alphaMode === "ru" && activeLetter ? letterCollections.get(activeLetter) ?? null : null;
   const letterInStudy = activeLetterCollection
     ? selectedCollectionIds.has(activeLetterCollection.id)
     : false;
@@ -746,21 +766,25 @@ function DictionaryPageContent() {
               </div>
               <div className="flex flex-wrap gap-1">
                 {alphabetLetters.map((letter) => {
-                  const hasCol = letterCollections.has(letter);
+                  const hasCol = alphaMode === "ru" && letterCollections.has(letter);
                   const active = activeLetter === letter;
                   const inStudy = hasCol && selectedCollectionIds.has(letterCollections.get(letter)!.id);
+                  const lakCount = alphaMode === "lak" ? lakLetterCounts?.get(letter) : undefined;
+                  const isEmpty = lakCount === 0;
                   return (
                     <button
                       key={letter}
                       type="button"
+                      disabled={isEmpty}
+                      title={lakCount !== undefined ? `${lakCount} слов` : undefined}
                       onClick={() => setActiveLetter(letter)}
-                      className={`relative shrink-0 rounded-lg px-2.5 py-1.5 text-sm font-semibold transition ${
+                      className={`relative shrink-0 rounded-lg px-2.5 py-1.5 text-sm font-semibold transition disabled:cursor-default disabled:opacity-30 ${
                         active
                           ? "bg-lk-gold text-lk-bg"
                           : "bg-lk-navy2 text-lk-muted hover:text-lk-text"
                       }`}
                     >
-                      {letter}
+                      {alphaMode === "lak" ? displayLetter(letter) : letter}
                       {inStudy ? (
                         <span className="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-lk-green" />
                       ) : null}

@@ -7,6 +7,7 @@ import {
   Search, Check, Plus, ChevronRight, X, BookOpen, LayoutGrid, List,
 } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
+import { lakSearchKey } from "@/lib/lak/alphabet";
 
 // ─── Группы тем по главам Дигиева ─────────────────────────────────────────────
 const TOPIC_GROUPS: Array<{ id: string; label: string; from: number; to: number }> = [
@@ -347,8 +348,10 @@ export default function PhrasebookPage() {
   const q = searchQuery.trim().toLowerCase();
   const displayedPhrases = useMemo(() => {
     if (!q) return phrases;
+    // Лакский текст — по ключу (кIа = кӀа = к1а), русский — как есть
+    const lakQ = lakSearchKey(q);
     return phrases.filter(
-      (p) => p.lemma.toLowerCase().includes(q) || p.translation.toLowerCase().includes(q)
+      (p) => lakSearchKey(p.lemma).includes(lakQ) || p.translation.toLowerCase().includes(q)
     );
   }, [phrases, q]);
 

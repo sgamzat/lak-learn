@@ -4,6 +4,7 @@ import { withTransaction } from "@/lib/server/db";
 import { setAccessCookie } from "@/lib/server/session";
 import { normalizeCollectionKind, type CollectionKind } from "@/types/collection";
 import { wordInCollectionSql } from "@/lib/server/membership";
+import { lakSearchKey } from "@/lib/lak/alphabet";
 
 type UpdateCollectionBody = {
   slug?: string;
@@ -112,12 +113,18 @@ export async function GET(request: Request, { params }: { params: Promise<{ coll
       wordInCollectionSql("$1")
     ];
 
-    let startsWithRef = "$1";
+    // Без поиска сортировка по совпадению не нужна: LIKE NULL → NULL → ветка ELSE.
+    // Раньше здесь подставлялся $1 (id коллекции, bigint) и запрос падал
+    // с «operator does not exist: text ~~ bigint».
+    let startsWithRef = "NULL";
+    let lakStartsWithRef = "NULL";
 
     if (searchQuery) {
       const containsRef = addParam(`%${searchQuery}%`);
+      const lakContainsRef = addParam(`%${lakSearchKey(searchQuery)}%`);
       startsWithRef = addParam(`${searchQuery}%`);
-      whereParts.push(`(LOWER(w.lemma) LIKE ${containsRef} OR LOWER(w.translation) LIKE ${containsRef})`);
+      lakStartsWithRef = addParam(`${lakSearchKey(searchQuery)}%`);
+      whereParts.push(`(w.lemma_key LIKE ${lakContainsRef} OR LOWER(w.translation) LIKE ${containsRef})`);
     }
 
     const limitRef = addParam(safeLimit);
@@ -128,7 +135,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ coll
         FROM words w
         WHERE ${whereParts.join(" AND ")}
         ORDER BY
-          CASE WHEN LOWER(w.lemma) LIKE ${startsWithRef} THEN 0 ELSE 1 END ASC,
+          CASE WHEN w.lemma_key LIKE ${lakStartsWithRef} THEN 0 ELSE 1 END ASC,
           CASE WHEN LOWER(w.translation) LIKE ${startsWithRef} THEN 0 ELSE 1 END ASC,
           CASE WHEN popularity_score IS NULL THEN 1 ELSE 0 END ASC,
           popularity_score ASC,
