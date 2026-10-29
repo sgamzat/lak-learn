@@ -16,6 +16,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   chaptersToImportRecords,
+  collectProperNouns,
+  normalizeWordCase,
   parseDigievHtml
 } from "../src/lib/import/digievPhrasebook.ts";
 import { buildDigievSeedSql } from "../src/lib/import/digievSeed.ts";
@@ -53,12 +55,22 @@ function main(): void {
 
   const chapters = parseDigievHtml(readHtml(fromFile));
   if (!chapters.length) throw new Error("Ничего не найдено");
-  const records = chaptersToImportRecords(chapters);
+  const allRecords = chaptersToImportRecords(chapters);
+  const properNouns = collectProperNouns(allRecords.filter((r) => r.wordType === "phrase"));
+  let recased = 0;
+  const records = allRecords.map((r) => {
+    // Регистр — только у слов тематических глав: в «Кратком словаре» он уже строчный
+    if (r.wordType !== "word" || r.chapter > 90) return r;
+    const fixed = normalizeWordCase(r, properNouns);
+    if (fixed.translation !== r.translation) recased += 1;
+    return { ...r, ...fixed, synonymGroupId: r.synonymGroupId ? fixed.translation.toLowerCase() : null };
+  });
 
   const words = records.filter((r) => r.wordType === "word").length;
   console.log(`\n📖 Глав:    ${chapters.length}`);
   console.log(`🔤 Слов:    ${words}`);
   console.log(`💬 Фраз:    ${records.length - words}`);
+  console.log(`🔡 Регистр приведён к строчному: ${recased} (имён собственных: ${properNouns.size})`);
 
   console.log("\nГлавы по числу записей:");
   for (const ch of [...chapters].sort((a, b) => b.phrases.length - a.phrases.length).slice(0, 10)) {

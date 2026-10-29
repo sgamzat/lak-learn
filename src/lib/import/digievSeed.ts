@@ -10,8 +10,8 @@
  *     (например, «Без названия» → теперь «Антонимы», списки имён).
  *  2. Добавляет новые пары (lemma, translation). Существующие строки
  *     (в т.ч. из словаря 1958) НЕ перезаписываются.
- *  3. Пары, которые по Дигиеву — слова, получают word_type = 'word'
- *     (старый импорт делал «фразой» всё подряд, и слова пропадали из словаря).
+ *  3. Тип записи: для пар только из Дигиева — его классификация; пары из
+ *     словаря 1958 только повышаются до «слова» (старый импорт делал «фразой» всё).
  *  4. Связывает слова с коллекциями.
  *  5. Удаляет связи, которых больше нет в источнике (обрывки старого парсера),
  *     и скрывает слова, оставшиеся без коллекций. Слова, которые есть в других
@@ -103,13 +103,27 @@ FROM seed_digiev_words
 ORDER BY lemma, translation, chapter
 ON CONFLICT (lemma, translation) DO NOTHING;
 
--- 3. Слово по Дигиеву — слово (раньше импорт делал «фразой» всё подряд)
+-- 3. Тип записи. Пары, которые есть только у Дигиева, получают его классификацию
+--    (в обе стороны: прошлые версии сида ошибались). Пары, которые есть и в словаре 1958,
+--    только повышаются до «слова» — классификацию словаря не понижаем.
 UPDATE words w
-SET word_type = 'word', updated_at = NOW()
-FROM (SELECT DISTINCT lemma, translation FROM seed_digiev_words WHERE word_type = 'word') s
+SET word_type = s.word_type, updated_at = NOW()
+FROM (
+  SELECT DISTINCT ON (lemma, translation) lemma, translation, word_type
+  FROM seed_digiev_words
+  ORDER BY lemma, translation, (word_type = 'word') DESC
+) s
 WHERE w.lemma = s.lemma
   AND w.translation = s.translation
-  AND w.word_type IS DISTINCT FROM 'word';
+  AND w.word_type IS DISTINCT FROM s.word_type
+  AND (
+    s.word_type = 'word'
+    OR NOT EXISTS (
+      SELECT 1 FROM collection_words cw
+      JOIN collections c ON c.id = cw.collection_id
+      WHERE cw.word_id = w.id AND c.slug LIKE 'slovar-1958-%'
+    )
+  );
 
 -- 4. Связи с коллекциями
 INSERT INTO collection_words (collection_id, word_id, is_manual, is_excluded)
@@ -135,7 +149,9 @@ WHERE c.slug LIKE 'digiev-%'
   AND NOT EXISTS (
     SELECT 1 FROM collection_words o
     JOIN collections oc ON oc.id = o.collection_id
-    WHERE o.word_id = cw.word_id AND oc.slug NOT LIKE 'digiev-%'
+    WHERE o.word_id = cw.word_id
+      AND oc.slug NOT LIKE 'digiev-%'
+      AND oc.slug NOT LIKE 'course-%' -- курсы строит refresh_lexicon() из учебного плана
   );
 
 DELETE FROM collection_words cw
@@ -146,7 +162,11 @@ UPDATE words w
 SET is_active = FALSE, updated_at = NOW()
 WHERE w.is_active
   AND w.id IN (SELECT word_id FROM seed_digiev_stale)
-  AND NOT EXISTS (SELECT 1 FROM collection_words cw WHERE cw.word_id = w.id);
+  AND NOT EXISTS (
+    SELECT 1 FROM collection_words cw
+    JOIN collections c ON c.id = cw.collection_id
+    WHERE cw.word_id = w.id AND c.slug NOT LIKE 'course-%'
+  );
 
 INSERT INTO audit_log (actor_user_id, action, entity_type, entity_id, payload)
 SELECT NULL, 'seed.digiev_phrasebook', 'collection', 'digiev',

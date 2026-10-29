@@ -24,6 +24,7 @@ type QueueRow = {
   notes: string | null;
   translation: string;
   synonym_group_id: string | null;
+  lexeme_id: string | null;
   example_sentence: string | null;
   due_at: string | null;
   interval_state: IntervalState;
@@ -52,6 +53,7 @@ const selectCardFields = `
   w.notes,
   w.translation,
   w.synonym_group_id,
+  w.lexeme_id::text                                                 AS lexeme_id,
   (
     SELECT we.sentence_src || COALESCE(' — ' || we.sentence_translation, '')
     FROM word_examples we
@@ -129,6 +131,8 @@ export async function GET(request: Request) {
               ELSE                           1
             END ASC,
             cs.due_at ASC NULLS LAST,
+            -- Новые карточки — по учебному плану (study_rank, миграция 013), а не по алфавиту
+            w.study_rank ASC NULLS LAST,
             w.id ASC
           LIMIT $3
         `,
@@ -173,7 +177,9 @@ export async function GET(request: Request) {
               WHEN cs.due_at <= NOW()   THEN 0
               ELSE                           1
             END ASC,
-            cs.due_at ASC NULLS LAST
+            cs.due_at ASC NULLS LAST,
+            w.study_rank ASC NULLS LAST,
+            w.id ASC
           LIMIT $2
         `,
         [auth.user.id, SRS_CANDIDATE_FETCH_LIMIT]
