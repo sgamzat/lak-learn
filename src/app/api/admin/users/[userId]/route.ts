@@ -15,7 +15,7 @@ type ExistingUserRow = {
   is_blocked: boolean;
 };
 
-export async function PATCH(request: Request, { params }: { params: { userId: string } }) {
+export async function PATCH(request: Request, { params }: { params: Promise<{ userId: string }> }) {
   const guard = await requireAdmin(request);
 
   if (!guard.auth || guard.response) {
@@ -24,7 +24,7 @@ export async function PATCH(request: Request, { params }: { params: { userId: st
 
   const auth = guard.auth;
 
-  const userId = params.userId;
+  const userId = (await params).userId;
 
   if (!userId) {
     return NextResponse.json({ error: "userId обязателен" }, { status: 400 });
@@ -126,7 +126,7 @@ export async function PATCH(request: Request, { params }: { params: { userId: st
   return response;
 }
 
-export async function DELETE(request: Request, { params }: { params: { userId: string } }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ userId: string }> }) {
   const guard = await requireAdmin(request);
 
   if (!guard.auth || guard.response) {
@@ -135,7 +135,7 @@ export async function DELETE(request: Request, { params }: { params: { userId: s
 
   const auth = guard.auth;
 
-  const userId = params.userId;
+  const userId = (await params).userId;
 
   if (!userId) {
     return NextResponse.json({ error: "userId обязателен" }, { status: 400 });
