@@ -1,5 +1,5 @@
 import { query, withTransaction } from "@/lib/server/db";
-import type { SRSRating } from "@/types/srs";
+import type { ExerciseType, SRSRating } from "@/types/srs";
 
 export type ExistingCardRow = {
   easiness_factor: string;
@@ -48,6 +48,29 @@ export function ratingToQuality(rating: SRSRating): 1 | 3 | 5 {
   return 5;
 }
 
+export type SRSQuality = 1 | 3 | 4 | 5;
+
+export function isValidExerciseType(value: unknown): value is ExerciseType {
+  return value === "flashcard" || value === "choice" || value === "choice-reverse" || value === "recall";
+}
+
+/**
+ * Оценка SM-2 с учётом упражнения. Правильный ответ весит по-разному:
+ *   - ввод слова без ошибок (recall) — 5: слово вспомнено самостоятельно;
+ *   - ввод с опечаткой — 4: вспомнено, но не точно;
+ *   - выбор из вариантов (choice, choice-reverse) — 4: это узнавание, оно легче
+ *     воспроизведения; интервал растёт, но «лёгкость» слова не завышается;
+ *   - карточка с самооценкой (flashcard) — как оценил ученик (5 / 3 / 1).
+ * Ошибка в любом упражнении — 1.
+ */
+export function qualityFor(rating: SRSRating, exercise?: ExerciseType | null, typo = false): SRSQuality {
+  if (rating === "forgot") return 1;
+  if (rating === "unsure") return 3;
+  if (exercise === "choice" || exercise === "choice-reverse") return 4;
+  if (exercise === "recall" && typo) return 4;
+  return 5;
+}
+
 export function clampEasinessFactor(value: number): number {
   return Math.max(1.3, Number(value.toFixed(2)));
 }
@@ -56,8 +79,10 @@ export function getNextCardState(params: {
   rating: SRSRating;
   existingCard: ExistingCardRow | null;
   now?: Date;
+  /** Если не задано — по рейтингу (5 / 3 / 1), как раньше */
+  quality?: SRSQuality;
 }): NextCardState {
-  const quality = ratingToQuality(params.rating);
+  const quality = params.quality ?? ratingToQuality(params.rating);
   const currentEf = params.existingCard ? Number.parseFloat(params.existingCard.easiness_factor) : 2.5;
   const currentRepetition = params.existingCard?.repetition ?? 0;
   const currentIntervalDays = params.existingCard?.interval_days ?? 0;
@@ -99,10 +124,26 @@ export function getNextCardState(params: {
   };
 }
 
-export function getXPByRating(rating: SRSRating): number {
-  if (rating === "know") return 10;
+export function getXPByRating(rating: SRSRating, quality?: SRSQuality): number {
+  if (rating === "know") return quality === 4 ? 8 : 10;
   if (rating === "unsure") return 5;
   return 2;
+}
+
+/** Часовой пояс, которому можно доверять (из браузера), иначе null */
+export function normalizeTimeZone(value: unknown): string | null {
+  if (typeof value !== "string" || value.length > 64 || !/^[A-Za-z_]+(?:\/[A-Za-z0-9_+\-]+)*$/.test(value)) return null;
+  try {
+    new Intl.DateTimeFormat("en-CA", { timeZone: value });
+    return value;
+  } catch {
+    return null;
+  }
+}
+
+/** Календарная дата YYYY-MM-DD в часовом поясе пользователя */
+export function toDateKey(date: Date, timeZone = "UTC"): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
 }
 
 /** Календарная дата YYYY-MM-DD в UTC — для стабильного streak без TZ-сюрпризов. */
@@ -118,20 +159,20 @@ export function computeNextStreakDays(params: {
   currentStreak: number;
   lastReviewedAt: Date | null;
   now?: Date;
+  /** Часовой пояс пользователя: день меняется в его полночь, а не в 03:00 по Москве */
+  timeZone?: string;
 }): number {
   const now = params.now ?? new Date();
-  const today = toUtcDateKey(now);
+  const timeZone = params.timeZone ?? "UTC";
+  const today = toDateKey(now, timeZone);
   if (!params.lastReviewedAt) return 1;
 
-  const last = toUtcDateKey(params.lastReviewedAt);
+  const last = toDateKey(params.lastReviewedAt, timeZone);
   if (last === today) return Math.max(1, params.currentStreak);
 
-  const yesterdayDate = new Date(Date.UTC(
-    now.getUTCFullYear(),
-    now.getUTCMonth(),
-    now.getUTCDate() - 1
-  ));
-  const yesterday = toUtcDateKey(yesterdayDate);
+  // «Вчера» — по календарю пользователя (без сюрпризов перехода на летнее время)
+  const [y, m, d] = today.split("-").map(Number);
+  const yesterday = new Date(Date.UTC(y, m - 1, d - 1)).toISOString().slice(0, 10);
   if (last === yesterday) return Math.max(1, params.currentStreak) + 1;
   return 1;
 }
@@ -194,6 +235,9 @@ export async function submitSRSReview(params: {
   wordId: number;
   rating: SRSRating;
   now?: Date;
+  exercise?: ExerciseType | null;
+  typo?: boolean;
+  timeZone?: string | null;
 }): Promise<{ ok: true; result: ReviewResult } | { ok: false; error: string; status: number }> {
   const now = params.now ?? new Date();
   const existsWord = await query<{ id: number }>(
@@ -251,11 +295,25 @@ export async function submitSRSReview(params: {
       }
     }
 
+    const quality = qualityFor(params.rating, params.exercise, params.typo === true);
     const nextCardState = getNextCardState({
       rating: params.rating,
       existingCard,
       now,
+      quality,
     });
+
+    // Часовой пояс: из браузера (сохраняем) или ранее сохранённый
+    if (params.timeZone) {
+      await client.query(
+        "UPDATE users SET timezone = $2 WHERE id = $1 AND timezone IS DISTINCT FROM $2",
+        [params.userId, params.timeZone]
+      );
+    }
+    const tzRow = await client.query<{ timezone: string | null }>("SELECT timezone FROM users WHERE id = $1", [
+      params.userId
+    ]);
+    const timeZone = normalizeTimeZone(tzRow.rows[0]?.timezone) ?? "Europe/Moscow";
 
     const streakState = await client.query<{
       last_reviewed_at: Date | string | null;
@@ -276,6 +334,7 @@ export async function submitSRSReview(params: {
       currentStreak: streakState.rows[0]?.streak_days ?? 0,
       lastReviewedAt,
       now,
+      timeZone,
     });
 
     // Время ответа берём из now (а не NOW() базы): по нему же проверяется дубль
@@ -320,10 +379,10 @@ export async function submitSRSReview(params: {
 
     await client.query(
       `
-        INSERT INTO review_history (user_id, word_id, rating, reviewed_at, next_review_at)
-        VALUES ($1, $2, $3, $5, $4)
+        INSERT INTO review_history (user_id, word_id, rating, reviewed_at, next_review_at, exercise_type, quality)
+        VALUES ($1, $2, $3, $5, $4, $6, $7)
       `,
-      [params.userId, params.wordId, params.rating, nextCardState.dueAt, now]
+      [params.userId, params.wordId, params.rating, nextCardState.dueAt, now, params.exercise ?? null, quality]
     );
 
     await client.query(
@@ -336,7 +395,7 @@ export async function submitSRSReview(params: {
           streak_days = EXCLUDED.streak_days,
           updated_at = NOW()
       `,
-      [params.userId, getXPByRating(params.rating), nextStreak]
+      [params.userId, getXPByRating(params.rating, quality), nextStreak]
     );
 
     return {
