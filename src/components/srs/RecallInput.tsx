@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useReducedMotion } from "framer-motion";
 import type { FlashcardData, SRSRating } from "@/types/srs";
 import { lakLooseKey } from "@/lib/lak/alphabet";
+import { lakAnswerKey, lakAnswerVariants } from "@/lib/lak/variants";
 
 interface RecallInputProps {
   card: FlashcardData;
@@ -24,8 +25,9 @@ type CheckResult =
   | { type: "wrong" };
 
 function checkAnswer(input: string, correct: string): CheckResult {
-  const a = normalize(input);
-  const b = normalize(correct);
+  // Целиком сравниваем без знаков препинания: «Цукун ура?» = «цукун ура»
+  const a = lakAnswerKey(input);
+  const b = lakAnswerKey(correct);
 
   if (a === b) return { type: "correct", typo: false };
 
@@ -218,6 +220,15 @@ export function RecallInput({ card, allCards, onRate }: RecallInputProps) {
   const [phase, setPhase] = useState<Phase>("input");
   const [showHint, setShowHint] = useState(false);
   const [inputCard, setInputCard] = useState<FlashcardData | null>(null);
+  // Вариант ответа, с которым сравнивали: «лечлан» или «лечин», «уллан» или «буллан»
+  const [matched, setMatched] = useState<string>(card.word);
+
+  // «лечлан, лечин», «инжит уллан (буллан)» — засчитывается любой вариант
+  const variants = useMemo(
+    () => lakAnswerVariants(card.word, { wordType: card.wordType, translation: card.translation }),
+    [card.word, card.wordType, card.translation]
+  );
+  const otherVariants = variants.filter((v) => lakAnswerKey(v) !== lakAnswerKey(matched));
 
   const inputRef = useRef<HTMLInputElement>(null);
   const continueRef = useRef<HTMLButtonElement>(null);
@@ -229,6 +240,7 @@ export function RecallInput({ card, allCards, onRate }: RecallInputProps) {
     setPhase("input");
     setShowHint(false);
     setInputCard(null);
+    setMatched(card.word);
     advancedRef.current = false;
     const t = window.setTimeout(() => inputRef.current?.focus(), 80);
     return () => window.clearTimeout(t);
@@ -258,11 +270,23 @@ export function RecallInput({ card, allCards, onRate }: RecallInputProps) {
 
   const handleSubmit = () => {
     if (!input.trim() || phase !== "input") return;
-    const result = checkAnswer(input, card.word);
+    // Точное совпадение с любым вариантом — верно; иначе опечатка в любом из них
+    let typoVariant: string | null = null;
+    for (const variant of variants) {
+      const r = checkAnswer(input, variant);
+      if (r.type === "correct" && !r.typo) {
+        setMatched(variant);
+        setPhase("correct-exact");
+        return;
+      }
+      if (r.type === "correct" && r.typo && typoVariant === null) typoVariant = variant;
+    }
 
-    if (result.type === "correct") {
-      setPhase(result.typo ? "correct-typo" : "correct-exact");
+    if (typoVariant !== null) {
+      setMatched(typoVariant);
+      setPhase("correct-typo");
     } else {
+      setMatched(variants[0] ?? card.word);
       setInputCard(findCardByWord(input, allCards));
       setPhase("wrong");
     }
@@ -370,8 +394,11 @@ export function RecallInput({ card, allCards, onRate }: RecallInputProps) {
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-lk-green">
               Правильный ответ
             </p>
-            <WrongDiffHighlight input={input} correct={card.word} />
+            <WrongDiffHighlight input={input} correct={matched} />
             <p className="mt-1.5 text-sm text-lk-text">= {card.translation}</p>
+            {otherVariants.length > 0 && (
+              <p className="mt-1 text-xs text-lk-muted">Также верно: {otherVariants.join(" · ")}</p>
+            )}
             {card.transcription && (
               <p className="mt-0.5 font-mono text-xs text-lk-muted">[{card.transcription}]</p>
             )}
@@ -397,6 +424,9 @@ export function RecallInput({ card, allCards, onRate }: RecallInputProps) {
             </p>
             <p className="text-xl font-bold text-lk-text">{card.word}</p>
             <p className="mt-1 text-sm text-lk-muted">= {card.translation}</p>
+            {otherVariants.length > 0 && (
+              <p className="mt-1 text-xs text-lk-muted">Также верно: {otherVariants.join(" · ")}</p>
+            )}
             {card.transcription && (
               <p className="mt-0.5 font-mono text-xs text-lk-muted">[{card.transcription}]</p>
             )}
@@ -420,7 +450,7 @@ export function RecallInput({ card, allCards, onRate }: RecallInputProps) {
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-lk-gold">
               Почти верно — небольшая опечатка
             </p>
-            <InputHighlight input={input} correct={card.word} />
+            <InputHighlight input={input} correct={matched} />
             <p className="mt-2 text-xs text-lk-muted">
               <span className="inline-block rounded bg-lk-gold-dim px-1 text-lk-gold">золотым</span>
               {" "}
@@ -432,7 +462,7 @@ export function RecallInput({ card, allCards, onRate }: RecallInputProps) {
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-lk-green">
               Правильно пишется
             </p>
-            <CorrectHighlight input={input} correct={card.word} />
+            <CorrectHighlight input={input} correct={matched} />
             <p className="mt-2 text-xs text-lk-muted">
               <span className="inline-block rounded bg-lk-green/40 px-1 text-lk-text">зелёным</span>
               {" "}
