@@ -2,14 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useReducedMotion } from "framer-motion";
-import type { FlashcardData, SRSRating } from "@/types/srs";
+import type { FlashcardData, RateDetails, SRSRating } from "@/types/srs";
 import { lakLooseKey } from "@/lib/lak/alphabet";
 import { lakAnswerKey, lakAnswerVariants } from "@/lib/lak/variants";
 
 interface RecallInputProps {
   card: FlashcardData;
   allCards: FlashcardData[];
-  onRate: (rating: SRSRating) => void;
+  onRate: (rating: SRSRating, details?: RateDetails) => void;
 }
 
 // Любой вариант палочки (I, l, 1, |, Ӏ, ӏ) засчитывается как палочка.
@@ -295,7 +295,8 @@ export function RecallInput({ card, allCards, onRate }: RecallInputProps) {
   const handleContinue = () => {
     if (advancedRef.current) return;
     advancedRef.current = true;
-    onRate(phase === "wrong" ? "forgot" : "know");
+    // Опечатка — «почти верно»: интервал растёт, но меньше, чем за точный ответ
+    onRate(phase === "wrong" ? "forgot" : "know", { typo: phase === "correct-typo" });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {

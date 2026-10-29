@@ -1,5 +1,5 @@
 import type { DashboardData } from "@/types/dashboard";
-import type { FlashcardData, SRSRating } from "@/types/srs";
+import type { ExerciseType, FlashcardData, SRSRating } from "@/types/srs";
 import type { AuthResponse } from "@/types/auth";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ?? "";
@@ -110,8 +110,18 @@ export type SRSReviewResponse = {
   repetition: number;
 };
 
-export async function submitSRSReview(wordId: string, rating: SRSRating): Promise<SRSReviewResponse> {
-  return requestJsonPost<SRSReviewResponse>("/api/srs/review", { wordId, rating });
+export async function submitSRSReview(
+  wordId: string,
+  rating: SRSRating,
+  meta: { exercise?: ExerciseType; typo?: boolean } = {}
+): Promise<SRSReviewResponse> {
+  let timeZone: string | undefined;
+  try {
+    timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {
+    timeZone = undefined;
+  }
+  return requestJsonPost<SRSReviewResponse>("/api/srs/review", { wordId, rating, ...meta, timeZone });
 }
 
 export async function getStudySelection(): Promise<StudySelection> {

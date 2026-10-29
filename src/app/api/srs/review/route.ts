@@ -1,12 +1,18 @@
 import { NextResponse } from "next/server";
 import { getAuthContextFromRequest } from "@/lib/server/auth";
 import { setAccessCookie } from "@/lib/server/session";
-import { isValidSRSRating, normalizeWordId, submitSRSReview } from "@/lib/server/srs";
+import { isValidExerciseType, isValidSRSRating, normalizeTimeZone, normalizeWordId, submitSRSReview } from "@/lib/server/srs";
 import type { SRSRating } from "@/types/srs";
 
 type ReviewBody = {
   wordId?: string | number;
   rating?: SRSRating;
+  /** Упражнение: вес ответа зависит от него (узнавание слабее воспроизведения) */
+  exercise?: string;
+  /** Ответ в упражнении на ввод засчитан с опечаткой */
+  typo?: boolean;
+  /** Часовой пояс браузера (Intl) — для серии дней */
+  timeZone?: string;
 };
 
 export async function POST(request: Request) {
@@ -34,7 +40,10 @@ export async function POST(request: Request) {
   const outcome = await submitSRSReview({
     userId: auth.user.id,
     wordId,
-    rating
+    rating,
+    exercise: isValidExerciseType(body.exercise) ? body.exercise : null,
+    typo: body.typo === true,
+    timeZone: normalizeTimeZone(body.timeZone)
   });
 
   if (!outcome.ok) {

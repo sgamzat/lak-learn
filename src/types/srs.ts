@@ -2,6 +2,12 @@
 import type { WordGender, VerbAspect, WordType } from "@/types/word";
 
 export type SRSRating = "forgot" | "unsure" | "know";
+
+/** Упражнение, в котором дан ответ: от него зависит вес ответа в SM-2 */
+export type ExerciseType = "flashcard" | "choice" | "choice-reverse" | "recall";
+
+/** Подробности ответа: опечатка в упражнении на ввод */
+export type RateDetails = { typo?: boolean };
 export type IntervalState = "overdue" | "dueSoon" | "scheduled";
 
 /**

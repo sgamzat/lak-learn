@@ -10,9 +10,8 @@ import { SwipeCard } from "@/components/srs/SwipeCard";
 import { MultipleChoice } from "@/components/srs/MultipleChoice";
 import { RecallInput } from "@/components/srs/RecallInput";
 import { SRSSummaryScreen } from "@/components/srs/SRSSummaryScreen";
-import type { FlashcardData, SRSRating, SRSReviewState } from "@/types/srs";
+import type { FlashcardData, SRSRating, SRSReviewState, ExerciseType, RateDetails } from "@/types/srs";
 
-type ExerciseType = "flashcard" | "choice" | "choice-reverse" | "recall";
 type SessionPhase = "loading" | "ready" | "active" | "finished";
 
 function getExerciseType(repetition: number): ExerciseType {
@@ -226,14 +225,15 @@ export function SRSReviewScreen() {
         : "active";
 
   const handleRate = useCallback(
-    (rating: SRSRating) => {
+    (rating: SRSRating, details?: RateDetails) => {
       if (state.isFinished) return;
       const activeCard = state.queue[state.currentIndex];
       if (!activeCard) return;
 
       dispatch({ type: "rate", payload: rating });
 
-      submitSRSReview(activeCard.id, rating)
+      // Тип упражнения — для веса ответа: узнавание слабее, чем ввод слова
+      submitSRSReview(activeCard.id, rating, { exercise: exerciseType, typo: details?.typo === true })
         .then((res) => {
           setReviewError(null);
           if (typeof res.intervalDays === "number") {
@@ -242,7 +242,7 @@ export function SRSReviewScreen() {
         })
         .catch(() => setReviewError("Не сохранилось, проверьте соединение"));
     },
-    [state.currentIndex, state.isFinished, state.queue]
+    [state.currentIndex, state.isFinished, state.queue, exerciseType]
   );
 
   const handleRestart = useCallback(() => {

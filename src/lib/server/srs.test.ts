@@ -6,7 +6,9 @@ import {
   getNextCardState,
   getXPByRating,
   isValidSRSRating,
+  normalizeTimeZone,
   normalizeWordId,
+  qualityFor,
   ratingToQuality,
   SRS_NEW_PER_SESSION,
   SRS_SESSION_LIMIT,
@@ -49,6 +51,42 @@ describe("SRS helpers", () => {
     expect(getXPByRating("know")).toBe(10);
     expect(getXPByRating("unsure")).toBe(5);
     expect(getXPByRating("forgot")).toBe(2);
+  });
+
+  it("qualityFor: узнавание слабее воспроизведения, опечатка — почти верно", () => {
+    expect(qualityFor("know", "recall")).toBe(5);
+    expect(qualityFor("know", "recall", true)).toBe(4);
+    expect(qualityFor("know", "choice")).toBe(4);
+    expect(qualityFor("know", "choice-reverse")).toBe(4);
+    expect(qualityFor("know", "flashcard")).toBe(5);
+    expect(qualityFor("unsure", "flashcard")).toBe(3);
+    expect(qualityFor("forgot", "recall")).toBe(1);
+    expect(qualityFor("know")).toBe(5); // старые клиенты без exercise
+  });
+
+  it("узнавание растит интервал, но не завышает лёгкость слова", () => {
+    const card: ExistingCardRow = { easiness_factor: "2.5", repetition: 2, interval_days: 6, lapses: 0, total_reviews: 2 };
+    const recall = getNextCardState({ rating: "know", existingCard: card, quality: qualityFor("know", "recall") });
+    const choice = getNextCardState({ rating: "know", existingCard: card, quality: qualityFor("know", "choice") });
+    expect(recall.easinessFactor).toBeGreaterThan(choice.easinessFactor);
+    expect(choice.easinessFactor).toBe(2.5);
+    expect(choice.intervalDays).toBeGreaterThan(6);
+  });
+
+  it("серия дней — по полуночи пользователя, а не по UTC", () => {
+    // 22:30 UTC 10 марта = 01:30 МСК 11 марта; прошлый ответ — 20:00 МСК 10 марта
+    const last = new Date("2026-03-10T17:00:00.000Z");
+    const now = new Date("2026-03-10T22:30:00.000Z");
+    expect(computeNextStreakDays({ currentStreak: 4, lastReviewedAt: last, now, timeZone: "Europe/Moscow" })).toBe(5);
+    // по UTC это был бы тот же день — серия не росла бы
+    expect(computeNextStreakDays({ currentStreak: 4, lastReviewedAt: last, now, timeZone: "UTC" })).toBe(4);
+  });
+
+  it("normalizeTimeZone принимает только настоящие пояса", () => {
+    expect(normalizeTimeZone("Europe/Moscow")).toBe("Europe/Moscow");
+    expect(normalizeTimeZone("America/Argentina/Buenos_Aires")).toBe("America/Argentina/Buenos_Aires");
+    expect(normalizeTimeZone("Mars/Olympus")).toBeNull();
+    expect(normalizeTimeZone("'; DROP TABLE users;--")).toBeNull();
   });
 
   it("buildSessionQueue: одно лакское слово — одна новая карточка за сессию", () => {
