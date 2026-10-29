@@ -17,9 +17,6 @@ concurrency:
 
 jobs:
   build:
-    # Ветку chore/next-16 проверяет update-deps-next16.yml (после npm install).
-    # Условие удаляется вместе с тем workflow после мержа.
-    if: github.head_ref != 'chore/next-16'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
