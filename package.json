@@ -13,7 +13,8 @@
     "parse:1958": "node --experimental-strip-types parse/run_slovar_1958.ts",
     "parse:digiev": "node --experimental-strip-types parse/run_digiev.ts",
     "admin:create": "node scripts/create-admin.mjs",
-    "lessons:seed": "node --experimental-strip-types scripts/build-lessons-seed.ts"
+    "lessons:seed": "node --experimental-strip-types scripts/build-lessons-seed.ts",
+    "parse:lakku-dunial": "node --experimental-strip-types parse/run_lakku_dunial.ts"
   },
   "dependencies": {
     "cheerio": "^1.2.0",

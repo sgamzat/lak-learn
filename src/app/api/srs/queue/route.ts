@@ -19,6 +19,8 @@ type QueueRow = {
   transcription: string | null;
   part_of_speech: string | null;
   gender: string | null;
+  lak_class: number | null;
+  lak_plural: string | null;
   verb_aspect: string | null;
   word_type: string;
   notes: string | null;
@@ -48,6 +50,8 @@ const selectCardFields = `
   w.transcription,
   w.part_of_speech,
   w.gender,
+  w.lak_class,
+  w.lak_plural,
   w.verb_aspect,
   w.word_type,
   w.notes,
@@ -294,6 +298,8 @@ export async function GET(request: Request) {
     transcription: row.transcription ?? "",
     partOfSpeech: row.part_of_speech ?? "",
     gender: (row.gender as FlashcardData["gender"]) ?? null,
+    lakClass: row.lak_class ?? null,
+    lakPlural: row.lak_plural ?? null,
     verbAspect: (row.verb_aspect as FlashcardData["verbAspect"]) ?? null,
     wordType: (row.word_type as FlashcardData["wordType"]) ?? "word",
     notes: row.notes ?? null,

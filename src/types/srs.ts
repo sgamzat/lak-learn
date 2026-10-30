@@ -24,7 +24,9 @@ export interface FlashcardData {
   exampleSentence: string;
 
   // Новые грамматические поля
-  gender:          WordGender | null; // м / ж / ср — для существительных
+  gender:          WordGender | null; // род русского перевода (не показывается)
+  lakClass:        number | null;     // класс лакского существительного 1–4
+  lakPlural:       string | null;     // мн. ч. лакского существительного
   verbAspect:      VerbAspect | null; // сов. / несов. / однокр. — для глаголов
   wordType:        WordType;          // word | phrase
   notes:           string | null;     // устар., разг. и т.д.
