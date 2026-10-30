@@ -57,9 +57,53 @@ export function wordInCollectionSql(collectionIdSql: string, wordAlias = "w"): s
 }
 
 /**
- * Только основное слово из группы синонимов. Синонимы (priority >= 2)
- * не попадают в SRS-очередь, поэтому не должны учитываться и в прогрессе.
+ * «Слово входит в коллекцию» на уровне лакского слова (лексемы, миграция 018):
+ * слово в коллекции, если в ней любое его значение. Для повторения, прогресса
+ * тем и счётчиков — там учится одно главное значение на слово, а в теме Дигиева
+ * может быть записано другое («къатта — дом» вместо «къатта — дом, комната»).
+ *
+ * Для списков «что лежит в теме» (разговорник, админка) — wordInCollectionSql.
+ */
+export function lexemeInCollectionSql(collectionIdSql: string, wordAlias = "w"): string {
+  // Слово — это лексема (миграция 018): оно в коллекции, если в ней любое его
+  // значение. Иначе главное значение «къатта — дом, комната» (учебник) выпало бы
+  // из темы Дигиева, где записано «къатта — дом».
+  return `(
+    (
+      EXISTS (
+        SELECT 1
+        FROM collections m_c
+        JOIN tags m_t ON LOWER(m_t.code) = ANY (
+          SELECT LOWER(value) FROM unnest(m_c.rule_tag_codes) AS value
+        )
+        JOIN word_tags m_wt ON m_wt.tag_id = m_t.id
+        JOIN words m_w ON m_w.id = m_wt.word_id
+        WHERE m_c.id = ${collectionIdSql}
+          AND m_w.lexeme_id = ${wordAlias}.lexeme_id
+      )
+      OR EXISTS (
+        SELECT 1
+        FROM collection_words m_cw
+        JOIN words m_w ON m_w.id = m_cw.word_id
+        WHERE m_cw.collection_id = ${collectionIdSql}
+          AND m_w.lexeme_id = ${wordAlias}.lexeme_id
+          AND m_cw.is_excluded = FALSE
+      )
+    )
+    AND NOT EXISTS (
+      SELECT 1
+      FROM collection_words m_cw
+      WHERE m_cw.collection_id = ${collectionIdSql}
+        AND m_cw.word_id = ${wordAlias}.id
+        AND m_cw.is_excluded = TRUE
+    )
+  )`;
+}
+
+/**
+ * Только главное значение лакского слова (words.is_primary, миграция 018).
+ * Остальные значения не учатся отдельно и не считаются в прогрессе.
  */
 export function primaryTranslationSql(wordAlias = "w"): string {
-  return `${wordAlias}.translation_priority = 1`;
+  return `${wordAlias}.is_primary`;
 }

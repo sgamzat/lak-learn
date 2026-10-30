@@ -37,6 +37,8 @@ export interface FlashcardData {
   // Другие значения того же лакского слова и источник записи
   otherMeanings:   string[];
   source:          string | null;
+  /** Другие написания слова, тоже верные в ответе: «цӀву» для «цӀу» */
+  spellings:       string[];
 
   // SRS-метаданные
   intervalState:   IntervalState;

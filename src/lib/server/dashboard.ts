@@ -1,5 +1,5 @@
 import { query } from "@/lib/server/db";
-import { KNOWN_INTERVAL_DAYS, primaryTranslationSql, wordInCollectionSql } from "@/lib/server/membership";
+import { KNOWN_INTERVAL_DAYS, primaryTranslationSql, lexemeInCollectionSql } from "@/lib/server/membership";
 import type { AuthUser } from "@/types/auth";
 import type { CollectionProgress, DashboardData, NextLesson, TopicStatus } from "@/types/dashboard";
 import { getLessonProgressMap } from "@/lib/server/lessons";
@@ -129,7 +129,7 @@ function mapCollectionRow(row: CollectionRow): CollectionProgress {
 }
 
 export async function getDashboardData(user: AuthUser): Promise<DashboardData> {
-  const membership = wordInCollectionSql("c.id", "w");
+  const membership = lexemeInCollectionSql("c.id", "w");
 
   const [
     progressResult,
@@ -171,7 +171,7 @@ export async function getDashboardData(user: AuthUser): Promise<DashboardData> {
         WHERE usc.user_id = $1
           AND c.is_active = TRUE
           AND c.is_public = TRUE
-          AND w.translation_priority = 1
+          AND w.is_primary
           AND ${membership}
       ),
       selected_words AS (
@@ -180,7 +180,7 @@ export async function getDashboardData(user: AuthUser): Promise<DashboardData> {
         JOIN words w ON w.id = usw.word_id
         WHERE usw.user_id = $1
           AND w.is_active = TRUE
-          AND w.translation_priority = 1
+          AND w.is_primary
         UNION
         SELECT word_id FROM selected_collections_words
       ),

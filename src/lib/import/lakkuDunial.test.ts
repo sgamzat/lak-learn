@@ -45,6 +45,10 @@ describe("словарь «Лакку дуниял» — статья", () => {
     expect(parseEntry("бювчIусса II – гладкий, -ая, -ое, -ие")?.lakClass).toBeNull();
   });
 
+  it("транскрипция формы — не транскрипция слова", () => {
+    expect(parseEntry("цIу II (цIил [цIи:л]) – соль")).toMatchObject({ lemma: "цӀу", lakClass: 2, transcription: null, forms: "цӀил" });
+  });
+
   it("два класса — класс не указываем", () => {
     expect(parseEntry("оьрчI I,II (ал, -ру, -ал) – мальчик, юноша")).toMatchObject({ lakClass: null, plural: "оьрчӀру" });
   });

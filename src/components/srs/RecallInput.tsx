@@ -268,8 +268,12 @@ export function RecallInput({ card, allCards, onRate }: RecallInputProps) {
 
   // «лечлан, лечин», «инжит уллан (буллан)» — засчитывается любой вариант
   const variants = useMemo(
-    () => lakAnswerVariants(card.word, { wordType: card.wordType, translation: card.translation }),
-    [card.word, card.wordType, card.translation]
+    () => [
+      ...lakAnswerVariants(card.word, { wordType: card.wordType, translation: card.translation }),
+      // Другие написания того же слова («цӀву» для «цӀу»)
+      ...(card.spellings ?? []).flatMap((s) => lakAnswerVariants(s, { wordType: card.wordType }))
+    ],
+    [card.word, card.wordType, card.translation, card.spellings]
   );
   const otherVariants = variants.filter((v) => lakAnswerKey(v) !== lakAnswerKey(matched));
 

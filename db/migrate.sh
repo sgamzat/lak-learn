@@ -62,6 +62,12 @@ echo "Migrations done. Applied: $applied_count, skipped: $skipped_count"
 # Пересчёт источников и учебного плана (миграция 013). Быстрый и идемпотентный:
 # выполняется на каждом запуске, чтобы учесть сиды и правки в админке.
 refresh_lexicon() {
+  # Сначала лексемы и главные значения (миграция 018), затем учебный план
+  has_lx=$(psql_base -Atc "SELECT 1 FROM pg_proc WHERE proname = 'refresh_lexemes' LIMIT 1" || true)
+  if [ "$has_lx" = "1" ]; then
+    echo "Refreshing lexemes (one word — one entry)..."
+    psql_base -Atc "SELECT row_to_json(r)::text FROM refresh_lexemes() r"
+  fi
   has_fn=$(psql_base -Atc "SELECT 1 FROM pg_proc WHERE proname = 'refresh_lexicon' LIMIT 1" || true)
   if [ "$has_fn" = "1" ]; then
     echo "Refreshing lexicon and curriculum..."
