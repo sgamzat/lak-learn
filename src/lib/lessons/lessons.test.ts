@@ -50,6 +50,22 @@ describe("квиз", () => {
     }
   });
 
+  it("во всех уроках: 4 разных варианта, а в парах — разные переводы", () => {
+    for (const l of LESSONS) {
+      l.steps.forEach((s, i) => {
+        if (s.type === "quiz") {
+          for (const q of buildQuiz(l, s, l.number * 1000 + i)) {
+            expect(`${l.number}:${q.word.lak}:${new Set(q.options).size}`).toBe(`${l.number}:${q.word.lak}:4`);
+          }
+        }
+        if (s.type === "match") {
+          const ru = s.words.map((w) => l.words.find((x) => x.lak === w)!.ru);
+          expect(`${l.number}:${new Set(ru).size}`).toBe(`${l.number}:${ru.length}`);
+        }
+      });
+    }
+  });
+
   it("счёт заданий: квиз считается по вопросам", () => {
     const simple = lesson.steps.filter((s) => ["choice", "order", "match"].includes(s.type)).length;
     expect(countExercises(lesson)).toBe(simple + step.count!);
