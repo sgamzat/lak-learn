@@ -138,6 +138,8 @@ WHERE w.lemma_key = g.lemma_key
   AND w.word_type = 'word'
   -- Только существительные: «хьхьичӀалу» — и «впереди» (сущ.), и «преградить» (глаг.)
   AND COALESCE(w.part_of_speech, 'Сущ.') = 'Сущ.'
+  -- «душ → душ» (заимствование) — не «душ → девушка»
+  AND NOT w.is_loanword
   AND (w.lak_class IS NULL OR (w.lak_forms IS NULL AND g.lak_forms IS NOT NULL) OR (w.lak_plural IS NULL AND g.lak_plural IS NOT NULL));
 
 -- 4. Пары, которых больше нет в словаре
