@@ -1,0 +1,20 @@
+# Временный: собрать node_modules для локальной проверки. Ветку удалить после использования.
+name: deps-artifact
+on:
+  push:
+    branches: [chore/deps-artifact]
+jobs:
+  deps:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --no-audit --no-fund
+      - run: tar -czf node_modules.tgz node_modules
+      - uses: actions/upload-artifact@v4
+        with:
+          name: node_modules
+          path: node_modules.tgz
+          retention-days: 1
