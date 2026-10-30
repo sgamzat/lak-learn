@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { lakClassLabel } from "@/lib/lak/grammar";
 import { motion, useMotionValue, useTransform } from "framer-motion";
 import { Check, X } from "lucide-react";
 import type { FlashcardData, SRSRating } from "@/types/srs";
@@ -121,9 +122,9 @@ export function SwipeCard({ card, isRevealed, onReveal, onRate, reduceMotion }: 
               {card.partOfSpeech}
             </span>
           )}
-          {card.gender && (
+          {lakClassLabel(card.lakClass) && (
             <span className="rounded-full bg-lk-card2 px-3 py-1 text-xs font-medium text-lk-muted">
-              {card.gender === "м" ? "муж. р." : card.gender === "ж" ? "жен. р." : "ср. р."}
+              {lakClassLabel(card.lakClass)}
             </span>
           )}
           {card.verbAspect && (
@@ -166,6 +167,12 @@ export function SwipeCard({ card, isRevealed, onReveal, onRate, reduceMotion }: 
           {card.exampleSentence && (
             <p className="mt-3 text-sm italic leading-relaxed text-lk-muted">
               «{card.exampleSentence}»
+            </p>
+          )}
+
+          {card.lakPlural && (
+            <p className="mt-2 text-xs text-lk-muted">
+              мн. ч. <span lang="lbe" className="font-serif text-sm font-semibold text-lk-text">{card.lakPlural}</span>
             </p>
           )}
 

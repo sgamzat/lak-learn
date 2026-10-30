@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { lakClassLabel } from "@/lib/lak/grammar";
 import { useReducedMotion } from "framer-motion";
 import type { FlashcardData, RateDetails, SRSRating } from "@/types/srs";
 import { lakLooseKey } from "@/lib/lak/alphabet";
@@ -228,9 +229,21 @@ function pluralLetters(n: number): string {
 
 /** После ответа: пример целиком, другие значения слова, источник */
 export function CardExtras({ card }: { card: FlashcardData }) {
-  if (!card.exampleSentence && !card.otherMeanings?.length && !card.source) return null;
+  const cls = lakClassLabel(card.lakClass);
+  if (!card.exampleSentence && !card.otherMeanings?.length && !card.source && !cls && !card.lakPlural) return null;
   return (
     <div className="mt-3 space-y-1.5 border-t border-lk-line pt-3 text-left">
+      {(cls || card.lakPlural) && (
+        <p className="text-xs text-lk-muted">
+          {cls}
+          {cls && card.lakPlural ? " · " : ""}
+          {card.lakPlural && (
+            <>
+              мн. ч. <span lang="lbe" className="font-serif text-sm font-semibold text-lk-text">{card.lakPlural}</span>
+            </>
+          )}
+        </p>
+      )}
       {card.exampleSentence && (
         <p className="text-sm italic leading-relaxed text-lk-muted">«{card.exampleSentence}»</p>
       )}

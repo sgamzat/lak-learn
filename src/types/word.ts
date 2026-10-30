@@ -24,7 +24,10 @@ export type DictionaryWord = {
 
   // Грамматика — разделена на отдельные поля
   partOfSpeech:        string | null;   // Сущ. / Глаг. / Прил. / Нареч. / Фраза и т.д.
-  gender:              WordGender | null; // м / ж / ср — только для существительных
+  gender:              WordGender | null; // род РУССКОГО перевода (словарь 1958), не лакский класс
+  lakClass:            number | null;     // класс лакского существительного 1–4
+  lakPlural:           string | null;     // мн. ч. лакского существительного
+  lakForms:            string | null;     // формы как в учебнике «Лакку дуниял»
   verbAspect:          VerbAspect | null; // сов. / несов. / однокр. — только для глаголов
   wordType:            WordType;          // word | phrase
 

@@ -21,6 +21,9 @@ type WordRow = {
   transcription:        string | null;
   part_of_speech:       string | null;
   gender:               string | null;
+  lak_class:            number | null;
+  lak_plural:           string | null;
+  lak_forms:            string | null;
   verb_aspect:          string | null;
   word_type:            string;
   notes:                string | null;
@@ -180,6 +183,9 @@ export async function GET(request: Request) {
         w.transcription,
         w.part_of_speech,
         w.gender,
+        w.lak_class,
+        w.lak_plural,
+        w.lak_forms,
         w.verb_aspect,
         w.word_type,
         w.notes,
@@ -202,6 +208,9 @@ export async function GET(request: Request) {
     transcription:       row.transcription,
     partOfSpeech:        row.part_of_speech,
     gender:              (row.gender as DictionaryWord["gender"]) ?? null,
+    lakClass:            row.lak_class ?? null,
+    lakPlural:           row.lak_plural ?? null,
+    lakForms:            row.lak_forms ?? null,
     verbAspect:          (row.verb_aspect as DictionaryWord["verbAspect"]) ?? null,
     wordType:            (row.word_type as DictionaryWord["wordType"]) ?? "word",
     notes:               row.notes,

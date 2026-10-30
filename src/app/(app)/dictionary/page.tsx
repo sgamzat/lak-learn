@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from "react";
+import { lakClassLabel } from "@/lib/lak/grammar";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -40,12 +41,6 @@ const MODES: { id: DictMode; label: string; hint: string }[] = [
   { id: "mine", label: "Моё", hint: "В изучении" },
 ];
 
-function genderLabel(g: string | null): string | null {
-  if (g === "м") return "м.р.";
-  if (g === "ж") return "ж.р.";
-  if (g === "ср") return "ср.р.";
-  return null;
-}
 
 async function fetchWords(params: Record<string, string>): Promise<DictionaryWord[]> {
   const qs = new URLSearchParams({ wordType: "word", primaryOnly: "true", ...params });
@@ -72,7 +67,7 @@ function WordDetail({
   onClose?: () => void;
 }) {
   const { tokens: T } = useTheme();
-  const gl = genderLabel(word.gender ?? null);
+  const gl = lakClassLabel(word.lakClass);
 
   return (
     <div className="flex h-full flex-col">
@@ -115,6 +110,18 @@ function WordDetail({
             <span className="rounded-full bg-lk-red-dim px-2.5 py-0.5 text-xs italic text-lk-red">{word.notes}</span>
           ) : null}
         </div>
+
+        {word.lakPlural || word.lakForms ? (
+          <div>
+            <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-lk-faint">Формы</p>
+            {word.lakPlural ? (
+              <p className="text-sm text-lk-text">
+                мн. ч. — <span lang="lbe" className="font-serif font-semibold">{word.lakPlural}</span>
+              </p>
+            ) : null}
+            {word.lakForms ? <p lang="lbe" className="mt-0.5 font-serif text-sm text-lk-muted">({word.lakForms})</p> : null}
+          </div>
+        ) : null}
 
         {word.transcription ? (
           <div>
@@ -159,7 +166,7 @@ function WordRow({
   onSelect: () => void;
   onToggle: () => void;
 }) {
-  const gl = genderLabel(word.gender ?? null);
+  const gl = lakClassLabel(word.lakClass);
 
   return (
     <div
