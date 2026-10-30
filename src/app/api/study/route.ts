@@ -73,7 +73,7 @@ export async function GET(request: Request) {
   const response = NextResponse.json(selection, { status: 200 });
 
   if (auth.refreshedAccessToken) {
-    setAccessCookie(response, auth.refreshedAccessToken);
+    setAccessCookie(response, auth.refreshedAccessToken, request);
   }
 
   return response;
@@ -181,7 +181,7 @@ export async function POST(request: Request) {
   const response = NextResponse.json({ ok: true, ...selection }, { status: 200 });
 
   if (auth.refreshedAccessToken) {
-    setAccessCookie(response, auth.refreshedAccessToken);
+    setAccessCookie(response, auth.refreshedAccessToken, request);
   }
 
   return response;

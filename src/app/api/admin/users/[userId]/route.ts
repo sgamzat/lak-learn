@@ -120,7 +120,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ us
   const response = NextResponse.json({ ok: true, user: updatedUser }, { status: 200 });
 
   if (auth.refreshedAccessToken) {
-    setAccessCookie(response, auth.refreshedAccessToken);
+    setAccessCookie(response, auth.refreshedAccessToken, request);
   }
 
   return response;
@@ -225,7 +225,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ u
   const response = NextResponse.json({ ok: true, user: deleted }, { status: 200 });
 
   if (auth.refreshedAccessToken) {
-    setAccessCookie(response, auth.refreshedAccessToken);
+    setAccessCookie(response, auth.refreshedAccessToken, request);
   }
 
   return response;

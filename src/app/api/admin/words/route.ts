@@ -687,7 +687,7 @@ export async function GET(request: Request) {
     );
 
     if (guard.auth.refreshedAccessToken) {
-      setAccessCookie(response, guard.auth.refreshedAccessToken);
+      setAccessCookie(response, guard.auth.refreshedAccessToken, request);
     }
 
     return response;
@@ -753,7 +753,7 @@ export async function GET(request: Request) {
   });
 
   if (guard.auth.refreshedAccessToken) {
-    setAccessCookie(response, guard.auth.refreshedAccessToken);
+    setAccessCookie(response, guard.auth.refreshedAccessToken, request);
   }
 
   return response;
@@ -1030,7 +1030,7 @@ export async function PUT(request: Request) {
   );
 
   if (guard.auth.refreshedAccessToken) {
-    setAccessCookie(response, guard.auth.refreshedAccessToken);
+    setAccessCookie(response, guard.auth.refreshedAccessToken, request);
   }
 
   return response;
@@ -1139,7 +1139,7 @@ export async function POST(request: Request) {
   const response = NextResponse.json({ id: created.id, ok: true, word: created }, { status: 201 });
 
   if (guard.auth.refreshedAccessToken) {
-    setAccessCookie(response, guard.auth.refreshedAccessToken);
+    setAccessCookie(response, guard.auth.refreshedAccessToken, request);
   }
 
   return response;

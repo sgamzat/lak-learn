@@ -40,7 +40,7 @@ export async function GET(request: Request) {
   );
 
   if (auth.refreshedAccessToken) {
-    setAccessCookie(response, auth.refreshedAccessToken);
+    setAccessCookie(response, auth.refreshedAccessToken, request);
   }
 
   return response;

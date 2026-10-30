@@ -12,7 +12,7 @@ export async function GET(request: Request) {
   const response = NextResponse.json({ user: publicUser(auth.user) }, { status: 200 });
 
   if (auth.refreshedAccessToken) {
-    setAccessCookie(response, auth.refreshedAccessToken);
+    setAccessCookie(response, auth.refreshedAccessToken, request);
   }
 
   return response;

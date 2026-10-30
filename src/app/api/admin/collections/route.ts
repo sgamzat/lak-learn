@@ -108,7 +108,7 @@ export async function GET(request: Request) {
   );
 
   if (guard.auth.refreshedAccessToken) {
-    setAccessCookie(response, guard.auth.refreshedAccessToken);
+    setAccessCookie(response, guard.auth.refreshedAccessToken, request);
   }
 
   return response;
@@ -192,7 +192,7 @@ export async function POST(request: Request) {
   const response = NextResponse.json({ ok: true, id: created }, { status: 201 });
 
   if (guard.auth.refreshedAccessToken) {
-    setAccessCookie(response, guard.auth.refreshedAccessToken);
+    setAccessCookie(response, guard.auth.refreshedAccessToken, request);
   }
 
   return response;
