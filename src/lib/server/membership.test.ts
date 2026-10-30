@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { primaryTranslationSql, wordInCollectionSql } from "@/lib/server/membership";
+import { lexemeInCollectionSql, primaryTranslationSql, wordInCollectionSql } from "@/lib/server/membership";
 
 describe("wordInCollectionSql", () => {
   it("не требует is_manual: связи импорта (is_manual = FALSE) тоже считаются", () => {
@@ -23,9 +23,18 @@ describe("wordInCollectionSql", () => {
   });
 });
 
+describe("lexemeInCollectionSql", () => {
+  it("слово в коллекции, если в ней любое его значение (по лексеме)", () => {
+    const sql = lexemeInCollectionSql("c.id", "ww");
+    expect(sql).toContain("m_w.lexeme_id = ww.lexeme_id");
+    expect(sql).toContain("m_cw.is_excluded = FALSE");
+    expect(sql).not.toMatch(/is_manual/);
+  });
+});
+
 describe("primaryTranslationSql", () => {
-  it("оставляет только основное слово из группы синонимов", () => {
-    expect(primaryTranslationSql()).toBe("w.translation_priority = 1");
-    expect(primaryTranslationSql("x")).toBe("x.translation_priority = 1");
+  it("оставляет только главное значение слова", () => {
+    expect(primaryTranslationSql()).toBe("w.is_primary");
+    expect(primaryTranslationSql("x")).toBe("x.is_primary");
   });
 });

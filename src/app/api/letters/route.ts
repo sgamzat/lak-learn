@@ -27,7 +27,7 @@ export async function GET(request: Request) {
       FROM words
       WHERE is_active = TRUE
         AND word_type = 'word'
-        AND translation_priority = 1
+        AND is_primary
         AND first_letter IS NOT NULL
       GROUP BY first_letter
     `

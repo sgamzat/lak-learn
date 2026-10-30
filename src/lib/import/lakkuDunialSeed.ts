@@ -25,6 +25,8 @@ export type LakkuDunialRow = {
   forms: string | null;
   plural: string | null;
   transcription: string | null;
+  /** Неверная транскрипция от прежнего парсера — заменить на transcription */
+  wrongTranscription: string | null;
 };
 
 const POS: Record<string, string> = { noun: "Сущ.", verb: "Глаг." };
@@ -50,7 +52,9 @@ export function lakkuDunialRows(entries: LakkuDunialEntry[]): LakkuDunialRow[] {
         lakClass: e.lakClass,
         forms: e.forms,
         plural: e.plural,
-        transcription: e.transcription
+        transcription: e.transcription,
+        wrongTranscription:
+          e.legacyTranscription && e.legacyTranscription !== e.transcription ? e.legacyTranscription : null
       });
     });
   }
@@ -69,6 +73,9 @@ export function buildLakkuDunialSeedSql(rows: LakkuDunialRow[]): string {
       `(${lit(r.lemma)}, ${lit(r.translation)}, ${r.priority}, ${lit(r.wordType)}, ${lit(r.partOfSpeech)}, ` +
       `${r.lakClass ?? "NULL"}, ${lit(r.forms)}, ${lit(r.plural)}, ${lit(r.transcription)})`
   );
+  const fixes = rows
+    .filter((r) => r.wrongTranscription)
+    .map((r) => `(${lit(r.lemma)}, ${lit(r.translation)}, ${lit(r.wrongTranscription)}, ${lit(r.transcription)})`);
   const chunks: string[] = [];
   for (let i = 0; i < values.length; i += 1000) chunks.push(values.slice(i, i + 1000).join(",\n"));
 
@@ -110,6 +117,15 @@ ON CONFLICT (lemma, translation) DO UPDATE SET
   updated_at     = NOW()
 WHERE words.lak_class IS NULL OR words.lak_forms IS NULL OR words.lak_plural IS NULL
    OR words.transcription IS NULL OR words.part_of_speech IS NULL;
+
+-- 1а. Транскрипция формы, записанная прежним парсером как транскрипция слова
+--     («цӀу — соль»: [цӀи:л] — это родительный падеж «цӀил»)
+${fixes.length ? `UPDATE words w
+SET transcription = f.correct, updated_at = NOW()
+FROM (VALUES
+${fixes.join(",\n")}
+) AS f(lemma, translation, wrong, correct)
+WHERE w.lemma = lak_canonical(f.lemma) AND w.translation = f.translation AND w.transcription = f.wrong;` : ""}
 
 -- 2. Источник
 INSERT INTO word_sources (word_id, source_id, locator)

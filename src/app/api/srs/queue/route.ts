@@ -9,7 +9,7 @@ import {
   SRS_SESSION_LIMIT,
 } from "@/lib/server/srs";
 import type { FlashcardData, IntervalState } from "@/types/srs";
-import { wordInCollectionSql } from "@/lib/server/membership";
+import { lexemeInCollectionSql } from "@/lib/server/membership";
 
 // ─── Тип строки из БД ────────────────────────────────────────────────────────
 
@@ -118,8 +118,8 @@ export async function GET(request: Request) {
             WHERE c.id = $2
               AND c.is_active = TRUE
               AND c.is_public = TRUE
-              AND w.translation_priority = 1
-              AND ${wordInCollectionSql("c.id")}
+              AND w.is_primary
+              AND ${lexemeInCollectionSql("c.id")}
           ),
           card_state AS (
             SELECT usc.word_id, usc.due_at, usc.repetition
@@ -155,8 +155,8 @@ export async function GET(request: Request) {
             WHERE usc.user_id = $1
               AND c.is_active = TRUE
               AND c.is_public = TRUE
-              AND w.translation_priority = 1
-              AND ${wordInCollectionSql("c.id")}
+              AND w.is_primary
+              AND ${lexemeInCollectionSql("c.id")}
           ),
           selected_words AS (
             SELECT usw.word_id
@@ -164,7 +164,7 @@ export async function GET(request: Request) {
             JOIN words w ON w.id = usw.word_id
             WHERE usw.user_id = $1
               AND w.is_active = TRUE
-              AND w.translation_priority = 1
+              AND w.is_primary
             UNION
             SELECT word_id FROM selected_collections_words
           ),
@@ -240,9 +240,9 @@ export async function GET(request: Request) {
 
   // Другие значения и источник — только для карточек сессии (15), а не для всех
   // 200 кандидатов: иначе запрос очереди занимал ~2 с
-  const extrasById = new Map<string, { other_meanings: string[] | null; source: string | null }>();
+  const extrasById = new Map<string, { other_meanings: string[] | null; source: string | null; spellings: string[] | null }>();
   if (sessionRows.length > 0) {
-    const extrasResult = await query<{ id: string; other_meanings: string[] | null; source: string | null }>(
+    const extrasResult = await query<{ id: string; other_meanings: string[] | null; source: string | null; spellings: string[] | null }>(
       `
         SELECT
           w.id::text AS id,
@@ -267,6 +267,7 @@ export async function GET(request: Request) {
                 WHERE o2.lexeme_id = w.lexeme_id
                   AND o2.id <> w.id
                   AND o2.is_active
+                  AND NOT o2.is_loanword
                   AND lower(o2.translation) <> lower(w.translation)
                 ORDER BY lower(o2.translation), o2.translation_priority
               ) o
@@ -283,7 +284,14 @@ export async function GET(request: Request) {
             WHERE ws.word_id = w.id AND s.kind <> 'manual'
             ORDER BY (s.kind = 'phrasebook') DESC, ws.locator
             LIMIT 1
-          ) AS source
+          ) AS source,
+          -- Другие написания того же слова: «цӀву» для «цӀу — соль» (lexeme_variants)
+          (
+            SELECT array_agg(DISTINCT o.lemma)
+            FROM words o
+            WHERE o.lexeme_id = w.lexeme_id AND o.is_active AND o.word_type = w.word_type
+              AND lak_search_key(o.lemma) <> lak_search_key(w.lemma)
+          ) AS spellings
         FROM words w
         WHERE w.id = ANY($1::bigint[])
       `,
@@ -307,6 +315,7 @@ export async function GET(request: Request) {
     exampleSentence: row.example_sentence ?? "",
     otherMeanings: extrasById.get(row.id)?.other_meanings ?? [],
     source: extrasById.get(row.id)?.source ?? null,
+    spellings: extrasById.get(row.id)?.spellings ?? [],
     synonyms: row.synonym_group_id
       ? (synonymMap.get(row.synonym_group_id) ?? [])
       : [],

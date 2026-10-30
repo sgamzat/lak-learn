@@ -28,6 +28,11 @@ export type LakkuDunialEntry = {
   /** Множественное число, если его можно восстановить из форм */
   plural: string | null;
   transcription: string | null;
+  /**
+   * Что записал в транскрипцию прежний парсер (первые квадратные скобки строки,
+   * в том числе внутри форм: «цIу II (цIил [цIи:л])» → «цIи:л»). Сид исправляет такие записи.
+   */
+  legacyTranscription: string | null;
   partOfSpeech: "noun" | "verb" | null;
   wordType: "word" | "phrase";
   line: number;
@@ -108,16 +113,18 @@ export function parseEntry(text: string, line = 0): LakkuDunialEntry | null {
 
   // Названия в кавычках («Азаллий ца хьхьу»), суффиксы («-хьуви») — не слова
   if (/^[«"-]/.test(head)) return null;
+  const legacyTranscription = head.match(/\[([^\]]+)\]/)?.[1]?.trim() ?? null;
+
+  // Формы в скобках, отделённых пробелом; «ажар(и)» — необязательное окончание, оставляем.
+  // Транскрипция внутри форм («цIил [цIи:л]») относится к форме, а не к слову — убираем
+  let forms: string | null = null;
+  head = head.replace(/\s\(([^)]*)\)/g, (_, inner: string) => {
+    if (!forms) forms = inner.replace(/\s*\[[^\]]*\]/g, "").trim();
+    return " ";
+  });
 
   const transcription = head.match(/\[([^\]]+)\]/)?.[1]?.trim() ?? null;
   head = head.replace(/\[[^\]]*\]/g, " ");
-
-  // Формы в скобках, отделённых пробелом; «ажар(и)» — необязательное окончание, оставляем
-  let forms: string | null = null;
-  head = head.replace(/\s\(([^)]*)\)/g, (_, inner: string) => {
-    if (!forms) forms = inner.trim();
-    return " ";
-  });
 
   let lakClass: number | null = null;
   const cls = CLASS_RE.exec(head);
@@ -153,6 +160,7 @@ export function parseEntry(text: string, line = 0): LakkuDunialEntry | null {
     forms: formsText,
     plural: partOfSpeech === "noun" && formsText ? pluralFromForms(lemma, formsText) : null,
     transcription,
+    legacyTranscription,
     partOfSpeech,
     wordType: /\s/.test(lemma.replace(/\([^)]*\)/g, "")) ? "phrase" : "word",
     line

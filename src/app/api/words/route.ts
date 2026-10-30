@@ -137,7 +137,7 @@ function buildFilters(url: URL) {
 
   // Только основные слова (для SRS и словаря по умолчанию)
   if (normalizeBoolean(url.searchParams.get("primaryOnly"))) {
-    where.push("w.translation_priority = 1");
+    where.push("w.is_primary");
   }
 
   // Только глаголы (для фильтра упражнений)

@@ -61,11 +61,14 @@ export async function completeLesson(
       [userId, lessonNumber, score]
     );
 
+    // Учится главное значение каждого слова урока (миграция 018): если у слова
+    // урока есть значение из учебника или другого урока, карточка будет одна
     const words = await client.query<{ id: number }>(
-      `SELECT w.id
+      `SELECT DISTINCT COALESCE(lx.primary_word_id, w.id) AS id
        FROM collections c
        JOIN collection_words cw ON cw.collection_id = c.id AND NOT cw.is_excluded
-       JOIN words w ON w.id = cw.word_id AND w.is_active AND w.translation_priority = 1
+       JOIN words w ON w.id = cw.word_id AND w.is_active
+       LEFT JOIN lexemes lx ON lx.id = w.lexeme_id
        WHERE c.slug = $1`,
       [lessonSlug(lessonNumber)]
     );

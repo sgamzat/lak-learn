@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getAuthContextFromRequest } from "@/lib/server/auth";
 import { query } from "@/lib/server/db";
 import { setAccessCookie } from "@/lib/server/session";
-import { wordInCollectionSql } from "@/lib/server/membership";
+import { lexemeInCollectionSql } from "@/lib/server/membership";
 
 type PublicCollectionRow = {
   id: number;
@@ -38,14 +38,14 @@ export async function GET(request: Request) {
         c.sort_order,
         c.rule_tag_codes,
         COALESCE(c.kind, 'topic') AS kind,
-        COUNT(w.id)::int AS word_count,
+        COUNT(w.id) FILTER (WHERE w.is_primary)::int AS word_count,
         -- То, что откроется в словаре: основные слова (без синонимов и фраз)
-        COUNT(w.id) FILTER (WHERE w.word_type = 'word' AND w.translation_priority = 1)::int AS dictionary_word_count,
-        COUNT(w.id) FILTER (WHERE w.word_type = 'phrase')::int AS phrase_count
+        COUNT(w.id) FILTER (WHERE w.word_type = 'word' AND w.is_primary)::int AS dictionary_word_count,
+        COUNT(w.id) FILTER (WHERE w.word_type = 'phrase' AND w.is_primary)::int AS phrase_count
       FROM collections c
       LEFT JOIN words w
         ON w.is_active = TRUE
-        AND ${wordInCollectionSql("c.id")}
+        AND ${lexemeInCollectionSql("c.id")}
       WHERE c.is_active = TRUE
         AND c.is_public = TRUE
         -- Слова уроков открываются в самих уроках, а не среди тем
