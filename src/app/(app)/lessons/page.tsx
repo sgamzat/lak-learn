@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { Check, ChevronRight } from "lucide-react";
 import { getPageAuthContext } from "@/lib/server/page-auth";
 import { getLessonProgressMap } from "@/lib/server/lessons";
-import { LESSONS, LESSON_SOURCE } from "@/lib/lessons";
+import { LESSONS, LESSON_PARTS, LESSON_SOURCE } from "@/lib/lessons";
 
 export default async function LessonsPage() {
   const auth = await getPageAuthContext();
@@ -23,9 +23,11 @@ export default async function LessonsPage() {
         По учебнику {LESSON_SOURCE.title} ({LESSON_SOURCE.author}). Пройдено {doneCount} из {LESSONS.length}.
       </p>
 
-      <h2 className="mb-3 mt-8 text-xs font-semibold uppercase tracking-wider text-lk-muted">Часть 1 · Первые шаги</h2>
+      {LESSON_PARTS.map((part) => (
+      <section key={part.title}>
+      <h2 className="mb-3 mt-8 text-xs font-semibold uppercase tracking-wider text-lk-muted">{part.title}</h2>
       <ol className="space-y-3">
-        {LESSONS.map((lesson) => {
+        {LESSONS.filter((l) => l.number >= part.from && l.number <= part.to).map((lesson) => {
           const p = progress.get(lesson.number);
           const done = Boolean(p?.completedAt);
           const inProgress = !done && (p?.step ?? 0) > 0;
@@ -66,6 +68,8 @@ export default async function LessonsPage() {
           );
         })}
       </ol>
+      </section>
+      ))}
 
       <p className="mt-8 text-xs leading-relaxed text-lk-muted">
         Аудио к урокам появится позже. Пока произносите звуки и фразы вслух — так они запоминаются лучше.
