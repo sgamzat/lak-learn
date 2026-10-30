@@ -68,6 +68,11 @@ describe("словарь «Лакку дуниял» — статья", () => {
     expect(joined).toHaveLength(2);
     expect(joined[0].text).toContain("байбивхьуссар) I – начать");
   });
+
+  it("строка со скобкой в начале после полной статьи — отдельная статья", () => {
+    const joined = joinEntryLines("бакI II (-рал, -ру, -урдил) – голова\n(щицIун-бунугу) бакI бахIин – связать судьбу");
+    expect(joined).toHaveLength(2);
+  });
 });
 
 describe("словарь «Лакку дуниял» — целиком", () => {

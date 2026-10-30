@@ -50,7 +50,9 @@ export function joinEntryLines(text: string): { text: string; line: number }[] {
     const line = raw.trim();
     if (!line || /^\d+$/.test(line) || /^[А-ЯЁ]$/.test(line) || line === "СЛОВАРЬ") return;
     const prev = out.at(-1);
-    if (prev && (unbalanced(prev.text) || /[,–-]$/.test(prev.text) || /^\(/.test(line))) {
+    // «(щицӀун-бунугу) бакӀ бахӀин – связать судьбу» — отдельная статья, а не продолжение
+    const continues = /^\(/.test(line) && !DASH_RE.test(prev?.text ?? "");
+    if (prev && (unbalanced(prev.text) || /[,–-]$/.test(prev.text) || continues)) {
       prev.text = `${prev.text} ${line}`.replace(/\s+/g, " ");
       return;
     }
