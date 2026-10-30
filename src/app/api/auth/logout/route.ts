@@ -10,7 +10,7 @@ export async function POST(request: Request) {
   }
 
   const response = NextResponse.json({ ok: true }, { status: 200 });
-  clearAuthCookies(response);
+  clearAuthCookies(response, request);
 
   return response;
 }

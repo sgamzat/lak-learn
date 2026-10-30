@@ -13,6 +13,6 @@ export async function GET(request: Request) {
   const response = NextResponse.json({
     lessons: LESSONS.map((l) => ({ ...lessonMeta(l), progress: progress.get(l.number) ?? null }))
   });
-  if (auth.refreshedAccessToken) setAccessCookie(response, auth.refreshedAccessToken);
+  if (auth.refreshedAccessToken) setAccessCookie(response, auth.refreshedAccessToken, request);
   return response;
 }

@@ -14,7 +14,7 @@ export async function GET(request: Request) {
   const response = NextResponse.json(payload, { status: 200 });
 
   if (auth.refreshedAccessToken) {
-    setAccessCookie(response, auth.refreshedAccessToken);
+    setAccessCookie(response, auth.refreshedAccessToken, request);
   }
 
   return response;

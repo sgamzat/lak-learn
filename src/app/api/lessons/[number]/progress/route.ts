@@ -37,6 +37,6 @@ export async function POST(request: Request, context: { params: Promise<{ number
   }
 
   const response = NextResponse.json({ ok: true, ...payload });
-  if (auth.refreshedAccessToken) setAccessCookie(response, auth.refreshedAccessToken);
+  if (auth.refreshedAccessToken) setAccessCookie(response, auth.refreshedAccessToken, request);
   return response;
 }

@@ -166,7 +166,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ coll
   );
 
   if (guard.auth.refreshedAccessToken) {
-    setAccessCookie(response, guard.auth.refreshedAccessToken);
+    setAccessCookie(response, guard.auth.refreshedAccessToken, request);
   }
 
   return response;
@@ -307,7 +307,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ co
   const response = NextResponse.json({ ok: true, collection: updated }, { status: 200 });
 
   if (guard.auth.refreshedAccessToken) {
-    setAccessCookie(response, guard.auth.refreshedAccessToken);
+    setAccessCookie(response, guard.auth.refreshedAccessToken, request);
   }
 
   return response;
@@ -360,7 +360,7 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ c
   const response = NextResponse.json({ ok: true, collection: deleted }, { status: 200 });
 
   if (guard.auth.refreshedAccessToken) {
-    setAccessCookie(response, guard.auth.refreshedAccessToken);
+    setAccessCookie(response, guard.auth.refreshedAccessToken, request);
   }
 
   return response;

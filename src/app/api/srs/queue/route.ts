@@ -198,7 +198,7 @@ export async function GET(request: Request) {
 
   if (rowsResult.rows.length === 0) {
     const response = NextResponse.json(emptyBody, { status: 200 });
-    if (auth.refreshedAccessToken) setAccessCookie(response, auth.refreshedAccessToken);
+    if (auth.refreshedAccessToken) setAccessCookie(response, auth.refreshedAccessToken, request);
     return response;
   }
 
@@ -318,6 +318,6 @@ export async function GET(request: Request) {
   };
 
   const response = NextResponse.json(body, { status: 200 });
-  if (auth.refreshedAccessToken) setAccessCookie(response, auth.refreshedAccessToken);
+  if (auth.refreshedAccessToken) setAccessCookie(response, auth.refreshedAccessToken, request);
   return response;
 }

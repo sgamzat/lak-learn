@@ -35,7 +35,7 @@ export async function PATCH(request: Request) {
   const response = NextResponse.json({ ok: true }, { status: 200 });
 
   if (auth.refreshedAccessToken) {
-    setAccessCookie(response, auth.refreshedAccessToken);
+    setAccessCookie(response, auth.refreshedAccessToken, request);
   }
 
   return response;

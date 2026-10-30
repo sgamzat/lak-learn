@@ -36,7 +36,7 @@ export async function POST(request: Request) {
 
   const { accessToken, refreshToken } = await createSessionForUser(user, extractRequestMeta(request.headers));
   const response = NextResponse.json({ user: publicUser(user) }, { status: 200 });
-  setAuthCookies(response, accessToken, refreshToken);
+  setAuthCookies(response, accessToken, refreshToken, request);
 
   return response;
 }

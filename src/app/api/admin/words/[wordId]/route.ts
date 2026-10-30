@@ -225,7 +225,7 @@ export async function PATCH(
 
     const response = NextResponse.json({ ok: true, word: updated }, { status: 200 });
     if (guard.auth.refreshedAccessToken) {
-      setAccessCookie(response, guard.auth.refreshedAccessToken);
+      setAccessCookie(response, guard.auth.refreshedAccessToken, request);
     }
     return response;
   } catch (err) {
@@ -294,7 +294,7 @@ export async function DELETE(
 
   const response = NextResponse.json({ ok: true, word: deleted }, { status: 200 });
   if (guard.auth.refreshedAccessToken) {
-    setAccessCookie(response, guard.auth.refreshedAccessToken);
+    setAccessCookie(response, guard.auth.refreshedAccessToken, request);
   }
   return response;
 }

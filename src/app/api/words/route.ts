@@ -213,7 +213,7 @@ export async function GET(request: Request) {
 
   const response = NextResponse.json({ words }, { status: 200 });
   if (auth.refreshedAccessToken) {
-    setAccessCookie(response, auth.refreshedAccessToken);
+    setAccessCookie(response, auth.refreshedAccessToken, request);
   }
   return response;
 }
