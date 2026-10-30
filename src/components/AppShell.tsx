@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LogOut, Settings, User, Trophy, Flame, BookOpen, Star,
-  Home, BookMarked, Type, RefreshCw, MessagesSquare
+  Home, BookMarked, Type, RefreshCw, MessagesSquare, GraduationCap
 } from "lucide-react";
 import { getDashboardData, logout } from "@/lib/api/client";
 import type { DashboardData } from "@/types/dashboard";
@@ -13,6 +13,7 @@ import { useTheme } from "@/components/ThemeProvider";
 
 const NAV_LINKS = [
   { href: "/dashboard",  label: "Главная",      Icon: Home },
+  { href: "/lessons",    label: "Уроки",        Icon: GraduationCap },
   { href: "/dictionary", label: "Словарь",      Icon: BookMarked },
   { href: "/phrasebook", label: "Разговорник",  Icon: MessagesSquare },
   { href: "/letters",    label: "Буквы",        Icon: Type },
@@ -139,7 +140,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { tokens: T, isDark } = useTheme();
 
-  const immersive = pathname.startsWith("/review");
+  // Повторение и открытый урок — во весь экран, без меню
+  const immersive = pathname.startsWith("/review") || /^\/lessons\/\d+/.test(pathname);
   const hideBottom = immersive || pathname.startsWith("/admin");
 
   const [data, setData] = useState<DashboardData | null>(null);
