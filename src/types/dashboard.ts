@@ -8,8 +8,19 @@ export interface UserProfile {
 }
 
 export interface ProgressMetrics {
+  /** Число ответов в повторении (историческое имя поля) */
   lessonsCompleted: number;
   accuracy: number;
+}
+
+/** Первый непройденный урок курса */
+export interface NextLesson {
+  number: number;
+  title: string;
+  /** Шаг, на котором ученик остановился (0 — не начат) */
+  step: number;
+  /** Пройдено уроков */
+  completed: number;
 }
 
 export interface SRSQueueSummary {
@@ -75,4 +86,5 @@ export interface DashboardData {
   leaderboardTop: LeaderboardRankRow[];
   myLeaderboardRow: LeaderboardRankRow | null;
   collections: CollectionProgress[];
+  nextLesson: NextLesson | null;
 }

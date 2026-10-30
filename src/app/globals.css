@@ -564,3 +564,11 @@ body {
     scroll-behavior: auto !important;
   }
 }
+/* Появление реплики в диалоге урока */
+@keyframes lkFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  [class*="animate-[lkFadeIn"] { animation: none !important; }
+}

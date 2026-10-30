@@ -1,7 +1,9 @@
 import { query } from "@/lib/server/db";
 import { KNOWN_INTERVAL_DAYS, primaryTranslationSql, wordInCollectionSql } from "@/lib/server/membership";
 import type { AuthUser } from "@/types/auth";
-import type { CollectionProgress, DashboardData, TopicStatus } from "@/types/dashboard";
+import type { CollectionProgress, DashboardData, NextLesson, TopicStatus } from "@/types/dashboard";
+import { getLessonProgressMap } from "@/lib/server/lessons";
+import { LESSONS } from "@/lib/lessons";
 
 type ProgressRow = {
   xp: number;
@@ -359,6 +361,13 @@ export async function getDashboardData(user: AuthUser): Promise<DashboardData> {
     ),
   ]);
 
+  const lessonProgress = await getLessonProgressMap(user.id);
+  const completedLessons = LESSONS.filter((l) => lessonProgress.get(l.number)?.completedAt).length;
+  const next = LESSONS.find((l) => !lessonProgress.get(l.number)?.completedAt);
+  const nextLesson: NextLesson | null = next
+    ? { number: next.number, title: next.title, step: lessonProgress.get(next.number)?.step ?? 0, completed: completedLessons }
+    : null;
+
   const progress = progressResult.rows[0] ?? { xp: 0, streak_days: 0 };
   const lessonsCompleted = lessonsResult.rows[0]?.lessons_completed ?? 0;
   const totalReviews = accuracyResult.rows[0]?.total_reviews ?? 0;
@@ -399,6 +408,7 @@ export async function getDashboardData(user: AuthUser): Promise<DashboardData> {
       role: user.role,
     },
     progress: { lessonsCompleted, accuracy },
+    nextLesson,
     srsSummary: {
       overdue: srsSummary.overdue,
       dueSoon: srsSummary.due_soon,

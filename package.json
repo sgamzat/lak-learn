@@ -12,7 +12,8 @@
     "db:migrate": "sh ./db/migrate.sh ./db/migrations ./db/seeds",
     "parse:1958": "node --experimental-strip-types parse/run_slovar_1958.ts",
     "parse:digiev": "node --experimental-strip-types parse/run_digiev.ts",
-    "admin:create": "node scripts/create-admin.mjs"
+    "admin:create": "node scripts/create-admin.mjs",
+    "lessons:seed": "node --experimental-strip-types scripts/build-lessons-seed.ts"
   },
   "dependencies": {
     "cheerio": "^1.2.0",

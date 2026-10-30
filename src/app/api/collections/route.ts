@@ -48,6 +48,8 @@ export async function GET(request: Request) {
         AND ${wordInCollectionSql("c.id")}
       WHERE c.is_active = TRUE
         AND c.is_public = TRUE
+        -- Слова уроков открываются в самих уроках, а не среди тем
+        AND COALESCE(c.kind, 'topic') <> 'lesson'
       GROUP BY c.id
       ORDER BY c.sort_order ASC, c.id ASC
     `

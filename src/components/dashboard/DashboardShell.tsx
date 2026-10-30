@@ -42,11 +42,22 @@ function heroCta(data: DashboardData, totalSRS: number): {
   label: string;
   secondary?: { href: string; label: string };
 } {
-  if (data.progress.lessonsCompleted === 0) {
-    return { href: "/letters", label: "К алфавиту →" };
+  const lesson = data.nextLesson;
+  const lessonLink = lesson
+    ? { href: `/lessons/${lesson.number}`, label: lesson.step > 0 ? `Продолжить урок ${lesson.number}` : `Урок ${lesson.number}` }
+    : null;
+  // Новичок — сразу в первый урок: там звуки, приветствия и первые слова
+  if (data.progress.lessonsCompleted === 0 && lesson && lesson.completed === 0) {
+    return { href: lessonLink!.href, label: `${lesson.step > 0 ? "Продолжить" : "Начать"} урок ${lesson.number} →`, secondary: { href: "/letters", label: "Алфавит" } };
   }
   if (totalSRS > 0) {
-    return { href: "/review", label: "Начать повторение →" };
+    return { href: "/review", label: "Начать повторение →", ...(lessonLink ? { secondary: lessonLink } : {}) };
+  }
+  if (lessonLink) {
+    return { href: lessonLink.href, label: `${lessonLink.label} →`, secondary: { href: "/review", label: "Повторение" } };
+  }
+  if (data.progress.lessonsCompleted === 0) {
+    return { href: "/letters", label: "К алфавиту →" };
   }
   if (data.srsSummary.newAvailable > 0) {
     return { href: "/review", label: "Учить новые →" };
@@ -205,7 +216,13 @@ export function DashboardShell() {
 
   const greetingSubtitle = useMemo(() => {
     if (!data) return "";
-    if (data.progress.lessonsCompleted === 0) return "Марха бур! Начните с алфавита — это займёт 5 минут.";
+    if (data.progress.lessonsCompleted === 0) {
+      return data.nextLesson?.completed === 0
+        ? "Марха бур! Начните с первого урока: приветствия и первые лакские звуки."
+        : data.nextLesson
+          ? `Следующий — урок ${data.nextLesson.number}: ${data.nextLesson.title}.`
+          : "Марха бур! Начните с алфавита — это займёт 5 минут.";
+    }
     if (totalSRS === 0 && data.srsSummary.newAvailable > 0) {
       return `${data.srsSummary.newAvailable} новых карточек готовы к изучению.`;
     }
