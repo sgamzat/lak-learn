@@ -53,12 +53,16 @@ jobs:
           npx playwright install --with-deps chromium > /dev/null
       - name: shots
         working-directory: app
-        run: node ../self/tools/shots.cjs || (tail -50 server.log; exit 1)
+        run: |
+          mkdir -p shots
+          node ../self/tools/shots.cjs > shots/log.txt 2>&1 || (cat shots/log.txt; tail -50 server.log; exit 1)
       - name: push
         if: always()
         working-directory: self
         run: |
-          rm -rf shots && mkdir -p shots && cp -r ../app/shots/* shots/ 2>/dev/null || true
-          cp ../app/server.log shots/server.log 2>/dev/null || true
+          rm -rf shots && mkdir -p shots
+          cp -r ../app/shots/. shots/ || true
+          cp ../app/server.log shots/server.log || true
+          ls -la shots
           git config user.name "shots-bot" && git config user.email "shots@example.com"
-          git add shots && git commit -qm "shots" && git push -q || true
+          git add -A shots && git commit -m "shots" && git push origin HEAD:chore/deps-artifact
