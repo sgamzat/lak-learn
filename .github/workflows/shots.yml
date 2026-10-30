@@ -55,7 +55,7 @@ jobs:
         working-directory: app
         run: |
           mkdir -p shots
-          node ../self/tools/shots.cjs > shots/log.txt 2>&1 || (cat shots/log.txt; tail -50 server.log; exit 1)
+          cp ../self/tools/shots.cjs ./shots.cjs && node shots.cjs > shots/log.txt 2>&1 || (cat shots/log.txt; tail -50 server.log; exit 1)
       - name: push
         if: always()
         working-directory: self
