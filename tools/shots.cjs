@@ -10,7 +10,7 @@ fs.mkdirSync("shots", { recursive: true });
   const mk = async (w, h, mode, seen) => {
     const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 2, locale: "ru-RU" });
     await ctx.addInitScript(([mode, seen]) => {
-      try { localStorage.setItem("laklearn-theme-mode", mode); localStorage.setItem("lk-mode", mode); if (seen) localStorage.setItem("laklearn_onboarding_done", "1"); } catch {}
+      try { localStorage.setItem("laklearn_mode", mode); if (seen) localStorage.setItem("laklearn_onboarding_done", "1"); } catch {}
     }, [mode, seen]);
     const p = await ctx.newPage();
     p.on("pageerror", (e) => errors.push(String(e)));
@@ -48,6 +48,16 @@ fs.mkdirSync("shots", { recursive: true });
   const d = await mk(1280, 900, "dark", true); await login(d.p, "student@example.com"); await shot(d.p, "04-student-d"); await d.ctx.close();
   const l = await mk(390, 844, "light", true); await login(l.p, "student@example.com"); await shot(l.p, "05-student-light-m"); await l.ctx.close();
 
+  // Онбординг: второй шаг
+  const o = await mk(390, 844, "dark", false); await login(o.p, "onb@example.com");
+  await o.p.goto(base + "/dashboard"); await o.p.waitForLoadState("networkidle"); await o.p.waitForTimeout(600);
+  await o.p.getByRole("button", { name: "Продолжить →" }).click(); await o.p.waitForTimeout(300);
+  await o.p.screenshot({ path: "shots/06-onboarding-2-m.png" }); await o.ctx.close();
+  // Словарь и уроки (ссылки на алфавит)
+  const v = await mk(390, 844, "dark", true); await login(v.p, "student@example.com");
+  await v.p.goto(base + "/dictionary"); await v.p.waitForLoadState("networkidle"); await v.p.waitForTimeout(600); await v.p.screenshot({ path: "shots/07-dictionary-m.png" });
+  await v.p.goto(base + "/lessons"); await v.p.waitForLoadState("networkidle"); await v.p.waitForTimeout(600); await v.p.screenshot({ path: "shots/08-lessons-m.png", fullPage: true });
+  await v.ctx.close();
   fs.writeFileSync("shots/errors.txt", errors.join("\n"));
   console.log("errors:", errors.length);
   await browser.close();
