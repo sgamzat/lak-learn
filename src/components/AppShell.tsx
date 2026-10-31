@@ -5,25 +5,25 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LogOut, Settings, User, Trophy, Flame, BookOpen, Star,
-  Home, BookMarked, MessagesSquare, GraduationCap
+  Home, BookMarked, MessagesSquare, GraduationCap, Type
 } from "lucide-react";
 import { getDashboardData, logout } from "@/lib/api/client";
 import type { DashboardData } from "@/types/dashboard";
 import { useTheme } from "@/components/ThemeProvider";
 
-// Четыре раздела. Повторение запускается с главной (там же счётчик карточек),
-// из урока и словаря; алфавит — из словаря и списка уроков.
+// Пять разделов. Повторение запускается с главной (там же счётчик карточек),
+// из урока и словаря. Алфавит — отдельная вкладка: к 55 буквам и звукам
+// возвращаются постоянно, особенно пока нет аудио.
 const NAV_LINKS = [
   { href: "/dashboard",  label: "Главная",      Icon: Home },
   { href: "/lessons",    label: "Уроки",        Icon: GraduationCap },
+  { href: "/letters",    label: "Алфавит",      Icon: Type },
   { href: "/dictionary", label: "Словарь",      Icon: BookMarked },
   { href: "/phrasebook", label: "Разговорник",  Icon: MessagesSquare },
 ] as const;
 
-/** Разделы без своей вкладки подсвечивают ближайшую: «Буквы» — «Словарь» */
 function isNavActive(href: string, pathname: string): boolean {
   if (href === "/dashboard") return pathname === "/dashboard";
-  if (href === "/dictionary" && pathname.startsWith("/letters")) return true;
   return pathname === href || pathname.startsWith(href);
 }
 
