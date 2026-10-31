@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { countLabel, plural } from "@/lib/plural";
 import { useEffect, useMemo, useState } from "react";
-import { Flame, Target, ArrowRight } from "lucide-react";
+import { Flame, ArrowRight } from "lucide-react";
 import { getDashboardData } from "@/lib/api/client";
 import type { CollectionProgress, DashboardData, TopicStatus } from "@/types/dashboard";
 import { useTheme } from "@/components/ThemeProvider";
@@ -132,14 +133,14 @@ function topicsSummary(collections: CollectionProgress[]): string | null {
 
   const parts: string[] = [];
   if (inWork > 0) {
-    parts.push(`${inWork} ${inWork === 1 ? "тема" : inWork < 5 ? "темы" : "тем"} в работе`);
+    parts.push(`${countLabel(inWork, ["тема", "темы", "тем"])} в работе`);
   } else {
     const started = collections.filter((c) => c.status !== "not_started").length;
     if (started === 0) parts.push("Выберите тему в разговорнике, чтобы начать");
     else parts.push("Все активные темы в порядке");
   }
   if (dueTotal > 0) {
-    parts.push(`${dueTotal} ${dueTotal === 1 ? "карточка ждёт" : "карточек ждут"}`);
+    parts.push(`${countLabel(dueTotal, ["карточка", "карточки", "карточек"])} ${plural(dueTotal, ["ждёт", "ждут", "ждут"])}`);
   }
   if (weakest && (weakest.weakWords > 0 || weakest.dueWords > 0)) {
     parts.push(`слабее всего «${weakest.title}»`);
@@ -151,10 +152,10 @@ function dueSplitLabel(dueWords: number, duePhrases: number): string | null {
   if (dueWords <= 0 && duePhrases <= 0) return null;
   const parts: string[] = [];
   if (duePhrases > 0) {
-    parts.push(`${duePhrases} ${duePhrases === 1 ? "фраза" : duePhrases < 5 ? "фразы" : "фраз"}`);
+    parts.push(countLabel(duePhrases, ["фраза", "фразы", "фраз"]));
   }
   if (dueWords > 0) {
-    parts.push(`${dueWords} ${dueWords === 1 ? "слово" : dueWords < 5 ? "слова" : "слов"}`);
+    parts.push(countLabel(dueWords, ["слово", "слова", "слов"]));
   }
   return parts.join(" · ");
 }
@@ -166,7 +167,6 @@ export function DashboardShell() {
   const [isLoading, setIsLoading] = useState(true);
   const [onboardingStep, setOnboardingStep] = useState<0 | 1 | 2 | 3>(0);
   const [onboardingName, setOnboardingName] = useState("");
-  const [onboardingGoal, setOnboardingGoal] = useState<5 | 10 | 15>(10);
   const [onboardingSaving, setOnboardingSaving] = useState(false);
 
   useEffect(() => {
@@ -218,24 +218,23 @@ export function DashboardShell() {
     if (!data) return "";
     if (data.progress.lessonsCompleted === 0) {
       return data.nextLesson?.completed === 0
-        ? "Марха бур! Начните с первого урока: приветствия и первые лакские звуки."
+        ? "Начните с первого урока: приветствия и первые лакские звуки."
         : data.nextLesson
           ? `Следующий — урок ${data.nextLesson.number}: ${data.nextLesson.title}.`
-          : "Марха бур! Начните с алфавита — это займёт 5 минут.";
+          : "Начните с алфавита — это займёт 5 минут.";
     }
     if (totalSRS === 0 && data.srsSummary.newAvailable > 0) {
-      return `${data.srsSummary.newAvailable} новых карточек готовы к изучению.`;
+      const n = data.srsSummary.newAvailable;
+      return `${countLabel(n, ["новая карточка", "новые карточки", "новых карточек"])} ${plural(n, ["готова", "готовы", "готовы"])} к изучению.`;
     }
     if (totalSRS === 0) return "Сегодня всё повторено. Отличная работа!";
+    // Одно число — все карточки к повторению (просроченные и на ближайшие сутки);
+    // без «просрочено»: слова только что пройденного урока тоже здесь
     const split = dueSplitLabel(data.srsSummary.dueWords, data.srsSummary.duePhrases);
-    if (data.srsSummary.overdue > 0) {
-      return split
-        ? `${data.srsSummary.overdue} просрочено (${split}) — освежи, пока помнишь.`
-        : `${data.srsSummary.overdue} карточек просрочено — освежи, пока помнишь.`;
-    }
-    return split
-      ? `${totalSRS} карточек ждут: ${split}.`
-      : `${totalSRS} карточек ждут повторения — один присест, пять минут.`;
+    const minutes = Math.max(1, Math.round(totalSRS / 4));
+    return `${countLabel(totalSRS, ["карточка ждёт", "карточки ждут", "карточек ждут"])} повторения${
+      split ? ` (${split})` : ""
+    } — около ${countLabel(minutes, ["минуты", "минут", "минут"])}.`;
   }, [data, totalSRS]);
 
   const card: React.CSSProperties = { background: T.navy2, border: `1px solid ${T.line}`, borderRadius: 18 };
@@ -255,7 +254,6 @@ export function DashboardShell() {
       }
       if (typeof window !== "undefined") {
         localStorage.setItem("laklearn_onboarding_done", "1");
-        localStorage.setItem("laklearn_daily_goal", String(onboardingGoal));
       }
     } catch {
       /* ignore */
@@ -294,7 +292,6 @@ export function DashboardShell() {
   }
 
   const cta = heroCta(data, totalSRS);
-  const dueSplit = dueSplitLabel(data.srsSummary.dueWords, data.srsSummary.duePhrases);
 
   return (
     <div className="w-full font-sans text-lk-text">
@@ -314,7 +311,7 @@ export function DashboardShell() {
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 28 }}>
               <PabakoMini size={36} gold={T.gold} />
               <div style={{ display: "flex", gap: 6 }}>
-                {[1, 2, 3].map((s) => (
+                {[1, 2].map((s) => (
                   <div
                     key={s}
                     style={{
@@ -369,60 +366,23 @@ export function DashboardShell() {
 
             {onboardingStep === 2 && (
               <div>
-                <div style={{ fontFamily: T.serif, fontSize: 26, fontWeight: 700, marginBottom: 8, color: T.text }}>Выберите цель</div>
-                <div style={{ color: T.textMut, fontSize: 15, marginBottom: 24, lineHeight: 1.5 }}>
-                  Сколько минут в день вы готовы уделять лакскому языку?
-                </div>
-                <div style={{ display: "flex", gap: 10, marginBottom: 24 }}>
-                  {([5, 10, 15] as const).map((g) => (
-                    <button
-                      key={g}
-                      type="button"
-                      onClick={() => setOnboardingGoal(g)}
-                      style={{
-                        flex: 1, padding: "14px 0", borderRadius: 12,
-                        border: `1.5px solid ${onboardingGoal === g ? T.gold : T.line}`,
-                        background: onboardingGoal === g ? T.goldDim : "transparent",
-                        color: onboardingGoal === g ? T.gold : T.textMut,
-                        fontFamily: T.sans, fontSize: 14, fontWeight: 700, cursor: "pointer",
-                      }}
-                    >
-                      {g} мин
-                    </button>
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setOnboardingStep(3)}
-                  style={{
-                    width: "100%", padding: 14, borderRadius: 12, border: "none",
-                    background: T.gold, color: T.bg, fontFamily: T.sans, fontSize: 15, fontWeight: 700, cursor: "pointer",
-                  }}
-                >
-                  Продолжить →
-                </button>
-              </div>
-            )}
-
-            {onboardingStep === 3 && (
-              <div>
                 <div style={{ fontFamily: T.serif, fontSize: 26, fontWeight: 700, marginBottom: 8, color: T.text }}>
                   {onboardingName.trim()
                     ? `Рады познакомиться, ${onboardingName.trim().split(" ")[0]}!`
                     : "Всё готово!"}
                 </div>
                 <div style={{ color: T.textMut, fontSize: 15, marginBottom: 28, lineHeight: 1.6 }}>
-                  Начнём с лакского алфавита — это основа всего. Займёт не больше {onboardingGoal} минут.
+                  Начнём с первого урока: приветствия и первые лакские звуки. Это около 10 минут. Алфавит — всегда в «Словаре».
                 </div>
                 <Link
-                  href="/letters"
+                  href="/lessons/1"
                   onClick={() => void finishOnboarding()}
                   style={{
                     display: "block", padding: 14, borderRadius: 12, background: T.gold, color: T.bg,
                     fontFamily: T.sans, fontSize: 15, fontWeight: 700, textDecoration: "none", textAlign: "center",
                   }}
                 >
-                  {onboardingSaving ? "Сохранение…" : "Начать с алфавита →"}
+                  {onboardingSaving ? "Сохранение…" : "Начать урок 1 →"}
                 </Link>
                 <button
                   type="button"
@@ -470,35 +430,8 @@ export function DashboardShell() {
                       : `Продолжим, ${data.profile.name.split(" ")[0]}?`}
                 </div>
                 <div style={{ color: "rgba(236,224,196,0.65)", fontSize: 15, marginTop: 8 }}>{greetingSubtitle}</div>
-                <div style={{ display: "flex", gap: 8, marginTop: 20, flexWrap: "wrap" }}>
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 11px", borderRadius: 99, background: "rgba(212,165,55,0.18)", color: "#D4A537", fontFamily: T.sans, fontSize: 12.5, fontWeight: 600 }}>
-                    <Flame size={12} color="#D4A537" style={{ display: "block" }} />
-                    {data.profile.streak} {data.profile.streak === 1 ? "день" : data.profile.streak < 5 ? "дня" : "дней"}
-                  </span>
-                  <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 11px", borderRadius: 99, background: "rgba(231,198,107,0.15)", color: "#E7C66B", fontFamily: T.sans, fontSize: 12.5, fontWeight: 600 }}>
-                    <Target size={12} color="#E7C66B" style={{ display: "block" }} />
-                    {data.profile.xp} XP
-                  </span>
-                  {data.progress.accuracy > 0 && (
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 11px", borderRadius: 99, background: "rgba(63,160,107,0.18)", color: "#3FA06B", fontFamily: T.sans, fontSize: 12.5, fontWeight: 600 }}>
-                      {data.progress.accuracy}% точность
-                    </span>
-                  )}
-                  {totalSRS > 0 && (
-                    <span
-                      style={{
-                        display: "inline-flex", alignItems: "center", gap: 5, padding: "5px 11px", borderRadius: 99,
-                        background: data.srsSummary.overdue > 0 ? "rgba(194,80,63,0.18)" : "rgba(212,165,55,0.18)",
-                        color: data.srsSummary.overdue > 0 ? "#C2503F" : "#D4A537",
-                        fontFamily: T.sans, fontSize: 12.5, fontWeight: 600,
-                      }}
-                    >
-                      {totalSRS} ждут{dueSplit ? ` · ${dueSplit}` : ""}
-                    </span>
-                  )}
-                </div>
               </div>
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "stretch", gap: 8, flexShrink: 0 }}>
+              <div className="w-full sm:w-auto" style={{ display: "flex", flexDirection: "column", alignItems: "stretch", gap: 8, flexShrink: 0 }}>
                 <Link
                   href={cta.href}
                   className="lk-btn-gold lk-lift"
@@ -515,7 +448,7 @@ export function DashboardShell() {
                     href={cta.secondary.href}
                     style={{
                       display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 12px",
-                      color: "rgba(236,224,196,0.7)", fontFamily: T.sans, fontSize: 13, fontWeight: 600, textDecoration: "none",
+                      color: "rgba(236,224,196,0.85)", fontFamily: T.sans, fontSize: 14, fontWeight: 600, textDecoration: "none",
                     }}
                   >
                     {cta.secondary.label} →
