@@ -1,4 +1,4 @@
-// Скриншоты мобильного интерфейса уроков (390×844)
+// Скриншоты главной страницы: новичок и ученик после урока и повторений
 const { chromium } = require("playwright");
 const fs = require("fs");
 const base = "http://localhost:3000";
@@ -6,73 +6,47 @@ fs.mkdirSync("shots", { recursive: true });
 
 (async () => {
   const browser = await chromium.launch();
-  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, colorScheme: "dark", locale: "ru-RU" });
-  const page = await ctx.newPage();
   const errors = [];
-  page.on("pageerror", (e) => errors.push(String(e)));
-  page.on("console", (m) => { if (m.type() === "error") errors.push(m.text()); });
-  const shot = async (name) => { await page.waitForTimeout(350); await page.screenshot({ path: `shots/${name}.png` }); };
+  const mk = async (w, h, mode, seen) => {
+    const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 2, locale: "ru-RU" });
+    await ctx.addInitScript(([mode, seen]) => {
+      try { localStorage.setItem("laklearn-theme-mode", mode); localStorage.setItem("lk-mode", mode); if (seen) localStorage.setItem("laklearn_onboarding_done", "1"); } catch {}
+    }, [mode, seen]);
+    const p = await ctx.newPage();
+    p.on("pageerror", (e) => errors.push(String(e)));
+    return { ctx, p };
+  };
+  const login = async (p, email) => {
+    let r = await p.request.post(base + "/api/auth/register", { data: { email, password: "Shots-Pass-123456", displayName: "Амина" } });
+    if (r.status() >= 400) r = await p.request.post(base + "/api/auth/login", { data: { email, password: "Shots-Pass-123456" } });
+    console.log(email, r.status());
+  };
+  const shot = async (p, name, full = true) => {
+    await p.goto(base + "/dashboard"); await p.waitForLoadState("networkidle"); await p.waitForTimeout(800);
+    await p.screenshot({ path: `shots/${name}.png`, fullPage: full });
+  };
 
-  const reg = await page.request.post(base + "/api/auth/register", {
-    data: { email: "shots@example.com", password: "Shots-Pass-123456", displayName: "Амина" }
-  });
-  console.log("register", reg.status());
-
-  await page.goto(base + "/dashboard"); await page.waitForLoadState("networkidle"); await shot("00-dashboard");
-  await page.goto(base + "/lessons"); await page.waitForLoadState("networkidle"); await shot("01-lessons");
-
-  for (const n of [1, 9]) {
-    await page.goto(`${base}/lessons/${n}`); await page.waitForLoadState("networkidle");
-    for (let i = 0; i < 80; i += 1) {
-      const tag = `l${n}-${String(i).padStart(2, "0")}`;
-      await shot(tag);
-      if (await page.getByText(/пройден$/).count()) { await page.waitForTimeout(1200); await shot(tag + "-final"); break; }
-
-      const options = page.locator('[aria-label="Варианты ответа"] button:not([disabled])');
-      if (await options.count()) { await options.nth(i % 2).click(); await shot(tag + "-a"); }
-
-      const box = page.locator('[aria-label="Ваш ответ"]');
-      if (await box.count()) {
-        const toks = box.locator("xpath=following-sibling::div[1]").locator("button:not([disabled])");
-        let guard = 0;
-        while ((await toks.count()) > 0 && guard++ < 20) await toks.first().click();
-        await shot(tag + "-b");
-        await page.getByRole("button", { name: "Проверить" }).click();
-        await shot(tag + "-a");
-      }
-
-      if (await page.getByText("Найдите пары").count()) {
-        const cols = page.locator(".grid.grid-cols-2 > div");
-        const left = cols.nth(0).locator("button");
-        const right = cols.nth(1).locator("button");
-        const nL = await left.count();
-        for (let k = 0; k < nL; k += 1) {
-          for (let r = 0; r < (await right.count()); r += 1) {
-            if (await left.nth(k).isDisabled()) break;
-            await left.nth(k).click();
-            if (await right.nth(r).isDisabled()) continue;
-            await right.nth(r).click();
-            await page.waitForTimeout(80);
-          }
-          if (k === 1) await shot(tag + "-m");
-        }
-        await shot(tag + "-a");
-      }
-
-      const bottom = page.locator("div.border-t.border-lk-line.bg-lk-navy2 button").last();
-      let guard = 0;
-      // Диалог: «Следующая реплика», пока не кончатся реплики
-      while ((await bottom.textContent())?.includes("реплика") && guard++ < 30) await bottom.click();
-      if (guard) await shot(tag + "-d");
-      if (await bottom.isDisabled()) { console.log("stuck at", tag); break; }
-      await bottom.click();
-      if (n === 9 && i >= 6) break;
-    }
+  // 1. Новичок: с онбордингом и без
+  for (const [w, h, tag] of [[390, 844, "m"], [1280, 900, "d"]]) {
+    const a = await mk(w, h, "dark", false); await login(a.p, "new@example.com"); await shot(a.p, `01-new-onboarding-${tag}`, false); await a.ctx.close();
+    const b = await mk(w, h, "dark", true); await login(b.p, "new@example.com"); await shot(b.p, `02-new-${tag}`); await b.ctx.close();
   }
 
-  await page.goto(base + "/dashboard"); await page.waitForLoadState("networkidle"); await shot("90-dashboard-after");
-  await page.goto(base + "/lessons"); await page.waitForLoadState("networkidle"); await shot("91-lessons-after");
-  await page.goto(base + "/review"); await page.waitForLoadState("networkidle"); await page.waitForTimeout(1500); await shot("92-review");
+  // 2. Ученик: прошёл урок 1, ответил на часть карточек
+  const s = await mk(390, 844, "dark", true);
+  await login(s.p, "student@example.com");
+  console.log("lesson", (await s.p.request.post(base + "/api/lessons/1/progress", { data: { completed: true, score: 80 } })).status());
+  await s.p.request.post(base + "/api/lessons/2/progress", { data: { step: 5 } });
+  const q = await (await s.p.request.get(base + "/api/srs/queue")).json();
+  const cards = q.queue ?? [];
+  console.log("queue", cards.length);
+  for (const [i, c] of cards.slice(0, 8).entries()) {
+    await s.p.request.post(base + "/api/srs/review", { data: { wordId: c.id, rating: i % 4 === 3 ? "forgot" : "know", exercise: "flashcard", timeZone: "Europe/Moscow" } });
+  }
+  await shot(s.p, "03-student-m");
+  await s.ctx.close();
+  const d = await mk(1280, 900, "dark", true); await login(d.p, "student@example.com"); await shot(d.p, "04-student-d"); await d.ctx.close();
+  const l = await mk(390, 844, "light", true); await login(l.p, "student@example.com"); await shot(l.p, "05-student-light-m"); await l.ctx.close();
 
   fs.writeFileSync("shots/errors.txt", errors.join("\n"));
   console.log("errors:", errors.length);
