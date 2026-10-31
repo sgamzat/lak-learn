@@ -71,7 +71,18 @@ export default async function LessonsPage() {
       </section>
       ))}
 
-      <p className="mt-8 text-xs leading-relaxed text-lk-muted">
+      <Link
+        href="/letters"
+        className="mt-8 flex items-center justify-between rounded-2xl border border-lk-line bg-lk-card p-4 no-underline"
+      >
+        <span>
+          <span className="block font-serif text-base font-semibold text-lk-text">Алфавит и звуки</span>
+          <span className="block text-sm text-lk-muted">55 букв лакского алфавита с примерами</span>
+        </span>
+        <ChevronRight size={18} className="shrink-0 text-lk-muted" aria-hidden />
+      </Link>
+
+      <p className="mt-6 text-xs leading-relaxed text-lk-muted">
         Аудио к урокам появится позже. Пока произносите звуки и фразы вслух — так они запоминаются лучше.
       </p>
     </main>

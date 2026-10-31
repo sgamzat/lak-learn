@@ -537,12 +537,20 @@ function DictionaryPageContent() {
               )}
             </p>
           </div>
-          <Link
-            href="/review"
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-lk-gold-border bg-lk-gold-dim px-3 py-1.5 text-xs font-semibold text-lk-gold no-underline transition hover:brightness-110"
-          >
-            <RefreshCw size={13} /> Повторение
-          </Link>
+          <div className="flex shrink-0 flex-col items-end gap-1.5 sm:flex-row sm:items-center">
+            <Link
+              href="/letters"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-lk-line px-3 py-1.5 text-xs font-semibold text-lk-muted no-underline transition hover:text-lk-text"
+            >
+              <Type size={13} /> Алфавит
+            </Link>
+            <Link
+              href="/review"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-lk-gold-border bg-lk-gold-dim px-3 py-1.5 text-xs font-semibold text-lk-gold no-underline transition hover:brightness-110"
+            >
+              <RefreshCw size={13} /> Повторение
+            </Link>
+          </div>
         </div>
 
         {/* Mode tabs */}
